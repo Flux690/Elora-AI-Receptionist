@@ -110,10 +110,6 @@ elora-ai-receptionist/
 - Node.js 18+ and npm
 - Firebase project with Firestore enabled
 - LiveKit Cloud account or self-hosted instance
-- API keys for:
-  - OpenAI (GPT-4o-mini)
-  - Assembly AI
-  - Cartesia
 
 ## Installation
 
