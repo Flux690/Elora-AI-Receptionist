@@ -1,99 +1,168 @@
-import admin from "firebase-admin";
-import config from "./config.js";
+import { and, desc, eq, gte, lt } from "drizzle-orm";
+import { db } from "./db/client.js";
+import { escalations, knowledgeItems, knowledgeChunks } from "./db/schema.js";
 
-admin.initializeApp({
-  credential: admin.credential.cert({
-    projectId: config.firebase.projectId,
-    clientEmail: config.firebase.clientEmail,
-    privateKey: config.firebase.privateKey,
-  }),
-});
+const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
-const db = admin.firestore();
-const requestsCollection = db.collection("requests");
-const knowledgeCollection = db.collection("knowledge");
+type EscalationRow = {
+  id: string;
+  tenantId: string;
+  callerPhone: string;
+  question: string;
+  transcriptExcerpt: string | null;
+  status: "Pending" | "Resolved";
+  answer: string | null;
+  resolvedAt: Date | null;
+  createdAt: Date;
+};
 
-// Fetch Recently added "Pending" requests (less than a day)
+function toLegacyRequestShape(row: EscalationRow) {
+  return {
+    id: row.id,
+    question: row.question,
+    callerId: row.callerPhone,
+    customerPhone: row.callerPhone,
+    status: row.status,
+    answer: row.answer,
+    resolvedAt: row.resolvedAt,
+    createdAt: row.createdAt,
+  };
+}
+
 async function getPendingRequests() {
-  const oneDayAgo = admin.firestore.Timestamp.fromDate(
-    new Date(Date.now() - 24 * 60 * 60 * 1000)
-  );
-  const snapshot = await requestsCollection
-    .where("status", "==", "Pending")
-    .where("createdAt", ">=", oneDayAgo)
-    .get();
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const rows = await db
+    .select()
+    .from(escalations)
+    .where(
+      and(
+        eq(escalations.tenantId, DEFAULT_TENANT_ID),
+        eq(escalations.status, "Pending"),
+        gte(escalations.createdAt, oneDayAgo)
+      )
+    )
+    .orderBy(desc(escalations.createdAt));
+
+  return rows.map((row) => toLegacyRequestShape(row as EscalationRow));
 }
 
-// Fetch "Resolved" requests
 async function getResolvedRequests() {
-  const snapshot = await requestsCollection
-    .where("status", "==", "Resolved")
-    .get();
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const rows = await db
+    .select()
+    .from(escalations)
+    .where(
+      and(
+        eq(escalations.tenantId, DEFAULT_TENANT_ID),
+        eq(escalations.status, "Resolved")
+      )
+    )
+    .orderBy(desc(escalations.resolvedAt), desc(escalations.createdAt));
+
+  return rows.map((row) => toLegacyRequestShape(row as EscalationRow));
 }
 
-// Fetch "Unresolved" requests (pending for more than 1 day)
 async function getUnresolvedRequests() {
-  const oneDayAgo = admin.firestore.Timestamp.fromDate(
-    new Date(Date.now() - 24 * 60 * 60 * 1000)
-  );
-  const snapshot = await requestsCollection
-    .where("status", "==", "Pending")
-    .where("createdAt", "<", oneDayAgo)
-    .get();
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const rows = await db
+    .select()
+    .from(escalations)
+    .where(
+      and(
+        eq(escalations.tenantId, DEFAULT_TENANT_ID),
+        eq(escalations.status, "Pending"),
+        lt(escalations.createdAt, oneDayAgo)
+      )
+    )
+    .orderBy(desc(escalations.createdAt));
+
+  return rows.map((row) => toLegacyRequestShape(row as EscalationRow));
 }
 
-// Retrieve the entire knowledge base
 async function getKnowledgeBase() {
-  const snapshot = await knowledgeCollection.get();
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const rows = await db
+    .select()
+    .from(knowledgeItems)
+    .where(eq(knowledgeItems.tenantId, DEFAULT_TENANT_ID))
+    .orderBy(desc(knowledgeItems.createdAt));
+
+  return rows.map((row) => ({
+    id: row.id,
+    question: row.question,
+    answer: row.answer,
+    createdAt: row.createdAt,
+  }));
 }
 
-// Resolve a "Pending" request and store it into knowledge base
-// Text the user the pending question
 async function resolveRequest(id: string, answer: string) {
-  const ref = requestsCollection.doc(id);
-  const doc = await ref.get();
-  if (!doc.exists) throw new Error("Request not found");
+  const now = new Date();
+  const existing = await db
+    .select()
+    .from(escalations)
+    .where(
+      and(
+        eq(escalations.id, id),
+        eq(escalations.tenantId, DEFAULT_TENANT_ID)
+      )
+    )
+    .limit(1);
 
-  const requestData = doc.data();
-  if (!requestData) throw new Error("Request data not found");
-  const { question, callerId } = requestData;
+  if (!existing[0]) {
+    throw new Error("Request not found");
+  }
 
-  await ref.update({
-    status: "Resolved",
-    answer,
-    resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+  const escalation = existing[0];
+
+  await db
+    .update(escalations)
+    .set({
+      status: "Resolved",
+      answer,
+      resolvedAt: now,
+    })
+    .where(eq(escalations.id, id));
+
+  const insertedKnowledge = await db
+    .insert(knowledgeItems)
+    .values({
+      tenantId: DEFAULT_TENANT_ID,
+      sourceEscalationId: escalation.id,
+      question: escalation.question,
+      answer,
+    })
+    .returning({ id: knowledgeItems.id, question: knowledgeItems.question });
+
+  const knowledge = insertedKnowledge[0];
+  const chunkText = `Question: ${knowledge.question}\nAnswer: ${answer}`;
+
+  await db.insert(knowledgeChunks).values({
+    tenantId: DEFAULT_TENANT_ID,
+    knowledgeItemId: knowledge.id,
+    chunkText,
+    embedding: null,
   });
 
-  const originalQuestion = requestData.question;
-  await knowledgeCollection.add({
-    question: originalQuestion,
-    answer,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
-
-  // Simulation: Text back the caller
-  console.log(`Request resolved for callerId: ${callerId}`);
-  console.log(`Question: ${question}`);
+  // Placeholder transport during migration; SMS integration lands in a dedicated phase.
+  console.log(`Request resolved for callerId: ${escalation.callerPhone}`);
+  console.log(`Question: ${escalation.question}`);
   console.log(`Answer: ${answer}`);
-  console.log(`Texting ${callerId}:\n"${question}\n${answer}"`);
+  console.log(`Texting ${escalation.callerPhone}:\n"${escalation.question}\n${answer}"`);
 
   return { id, status: "Resolved" };
 }
 
-// Create a new "Pending" request
 async function createPendingRequest(question: string, callerId: string) {
-  const newReq = {
-    question,
-    callerId,
-    status: "Pending",
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  };
-  const ref = await requestsCollection.add(newReq);
-  return { id: ref.id, ...newReq };
+  const inserted = await db
+    .insert(escalations)
+    .values({
+      tenantId: DEFAULT_TENANT_ID,
+      callerPhone: callerId,
+      question,
+      status: "Pending",
+    })
+    .returning();
+
+  const row = inserted[0] as EscalationRow;
+  return toLegacyRequestShape(row);
 }
 
 export default {
