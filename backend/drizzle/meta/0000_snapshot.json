@@ -1,5 +1,5 @@
 {
-  "id": "725bbc6d-baa7-4730-871b-6d7b0f681024",
+  "id": "68e7718f-60c4-4351-ab5f-b8db24bef9fe",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -424,7 +424,7 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'Pending'"
+          "default": "'pending'"
         },
         "answer": {
           "name": "answer",
@@ -844,10 +844,10 @@
         },
         "business_profile": {
           "name": "business_profile",
-          "type": "text",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'{}'"
+          "default": "'{}'::jsonb"
         },
         "google_calendar_id": {
           "name": "google_calendar_id",
@@ -916,8 +916,8 @@
       "name": "escalation_status",
       "schema": "public",
       "values": [
-        "Pending",
-        "Resolved"
+        "pending",
+        "resolved"
       ]
     },
     "public.vertical": {
