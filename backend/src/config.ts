@@ -1,8 +1,22 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-export default {
-  port: process.env.PORT || 8080,
+type AppConfig = {
+  port: number;
+  firebase: {
+    projectId?: string;
+    clientEmail?: string;
+    privateKey?: string;
+  };
+  livekit: {
+    apiKey?: string;
+    url?: string;
+    apiSecret?: string;
+  };
+};
+
+const config: AppConfig = {
+  port: Number(process.env.PORT) || 8080,
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
@@ -14,3 +28,5 @@ export default {
     apiSecret: process.env.LIVEKIT_API_SECRET,
   },
 };
+
+export default config;

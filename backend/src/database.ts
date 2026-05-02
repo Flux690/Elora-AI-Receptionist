@@ -2,7 +2,11 @@ import admin from "firebase-admin";
 import config from "./config.js";
 
 admin.initializeApp({
-  credential: admin.credential.cert(config.firebase),
+  credential: admin.credential.cert({
+    projectId: config.firebase.projectId,
+    clientEmail: config.firebase.clientEmail,
+    privateKey: config.firebase.privateKey,
+  }),
 });
 
 const db = admin.firestore();
@@ -49,12 +53,13 @@ async function getKnowledgeBase() {
 
 // Resolve a "Pending" request and store it into knowledge base
 // Text the user the pending question
-async function resolveRequest(id, answer) {
+async function resolveRequest(id: string, answer: string) {
   const ref = requestsCollection.doc(id);
   const doc = await ref.get();
   if (!doc.exists) throw new Error("Request not found");
 
   const requestData = doc.data();
+  if (!requestData) throw new Error("Request data not found");
   const { question, callerId } = requestData;
 
   await ref.update({
@@ -63,7 +68,7 @@ async function resolveRequest(id, answer) {
     resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  const originalQuestion = doc.data().question;
+  const originalQuestion = requestData.question;
   await knowledgeCollection.add({
     question: originalQuestion,
     answer,
@@ -80,7 +85,7 @@ async function resolveRequest(id, answer) {
 }
 
 // Create a new "Pending" request
-async function createPendingRequest(question, callerId) {
+async function createPendingRequest(question: string, callerId: string) {
   const newReq = {
     question,
     callerId,
