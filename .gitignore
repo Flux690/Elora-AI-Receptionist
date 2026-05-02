@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local planning docs
+PRD-v2.md
+
+# Build output
+dist/
+build/
+coverage/
+dist-ssr/
+**/dist/
+**/build/
+**/coverage/
+**/dist-ssr/
+
+# Logs
+logs/
+**/logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Local runtime data
+*.sqlite
+*.sqlite3
+*.db
+
+# LiveKit / generated assets
+*.onnx
+*.tflite
+models/
+
+# Temporary files
+tmp/
+temp/
+.cache/
+*.local
