@@ -8,6 +8,7 @@
     "frontend"
   ],
   "scripts": {
+    "typecheck": "npm run typecheck -w backend",
     "dev:backend": "npm run dev -w backend",
     "dev:agent": "npm run agent -w backend",
     "dev:frontend": "npm run dev -w frontend",

@@ -1,8 +1,6 @@
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";--> statement-breakpoint
-CREATE EXTENSION IF NOT EXISTS "vector";--> statement-breakpoint
 CREATE TYPE "public"."appointment_status" AS ENUM('requested', 'confirmed', 'cancelled');--> statement-breakpoint
 CREATE TYPE "public"."call_outcome" AS ENUM('answered', 'booked', 'escalated', 'abandoned', 'error');--> statement-breakpoint
-CREATE TYPE "public"."escalation_status" AS ENUM('Pending', 'Resolved');--> statement-breakpoint
+CREATE TYPE "public"."escalation_status" AS ENUM('pending', 'resolved');--> statement-breakpoint
 CREATE TYPE "public"."vertical" AS ENUM('salon', 'spa', 'clinic', 'home_service');--> statement-breakpoint
 CREATE TABLE "appointments" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -51,7 +49,7 @@ CREATE TABLE "escalations" (
 	"caller_phone" text NOT NULL,
 	"question" text NOT NULL,
 	"transcript_excerpt" text,
-	"status" "escalation_status" DEFAULT 'Pending' NOT NULL,
+	"status" "escalation_status" DEFAULT 'pending' NOT NULL,
 	"answer" text,
 	"resolved_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
@@ -91,7 +89,7 @@ CREATE TABLE "tenants" (
 	"vertical" "vertical" NOT NULL,
 	"timezone" text NOT NULL,
 	"system_prompt" text NOT NULL,
-	"business_profile" text DEFAULT '{}' NOT NULL,
+	"business_profile" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"google_calendar_id" text,
 	"google_refresh_token" text,
 	"google_connected_email" text,
@@ -119,13 +117,3 @@ CREATE INDEX "escalations_tenant_status_created_at_idx" ON "escalations" USING b
 CREATE INDEX "knowledge_chunks_tenant_id_idx" ON "knowledge_chunks" USING btree ("tenant_id");--> statement-breakpoint
 CREATE INDEX "knowledge_items_tenant_created_at_idx" ON "knowledge_items" USING btree ("tenant_id","created_at");--> statement-breakpoint
 CREATE INDEX "phone_numbers_tenant_id_idx" ON "phone_numbers" USING btree ("tenant_id");
---> statement-breakpoint
-INSERT INTO "tenants" ("id", "name", "vertical", "timezone", "system_prompt", "business_profile")
-VALUES (
-  '00000000-0000-0000-0000-000000000001',
-  'Default Tenant',
-  'salon',
-  'UTC',
-  'You are Elora, an AI receptionist.',
-  '{}'
-);

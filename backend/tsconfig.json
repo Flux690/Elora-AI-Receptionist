@@ -12,10 +12,7 @@
     "resolveJsonModule": true
   },
   "include": [
-    "src/index.ts",
-    "src/config.ts",
-    "src/database.ts",
-    "src/api/**/*.ts"
+    "src/**/*.ts"
   ],
   "exclude": [
     "dist",

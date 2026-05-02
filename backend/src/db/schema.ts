@@ -1,6 +1,7 @@
 import {
   customType,
   index,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -35,8 +36,8 @@ export const callOutcomeEnum = pgEnum("call_outcome", [
 ]);
 
 export const escalationStatusEnum = pgEnum("escalation_status", [
-  "Pending",
-  "Resolved",
+  "pending",
+  "resolved",
 ]);
 
 export const appointmentStatusEnum = pgEnum("appointment_status", [
@@ -51,7 +52,10 @@ export const tenants = pgTable("tenants", {
   vertical: verticalEnum("vertical").notNull(),
   timezone: text("timezone").notNull(),
   systemPrompt: text("system_prompt").notNull(),
-  businessProfile: text("business_profile").notNull().default("{}"),
+  businessProfile: jsonb("business_profile")
+    .$type<Record<string, unknown>>()
+    .notNull()
+    .default({}),
   googleCalendarId: text("google_calendar_id"),
   googleRefreshToken: text("google_refresh_token"),
   googleConnectedEmail: text("google_connected_email"),
@@ -124,7 +128,7 @@ export const escalations = pgTable(
     callerPhone: text("caller_phone").notNull(),
     question: text("question").notNull(),
     transcriptExcerpt: text("transcript_excerpt"),
-    status: escalationStatusEnum("status").notNull().default("Pending"),
+    status: escalationStatusEnum("status").notNull().default("pending"),
     answer: text("answer"),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

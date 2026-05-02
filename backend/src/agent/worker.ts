@@ -1,182 +1,236 @@
 import {
-  defineAgent,
+  type JobContext,
+  type JobProcess,
+  ServerOptions,
   cli,
-  voice,
+  defineAgent,
   inference,
-  WorkerOptions,
+  llm,
+  voice,
 } from "@livekit/agents";
-import * as silero from "@livekit/agents-plugin-silero";
 import * as livekit from "@livekit/agents-plugin-livekit";
+import * as silero from "@livekit/agents-plugin-silero";
+import { ParticipantKind } from "@livekit/rtc-node";
 import { RoomServiceClient } from "livekit-server-sdk";
-import dotenv from "dotenv";
 import { fileURLToPath } from "node:url";
-import { initializeRetriever } from "./retriever.js";
-import { isEndingConversation } from "./endings.js";
+import { z } from "zod";
 import config from "../config.js";
-import db from "../database.js";
+import { upsertClient, resolveClientByPhone, type ClientRow } from "../services/clients.js";
+import { createCall, finishCall } from "../services/calls.js";
+import { createEscalation } from "../services/escalations.js";
+import { searchKnowledge } from "../services/knowledge.js";
+import { resolveTenantByCalledNumber, type TenantRow } from "../services/tenants.js";
 
-dotenv.config({ path: ".env" });
+// ---------------------------------------------------------------------------
+// Agent context — everything the agent needs, closed over at dispatch time
+// ---------------------------------------------------------------------------
 
-const roomService = new RoomServiceClient(
-  config.livekit.url,
-  config.livekit.apiKey,
-  config.livekit.apiSecret
-);
+type AgentDeps = {
+  tenant: TenantRow;
+  client: ClientRow | null;
+  callerPhone: string;
+  callId: string;
+  roomName: string;
+  roomServiceClient: RoomServiceClient;
+};
 
-class RagAgent extends voice.Agent {
-  constructor(callerId, retriever) {
+// ---------------------------------------------------------------------------
+// System prompt
+// ---------------------------------------------------------------------------
+
+function buildSystemPrompt(deps: AgentDeps): string {
+  const { tenant, client } = deps;
+
+  const callerBlock = client?.name
+    ? `Caller: ${client.name} (returning client, phone: ${deps.callerPhone})`
+    : `Caller: unknown (phone: ${deps.callerPhone})`;
+
+  const profileSummary = Object.entries(tenant.businessProfile ?? {})
+    .map(([k, v]) => `${k}: ${v}`)
+    .join("\n");
+
+  return `You are Elora, an AI receptionist for ${tenant.name}.
+
+Your job:
+- Answer caller questions using session context or tools.
+- If you cannot answer confidently, use create_escalation.
+- Keep responses brief, natural, and phone-call friendly.
+
+Source rules:
+- Use search_knowledge for business facts not in this context.
+- Do not invent prices, policies, staff availability, or appointment times.
+- Do not mention internal tools, databases, or escalation records.
+
+Conversation rules:
+- Ask one question at a time.
+- Speak in one or two short sentences.
+- If follow-up is needed, tell the caller the team will get back to them.
+- Use end_call only after the caller clearly indicates they are done.
+
+Business context:
+Name: ${tenant.name}
+Timezone: ${tenant.timezone}
+${profileSummary}
+
+${callerBlock}
+
+${tenant.systemPrompt}`.trim();
+}
+
+// ---------------------------------------------------------------------------
+// Agent class with tools
+// ---------------------------------------------------------------------------
+
+class EloraAgent extends voice.Agent {
+  constructor(private deps: AgentDeps) {
     super({
-      instructions: `You are a friendly salon receptionist.
-- Answer customer questions based ONLY on the information provided to you.
-- Be warm, professional, and helpful.
-- If information is not provided, politely say you'll check with your supervisor.
-- Keep responses concise and natural.`,
+      instructions: buildSystemPrompt(deps),
+      tools: {
+        searchKnowledge: llm.tool({
+          description:
+            "Search the knowledge base for an answer to a caller's question about the business — services, pricing, hours, policies, or anything else not already known from context.",
+          parameters: z.object({
+            query: z.string().describe("The caller's question, verbatim or closely paraphrased."),
+          }),
+          execute: async ({ query }) => {
+            const results = await searchKnowledge(deps.tenant.id, query);
+            if (results.length === 0) return null;
+            return results.map((r) => r.chunkText).join("\n---\n");
+          },
+        }),
+
+        createEscalation: llm.tool({
+          description:
+            "Escalate a question you cannot answer to the business team. Use this when search_knowledge returns nothing useful and you cannot answer from context. Do not escalate the same question twice.",
+          parameters: z.object({
+            question: z.string().describe("The caller's question, as asked."),
+            transcriptExcerpt: z
+              .string()
+              .nullable()
+              .describe("A short excerpt of recent conversation for context."),
+          }),
+          execute: async ({ question, transcriptExcerpt }, { ctx }) => {
+            ctx.speechHandle.allowInterruptions = false;
+            await createEscalation({
+              tenantId: deps.tenant.id,
+              callId: deps.callId,
+              clientId: deps.client?.id ?? null,
+              callerPhone: deps.callerPhone,
+              question,
+              transcriptExcerpt,
+            });
+            return { escalated: true };
+          },
+        }),
+
+        endCall: llm.tool({
+          description:
+            "End the phone call. Use only after the caller has clearly indicated they are done — for example, said goodbye, thank you, or that's all.",
+          parameters: z.object({
+            reason: z.string().describe("Brief reason the call is ending."),
+          }),
+          execute: async () => {
+            await finishCall(deps.callId, "answered");
+            await deps.roomServiceClient.deleteRoom(deps.roomName);
+            return { ended: true };
+          },
+        }),
+      },
     });
-    this.callerId = callerId;
-    this.retriever = retriever;
-    this.ended = false; // signal for ending conversation and room deletion
-  }
-
-  async onUserTurnCompleted(turnCtx, newMessage) {
-    const userQuery = newMessage.textContent;
-    console.log("[USER]:", userQuery);
-
-    if (!this.retriever) {
-      console.error("[AGENT] Retriever unavailable!");
-      turnCtx.addMessage({
-        role: "assistant",
-        content: "Apologize - you're having technical difficulties.",
-      });
-      return;
-    }
-
-    // Check if user is ending the conversation
-    if (isEndingConversation(userQuery)) {
-      console.log(
-        "[AGENT] User ending conversation - will disconnect after goodbye"
-      );
-
-      this.ended = true;
-
-      turnCtx.addMessage({
-        role: "system",
-        content: "Say Exactly and nothing else- Thank you for calling!",
-      });
-      return;
-    }
-
-    // Perform RAG lookup
-    const result = this.retriever.findBestMatch(userQuery);
-    if (result.found) {
-      turnCtx.addMessage({
-        role: "assistant",
-        content: `Say Exactly- ${result.answer}. Is there anything else you'd like to know?`,
-      });
-    } else {
-      try {
-        await db.createPendingRequest(userQuery, this.callerId);
-        console.log("[AGENT] Pending request created");
-      } catch (err) {
-        console.error("[AGENT] DB error:", err);
-      }
-      turnCtx.addMessage({
-        role: "assistant",
-        content:
-          "Say Exactly and nothing else- Let me check with my supervisor and get back to you. Is there anything else I can help you with?",
-      });
-    }
   }
 }
 
+// ---------------------------------------------------------------------------
+// Worker entry
+// ---------------------------------------------------------------------------
+
+const roomServiceClient = new RoomServiceClient(
+  config.livekit.url ?? "",
+  config.livekit.apiKey ?? "",
+  config.livekit.apiSecret ?? ""
+);
+
 export default defineAgent({
-  prewarm: async (proc) => {
+  prewarm: async (proc: JobProcess) => {
     proc.userData.vad = await silero.VAD.load();
-    proc.userData.retriever = await initializeRetriever();
   },
-  entry: async (ctx) => {
-    await ctx.connect();
-    console.log("[ROOM]:", ctx.room.name);
-    const res = await roomService.listParticipants(ctx.room.name);
-    console.log(res);
+
+  entry: async (ctx: JobContext) => {
+    if (!ctx.room.name) {
+      console.error("[worker] Room has no name — cannot start session");
+      return;
+    }
+    const roomName = ctx.room.name;
+
     const participant = await ctx.waitForParticipant();
-    console.log("[PARTICIPANT]:", participant.identity);
 
-    let callerId = "unknown";
-    try {
-      if (participant && participant.metadata) {
-        const meta = JSON.parse(participant.metadata);
-        if (meta && meta.callerId) callerId = meta.callerId;
-      }
-    } catch {}
+    // Extract phone numbers from SIP participant attributes.
+    // callerPhone  = the number the customer called from.
+    // calledNumber = the business's number (used for tenant resolution).
+    const callerPhone =
+      participant.kind === ParticipantKind.SIP
+        ? (participant.attributes["sip.phoneNumber"] ?? "unknown")
+        : "dev-participant";
 
-    let retriever = ctx.proc?.userData?.retriever;
-    if (!retriever) {
-      console.log("[INIT] Waiting for retriever...");
-      const maxWait = 10000;
-      const start = Date.now();
-      while (!retriever && Date.now() - start < maxWait) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        retriever = ctx.proc?.userData?.retriever;
-      }
-      if (!retriever) {
-        throw new Error("Retriever failed to initialize");
-      }
+    const calledNumber =
+      participant.kind === ParticipantKind.SIP
+        ? (participant.attributes["sip.trunkPhoneNumber"] ?? "")
+        : "";
+
+    const tenant = calledNumber ? await resolveTenantByCalledNumber(calledNumber) : null;
+
+    if (!tenant) {
+      console.error(`[worker] No tenant found for called number: "${calledNumber}"`);
+      return;
     }
 
-    const session = new voice.AgentSession({
-      stt: new inference.STT({
-        model: "assemblyai/universal-streaming",
-        language: "en",
-      }),
-      llm: new inference.LLM({
-        model: "openai/gpt-4o-mini",
-      }),
-      tts: new inference.TTS({
-        model: "cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
-        language: "en",
-      }),
-      vad: ctx.proc?.userData?.vad,
-      turnDetection: new livekit.turnDetector.MultilingualModel(),
+    const client = await resolveClientByPhone(tenant.id, callerPhone);
+    await upsertClient(tenant.id, callerPhone);
+
+    const call = await createCall({
+      tenantId: tenant.id,
+      clientId: client?.id ?? null,
+      callerPhone,
+      livekitRoomName: roomName,
     });
 
-    const agent = new RagAgent(callerId, retriever);
-
-    // Listen for speech_created to handle post-goodbye cleanup
-    const handleSpeechCreated = async (ev) => {
-      if (agent.ended && ev.source === "generate_reply") {
-        console.log(
-          "[AGENT] Goodbye speech completed - closing session and deleting room"
-        );
-        try {
-          await ev.speechHandle.waitForPlayout(); // Wait for playout to complete
-          await session.close();
-          await roomService.deleteRoom(ctx.room.name);
-        } catch (err) {
-          console.error("[AGENT] Error during cleanup:", err);
-        } finally {
-          agent.ended = false;
-        }
-        // Remove listener to avoid multiple triggers
-        session.off("speech_created", handleSpeechCreated);
-      }
+    const deps: AgentDeps = {
+      tenant,
+      client,
+      callerPhone,
+      callId: call.id,
+      roomName: roomName,
+      roomServiceClient,
     };
-    session.on("speech_created", handleSpeechCreated);
 
-    await session.start({
-      agent,
-      room: ctx.room,
+    const session = new voice.AgentSession({
+      vad: ctx.proc.userData.vad as silero.VAD,
+      stt: new inference.STT({ model: "assemblyai/universal-streaming", language: "en" }),
+      llm: new inference.LLM({ model: "openai/gpt-4o-mini" }),
+      tts: new inference.TTS({
+        model: "cartesia/sonic-3",
+        voice: "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
+      }),
+      turnHandling: {
+        turnDetection: new livekit.turnDetector.MultilingualModel(),
+      },
     });
 
-    const greeting = await session.say(
-      "Hi, my name is Elora, your AI salon receptionist. How may I assist you today?"
-    );
-    await greeting.waitForPlayout();
-    console.log("[READY] Agent listening");
+    await session.start({ agent: new EloraAgent(deps), room: ctx.room });
+    await ctx.connect();
+
+    const greeting =
+      client?.name
+        ? `Hi ${client.name}, welcome back to ${tenant.name}. How can I help you today?`
+        : `Hi, you've reached ${tenant.name}. How can I help you today?`;
+
+    await session.say(greeting);
   },
 });
 
 cli.runApp(
-  new WorkerOptions({
+  new ServerOptions({
     agent: fileURLToPath(import.meta.url),
+    agentName: "elora-receptionist",
   })
 );

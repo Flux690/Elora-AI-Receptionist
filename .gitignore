@@ -9,6 +9,8 @@ node_modules/
 
 # Local planning docs
 PRD-v2.md
+IMPLEMENTATION_PHASES.md
+livekit_llms.txt
 
 # Build output
 dist/
