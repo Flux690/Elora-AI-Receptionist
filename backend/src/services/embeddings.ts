@@ -1,23 +1,14 @@
 import OpenAI from "openai";
-import config from "../config.js";
+import { env } from "../env.js";
 
-let client: OpenAI | null = null;
-
-function getClient(): OpenAI | null {
-  if (!config.openai.apiKey) return null;
-  if (!client) client = new OpenAI({ apiKey: config.openai.apiKey });
-  return client;
-}
+const client = new OpenAI({
+  apiKey: env.OPENROUTER_API_KEY,
+  baseURL: env.OPENROUTER_BASE_URL,
+});
 
 export async function embedText(text: string): Promise<number[] | null> {
-  const openai = getClient();
-  if (!openai) {
-    console.warn("[embeddings] OPENAI_API_KEY not set — skipping embedding");
-    return null;
-  }
-
-  const response = await openai.embeddings.create({
-    model: config.openai.embeddingModel,
+  const response = await client.embeddings.create({
+    model: env.EMBEDDING_MODEL,
     input: text,
   });
 

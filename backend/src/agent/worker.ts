@@ -9,12 +9,15 @@ import {
   voice,
 } from "@livekit/agents";
 import * as livekit from "@livekit/agents-plugin-livekit";
+import * as openai from "@livekit/agents-plugin-openai";
 import * as silero from "@livekit/agents-plugin-silero";
 import { ParticipantKind } from "@livekit/rtc-node";
 import { RoomServiceClient } from "livekit-server-sdk";
 import { fileURLToPath } from "node:url";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { z } from "zod";
-import config from "../config.js";
+import { env } from "../env.js";
 import { upsertClient, resolveClientByPhone, type ClientRow } from "../services/clients.js";
 import { createCall, finishCall } from "../services/calls.js";
 import { createEscalation } from "../services/escalations.js";
@@ -38,6 +41,9 @@ type AgentDeps = {
 // System prompt
 // ---------------------------------------------------------------------------
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const basePrompt = fs.readFileSync(path.join(__dirname, "prompt.md"), "utf-8");
+
 function buildSystemPrompt(deps: AgentDeps): string {
   const { tenant, client } = deps;
 
@@ -49,31 +55,17 @@ function buildSystemPrompt(deps: AgentDeps): string {
     .map(([k, v]) => `${k}: ${v}`)
     .join("\n");
 
-  return `You are Elora, an AI receptionist for ${tenant.name}.
+  return `${basePrompt}
 
-Your job:
-- Answer caller questions using session context or tools.
-- If you cannot answer confidently, use create_escalation.
-- Keep responses brief, natural, and phone-call friendly.
-
-Source rules:
-- Use search_knowledge for business facts not in this context.
-- Do not invent prices, policies, staff availability, or appointment times.
-- Do not mention internal tools, databases, or escalation records.
-
-Conversation rules:
-- Ask one question at a time.
-- Speak in one or two short sentences.
-- If follow-up is needed, tell the caller the team will get back to them.
-- Use end_call only after the caller clearly indicates they are done.
-
-Business context:
+## Business context
 Name: ${tenant.name}
 Timezone: ${tenant.timezone}
 ${profileSummary}
 
+## Caller context
 ${callerBlock}
 
+## Additional Rules
 ${tenant.systemPrompt}`.trim();
 }
 
@@ -81,8 +73,8 @@ ${tenant.systemPrompt}`.trim();
 // Agent class with tools
 // ---------------------------------------------------------------------------
 
-class EloraAgent extends voice.Agent {
-  constructor(private deps: AgentDeps) {
+class Agent extends voice.Agent {
+  constructor(deps: AgentDeps) {
     super({
       instructions: buildSystemPrompt(deps),
       tools: {
@@ -145,9 +137,9 @@ class EloraAgent extends voice.Agent {
 // ---------------------------------------------------------------------------
 
 const roomServiceClient = new RoomServiceClient(
-  config.livekit.url ?? "",
-  config.livekit.apiKey ?? "",
-  config.livekit.apiSecret ?? ""
+  env.LIVEKIT_URL,
+  env.LIVEKIT_API_KEY,
+  env.LIVEKIT_API_SECRET
 );
 
 export default defineAgent({
@@ -206,7 +198,11 @@ export default defineAgent({
     const session = new voice.AgentSession({
       vad: ctx.proc.userData.vad as silero.VAD,
       stt: new inference.STT({ model: "assemblyai/universal-streaming", language: "en" }),
-      llm: new inference.LLM({ model: "openai/gpt-4o-mini" }),
+      llm: new openai.LLM({
+        model: env.LLM_MODEL,
+        baseURL: env.OPENROUTER_BASE_URL,
+        apiKey: env.OPENROUTER_API_KEY,
+      }),
       tts: new inference.TTS({
         model: "cartesia/sonic-3",
         voice: "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
@@ -216,7 +212,7 @@ export default defineAgent({
       },
     });
 
-    await session.start({ agent: new EloraAgent(deps), room: ctx.room });
+    await session.start({ agent: new Agent(deps), room: ctx.room });
     await ctx.connect();
 
     const greeting =
@@ -231,6 +227,6 @@ export default defineAgent({
 cli.runApp(
   new ServerOptions({
     agent: fileURLToPath(import.meta.url),
-    agentName: "elora-receptionist",
+    agentName: "receptionist",
   })
 );
