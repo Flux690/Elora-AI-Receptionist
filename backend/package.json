@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "type": "module",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "dev": "nodemon src/index.js",
-    "agent": "node ./src/agent/worker.js dev",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "agent": "tsx ./src/agent/worker.ts dev",
     "test": "echo \"Error: no test specified\" && exit 1",
     "download-files": "node ./src/agent/VoiceAgent.js download-files"
   },
@@ -32,6 +34,10 @@
     "string-similarity": "^4.0.4"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.15.17",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
   }
 }

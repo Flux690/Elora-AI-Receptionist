@@ -7,8 +7,9 @@ router.get("/pending", async (_, res) => {
   try {
     const requests = await db.getPendingRequests();
     res.json(requests);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
   }
 });
 
@@ -16,8 +17,9 @@ router.get("/unresolved", async (_, res) => {
   try {
     const requests = await db.getUnresolvedRequests();
     res.json(requests);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
   }
 });
 
@@ -25,8 +27,9 @@ router.get("/resolved", async (_, res) => {
   try {
     const requests = await db.getResolvedRequests();
     res.json(requests);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
   }
 });
 
@@ -38,8 +41,9 @@ router.post("/:id/resolve", async (req, res) => {
 
     const result = await db.resolveRequest(id, answer);
     res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
   }
 });
 

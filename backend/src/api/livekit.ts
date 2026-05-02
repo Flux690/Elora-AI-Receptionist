@@ -12,6 +12,10 @@ router.post("/token", async (req, res) => {
       .json({ error: "Room Name and Participant Name are required" });
 
   try {
+    if (!config.livekit.apiKey || !config.livekit.apiSecret) {
+      throw new Error("LiveKit credentials are not configured");
+    }
+
     const at = new AccessToken(
       config.livekit.apiKey,
       config.livekit.apiSecret,
@@ -31,9 +35,10 @@ router.post("/token", async (req, res) => {
 
     const token = await at.toJwt();
     res.json({ token });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("Error generating token:", err);
-    res.status(500).json({ error: "Token generation failed" });
+    const message = err instanceof Error ? err.message : "Token generation failed";
+    res.status(500).json({ error: message });
   }
 });
 
