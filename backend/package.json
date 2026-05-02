@@ -2,7 +2,7 @@
   "name": "backend",
   "version": "1.0.0",
   "type": "module",
-  "description": "",
+  "description": "Elora backend API and LiveKit agent worker",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -11,37 +11,36 @@
     "agent": "tsx ./src/agent/worker.ts dev",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "download-files": "node ./src/agent/VoiceAgent.js download-files"
+    "test": "echo \"No tests configured yet\" && exit 0"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "livekit",
+    "voice-agent",
+    "neon",
+    "drizzle",
+    "typescript"
+  ],
+  "author": "Prabhat Mattoo",
   "license": "ISC",
   "dependencies": {
-    "@livekit/agents": "^1.0.15",
-    "@livekit/agents-plugin-livekit": "^1.0.15",
-    "@livekit/agents-plugin-silero": "^1.0.15",
+    "@livekit/agents": "^1.3.2",
+    "@livekit/agents-plugin-livekit": "^1.3.2",
+    "@livekit/agents-plugin-silero": "^1.3.2",
     "@livekit/noise-cancellation-node": "^0.1.9",
-    "@xenova/transformers": "^2.17.2",
-    "compromise": "^14.14.4",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "drizzle-orm": "^0.44.0",
-    "express": "^5.1.0",
-    "livekit-server-sdk": "^2.14.0",
-    "natural": "^8.1.0",
-    "node-nlp": "^3.10.2",
-    "pg": "^8.16.0",
-    "stopword": "^3.1.5",
-    "string-similarity": "^4.0.4"
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "express": "^5.2.1",
+    "livekit-server-sdk": "^2.15.2",
+    "pg": "^8.20.0"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.17",
-    "@types/express": "^5.0.3",
-    "@types/node": "^22.15.17",
-    "@types/pg": "^8.15.2",
-    "drizzle-kit": "^0.31.4",
-    "tsx": "^4.19.4",
-    "typescript": "^5.8.3"
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.10.0",
+    "@types/pg": "^8.15.6",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }
