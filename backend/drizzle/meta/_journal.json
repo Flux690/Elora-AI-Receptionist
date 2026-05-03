@@ -8,6 +8,20 @@
       "when": 1777749366672,
       "tag": "0000_orange_warbound",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777810114794,
+      "tag": "0001_handy_vin_gonzales",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777850060369,
+      "tag": "0002_gifted_shriek",
+      "breakpoints": true
     }
   ]
 }

@@ -1,14 +1,20 @@
-import express from "express";
-import cors from "cors";
+import { serve } from "@hono/node-server";
+import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { env } from "./env.js";
-import apiRoutes from "./api/index.js";
+import { routes } from "./routes/index.js";
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+const app = new Hono();
 
-app.use("/api", apiRoutes);
+app.use("*", cors());
+app.route("/api", routes);
 
-app.listen(env.PORT, () => {
-  console.log(`Server listening on http://localhost:${env.PORT}`);
+app.onError((err, c) => {
+  const message = err instanceof Error ? err.message : "Unknown error";
+  console.error("[server] unhandled error:", err);
+  return c.json({ error: message }, 500);
+});
+
+serve({ fetch: app.fetch, port: env.PORT }, () => {
+  console.log(`[server] listening on http://localhost:${env.PORT}`);
 });

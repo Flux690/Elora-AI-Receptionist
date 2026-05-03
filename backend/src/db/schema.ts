@@ -56,26 +56,12 @@ export const tenants = pgTable("tenants", {
     .$type<Record<string, unknown>>()
     .notNull()
     .default({}),
+  phoneNumber: text("phone_number").unique(),
+  clerkUserId: text("clerk_user_id").unique(),
   googleCalendarId: text("google_calendar_id"),
-  googleRefreshToken: text("google_refresh_token"),
-  googleConnectedEmail: text("google_connected_email"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
-
-export const phoneNumbers = pgTable(
-  "phone_numbers",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    tenantId: uuid("tenant_id")
-      .notNull()
-      .references(() => tenants.id, { onDelete: "cascade" }),
-    phoneNumber: text("phone_number").notNull().unique(),
-    livekitTrunkId: text("livekit_trunk_id"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [index("phone_numbers_tenant_id_idx").on(table.tenantId)]
-);
 
 export const clients = pgTable(
   "clients",
