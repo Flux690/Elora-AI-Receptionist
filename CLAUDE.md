@@ -10,10 +10,9 @@ It is being built as a B2B SaaS portfolio project. The data model is multi-tenan
 
 ```
 /                        ← npm workspace root
-├── backend/             ← Express API server + LiveKit agent worker (TypeScript)
-├── frontend/            ← Admin dashboard (React, currently JSX — migration pending)
+├── backend/             ← Hono API server + LiveKit agent worker (TypeScript)
+├── frontend/            ← Admin dashboard (React + Vite)
 ├── PRD-v2.md            ← Product requirements (source of truth for design decisions)
-├── IMPLEMENTATION_PHASES.md  ← Phase log: what's done, what's next
 └── CLAUDE.md            ← this file
 ```
 
@@ -26,7 +25,7 @@ All commands from the workspace root unless noted.
 npm run dev -w backend          # → http://localhost:8080
 
 # LiveKit agent worker (separate process)
-npm run agent -w backend        # registers as "elora-receptionist" with LiveKit Cloud
+npm run agent -w backend        # registers as "receptionist" with LiveKit Cloud
 
 # Production build
 npm run build -w backend
@@ -43,7 +42,7 @@ npm run dev -w frontend         # → http://localhost:5173
 
 Two processes from one package:
 
-1. **API server** (`src/index.ts`) — Express, serves admin dashboard at `/api/admin/*`, health at `/api/health`
+1. **API server** (`src/index.ts`) — Hono, serves admin dashboard at `/api/admin/*`, health at `/api/health`
 2. **Agent worker** (`src/agent/worker.ts`) — Long-running LiveKit agent process, one per deployment, handles all concurrent calls
 
 ### Key directories
@@ -51,15 +50,26 @@ Two processes from one package:
 ```
 backend/src/
 ├── agent/
-│   └── worker.ts        ← Full agent: defineAgent, EloraAgent class, tool definitions
-├── api/
-│   ├── index.ts         ← Mounts /admin and /health routers
-│   └── health.ts        ← GET /api/health — DB connectivity check
+│   ├── worker.ts        ← Full agent: defineAgent, Agent class, tool definitions
+│   └── prompt.md        ← Base system prompt (business context injected at runtime)
+├── controllers/         ← HTTP logic — parse input, call service, return response
+│   ├── health.ts
+│   ├── metrics.ts
+│   ├── escalations.ts
+│   ├── knowledge.ts
+│   ├── calls.ts
+│   └── settings.ts
 ├── db/
 │   ├── client.ts        ← Drizzle + pg Pool, exported as `db`
 │   └── schema.ts        ← All 8 table definitions + enums
+├── middleware/
+│   └── auth.ts          ← Clerk JWT verification + tenant resolution
 ├── routes/
-│   └── admin.ts         ← All /api/admin/* endpoints
+│   ├── index.ts         ← Mounts /health + /admin
+│   ├── health.ts
+│   └── admin/
+│       ├── index.ts     ← Applies auth middleware, mounts routes
+│       └── routes.ts    ← All 7 admin route definitions
 ├── services/            ← All DB access — one file per domain
 │   ├── tenants.ts
 │   ├── clients.ts
@@ -67,12 +77,45 @@ backend/src/
 │   ├── escalations.ts
 │   ├── knowledge.ts
 │   └── embeddings.ts
-└── config.ts            ← Typed env var loader
+├── types.ts             ← AppEnv, AppContext shared Hono types
+└── env.ts               ← Zod-validated env loader
 ```
 
-### Service layer rules
+### Layering rules
 
-All database access goes through `src/services/`. Routes and the agent worker call services — they never touch `db` directly except in `routes/admin.ts` for simple aggregate queries. Services take explicit typed inputs and return typed rows from `schema.$inferSelect`.
+- **Routes** — path + method + handler reference only. No logic.
+- **Controllers** — parse input, call service, return response. No try/catch — unexpected errors bubble to the global `onError` handler in `index.ts`.
+- **Services** — all DB access. Called by controllers and the agent worker. Never touch `db` directly outside services except `controllers/metrics.ts` for aggregate queries.
+
+### Hono context typing
+
+`AppEnv` / `AppContext` from `src/types.ts` must be used on all admin routes and controllers so `c.get('tenantId')` is type-safe.
+
+## Auth
+
+### How it works
+
+All `/api/admin/*` routes go through two middleware in sequence:
+
+1. `clerkAuth` (`@hono/clerk-auth`) — verifies the Clerk JWT from the `Authorization: Bearer` header. Reads `CLERK_SECRET_KEY` from env automatically.
+2. `requireTenant` — extracts `userId` from the verified token, looks up the tenant by `clerkUserId`, injects `tenantId` into Hono context.
+
+If no valid token → 401. If no tenant found for that userId → 404.
+
+### Linking a tenant to a Clerk user
+
+On first sign-in the user gets a Clerk `userId`. Link it to the tenant manually in Neon until the onboarding flow is built:
+
+```sql
+UPDATE tenants SET clerk_user_id = 'user_xxxxxxxxx' WHERE phone_number = '14843040147';
+```
+
+### Environment variables for Clerk
+
+| Variable | Where | Purpose |
+|----------|-------|---------|
+| `CLERK_SECRET_KEY` | `backend/.env` | JWT verification — never expose |
+| `VITE_CLERK_PUBLISHABLE_KEY` | `frontend/.env` | `<ClerkProvider>` — safe to expose |
 
 ## Agent worker patterns
 
@@ -81,13 +124,14 @@ All database access goes through `src/services/`. Routes and the agent worker ca
 | Import | Purpose |
 |--------|---------|
 | `defineAgent` | Agent factory function |
-| `voice.Agent` | Base class — `EloraAgent extends voice.Agent` |
+| `voice.Agent` | Base class — `Agent extends voice.Agent` |
 | `voice.AgentSession` | Manages STT → LLM → TTS pipeline |
 | `llm.tool` | Tool definition with Zod schema |
-| `inference.STT/LLM/TTS` | Model providers via LiveKit inference |
+| `inference.STT/TTS` | Model providers via LiveKit inference |
+| `openai.LLM` | LLM via OpenRouter (openai-compatible) |
 | `silero.VAD` | Voice activity detection (loaded in prewarm) |
 | `livekit.turnDetector.MultilingualModel` | Turn detection |
-| `ServerOptions` | Worker registration with `agentName: 'elora-receptionist'` |
+| `ServerOptions` | Worker registration with `agentName: 'receptionist'` |
 | `ParticipantKind` | Detect SIP vs WebRTC participant |
 
 ### SIP caller resolution
@@ -102,58 +146,125 @@ participant.attributes["sip.trunkPhoneNumber"]
 
 ### Tool pattern
 
-Tools are defined in the `EloraAgent` constructor using `llm.tool()` with Zod schemas. All dependencies (`tenant`, `client`, `callId`, `roomServiceClient`, etc.) are closed over from the `entry` function — the LLM never receives tenant IDs.
+Tools are defined in the `Agent` constructor using `llm.tool()` with Zod schemas. All dependencies (`tenant`, `client`, `callId`) are closed over from the `entry` function — the LLM never receives tenant IDs.
 
 ```ts
 tools: {
   searchKnowledge: llm.tool({ ... execute: async ({ query }) => ... }),
-  createEscalation: llm.tool({ ... execute: async ({ question }, { speechHandle }) => ... }),
-  endCall: llm.tool({ ... execute: async () => ... }),
+  createEscalation: llm.tool({ ... execute: async ({ question }, { ctx }) => ... }),
+  endCall: llm.tool({ ... execute: async ({ reason }, { ctx }) => ... }),
 }
 ```
 
 ### Entry function order
 
 ```
-waitForParticipant → resolve tenant → upsertClient → createCall
-→ session.start() → ctx.connect() → session.say(greeting)
+ctx.connect() → waitForParticipant() → resolve tenant → [resolveClientByPhone + upsertClient] → createCall
+→ new Agent(deps) → session.start() → session.say(greeting)
 ```
 
-`session.start()` before `ctx.connect()` is intentional — this is the current LiveKit Agents v1 pattern.
+**Why this deviates from the LiveKit docs canonical order (`session.start()` before `ctx.connect()`):**
+We need `sip.trunkPhoneNumber` from participant attributes to resolve the tenant and construct `new Agent(deps)`. The participant only exists after `ctx.connect()` + `waitForParticipant()`. This is a necessary deviation — we cannot build `Agent` without knowing the tenant first.
+
+### endCall tool pattern
+
+```ts
+execute: async ({ reason }, { ctx }) => {
+  await finishCall(deps.callId, "answered");
+  await ctx.session.generateReply({
+    userInput: `You are about to end the call due to ${reason}, notify the user with one last message`,
+  });
+  ctx.session.shutdown({ reason });
+},
+```
+
+`ctx.session.shutdown()` is the SDK-managed lifecycle method. Never use `RoomServiceClient.deleteRoom()`.
+
+## LiveKit SIP architecture
+
+### Dispatch rules
+
+A dispatch rule is a routing object in LiveKit. Phone numbers point to a dispatch rule via `sip_dispatch_rule_id`. When a call comes in, LiveKit looks up the rule and dispatches a job to the agent worker.
+
+**Current setup (one platform-wide rule):**
+- One dispatch rule for all tenants
+- All phone numbers point to this same rule
+- The "inbound routing filter" on the rule must be **empty** — if you list specific numbers there, only those numbers route through it and new tenants break automatically
+- Tenant is resolved at call time via `sip.trunkPhoneNumber` → `tenants.phone_number`
+
+**One-rule-per-tenant alternative (for future onboarding flow):**
+- Each tenant gets their own dispatch rule with `{"tenantId": "abc123"}` in dispatch metadata
+- The agent reads `ctx.job.metadata` (available before `ctx.connect()`) to get the tenant ID
+- Enables canonical `session.start()` → `ctx.connect()` order from docs
+- Only worth doing when building the programmatic onboarding flow — at that point it's one extra API call at no real cost
+
+**Dispatch metadata limitation:** Static JSON string baked into the rule at creation time. No templating. Only useful for per-tenant rules.
+
+### Phone Numbers API
+
+- Available via: HTTP Twirp API, Go SDK, LiveKit CLI
+- **NOT available in `livekit-server-sdk` Node.js** — the Node SDK only has `SipClient.createSipDispatchRule()`
+- Purchasing/assigning phone numbers from Node.js requires direct HTTP calls to the LiveKit Twirp API
+
+### Programmatic tenant onboarding flow (future)
+
+1. Create a LiveKit dispatch rule via `SipClient.createSipDispatchRule()`
+2. Purchase/assign a phone number via LiveKit HTTP API with `sip_dispatch_rule_id` pointing to the rule
+3. Insert a row into `tenants` with business details + `clerk_user_id`
+4. Set `phone_number` on the tenant row
 
 ## Database schema
 
-8 tables, all tenant-scoped. See `backend/src/db/schema.ts`.
+8 tables, all tenant-scoped. See [backend/src/db/schema.ts](backend/src/db/schema.ts).
 
 Key design notes:
+- `tenants.phone_number` — direct column (unique), no separate phone_numbers table
+- `tenants.clerk_user_id` — links Clerk auth user to tenant; set manually until onboarding flow exists
+- `tenants.google_calendar_id` — set when tenant connects Google Calendar integration
 - `business_profile` on `tenants` is `jsonb` — structured business facts (hours, services, policies)
-- `knowledge_chunks.embedding` is `vector(1536)` via custom Drizzle type — matches OpenAI `text-embedding-3-small`
+- `knowledge_chunks.embedding` is `vector(1536)` — if switching embedding models, verify dimension matches
 - `escalation_status` enum values are lowercase: `"pending"` / `"resolved"`
-- `knowledge_items` + `knowledge_chunks` are separate: items hold canonical Q&A, chunks hold the embedded text for retrieval
+- `knowledge_items` + `knowledge_chunks` are separate: items hold canonical Q&A, chunks hold embedded text for retrieval
 
 ## Multi-tenancy
 
 - Every table has `tenant_id`. Every service function takes `tenantId` as the first argument.
-- The agent resolves tenant from `sip.trunkPhoneNumber` → `phone_numbers` → `tenants` join.
-- Admin routes currently use `DEFAULT_TENANT_ID` stub — real tenant auth is a future phase.
+- Agent resolves tenant from `sip.trunkPhoneNumber` → `tenants.phone_number` (direct lookup, no join).
+- Admin API resolves tenant from Clerk JWT → `clerkUserId` → `tenants.clerk_user_id`.
 - The LLM never receives or chooses tenant IDs. Backend code always injects them.
 
 ## Environment variables
 
-See `backend/.env.example` for the full list. Critical ones:
-
 | Variable | Used by |
 |----------|---------|
 | `DATABASE_URL` | Neon Postgres connection string |
-| `LIVEKIT_URL` | Agent worker + RoomServiceClient |
-| `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | Agent worker + token generation |
-| `OPENAI_API_KEY` | LiveKit inference (LLM) + direct embeddings |
+| `LIVEKIT_URL` | Agent worker |
+| `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | Agent worker |
+| `CLERK_SECRET_KEY` | Hono auth middleware |
+| `OPENROUTER_API_KEY` | LLM calls + embeddings |
+| `OPENROUTER_BASE_URL` | Defaults to `https://openrouter.ai/api/v1` |
+| `LLM_MODEL` | Defaults to `openai/gpt-oss-20b:free` |
+| `EMBEDDING_MODEL` | Defaults to `nvidia/llama-nemotron-embed-vl-1b-v2:free` |
+
+## Call performance
+
+**DB calls per call (4 total, ~80–120ms combined):**
+1. `resolveTenantByCalledNumber` — direct lookup on `tenants.phone_number`
+2. `resolveClientByPhone` — looks up returning caller (runs in parallel with 3)
+3. `upsertClient` — inserts/updates caller record (runs in parallel with 2)
+4. `createCall` — creates call record
+
+Business details baked into system prompt once at call start. Not re-fetched per turn.
+
+**Latency profile to first audio:** ~1–1.5s
+- LiveKit dispatch: ~150ms
+- `ctx.connect()`: ~50ms
+- All 4 DB calls combined: ~80–120ms
+- TTS synthesis: ~500–800ms ← **dominant bottleneck**
 
 ## Phase status
 
-See `IMPLEMENTATION_PHASES.md` for the full log.
-
-- **Done**: Phases 0–4 (TypeScript, Neon/Drizzle schema, service layer, tool-based agent, admin routes)
-- **Next**: Phase 5 — LiveKit SIP wiring (inbound trunk + dispatch rule) + SMS on escalation resolve
-- **Later**: Phase 6 — Google Calendar (check_availability, book_appointment tools)
-- **Later**: Phase 7 — Frontend TypeScript migration + TanStack Query + full admin dashboard views
+- **Done**: SIP wiring, Neon/Drizzle schema, service layer, tool-based agent, LiveKit inbound trunk + dispatch rule, live call test, Hono migration, Clerk auth middleware, DB cleanup (phone_numbers table dropped, google fields cleaned)
+- **Next**: Frontend — Clerk sign-in, React Router, admin dashboard views with TanStack Query
+- **Later**: Google Calendar integration (`checkAvailability`, `bookAppointment` tools) via Clerk OAuth token
+- **Later**: Programmatic tenant onboarding flow
