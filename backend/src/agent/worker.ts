@@ -121,7 +121,7 @@ class Agent extends voice.Agent {
           execute: async ({ reason }, { ctx }) => {
             await finishCall(deps.callId, "answered");
             await ctx.session.generateReply({
-              instructions: "Say a brief, warm goodbye to the caller.",
+              userInput: `You are about to end the call due to ${reason}, notify the user with one last message`,
             });
             ctx.session.shutdown({ reason });
           },
