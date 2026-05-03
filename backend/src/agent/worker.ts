@@ -12,7 +12,6 @@ import * as livekit from "@livekit/agents-plugin-livekit";
 import * as openai from "@livekit/agents-plugin-openai";
 import * as silero from "@livekit/agents-plugin-silero";
 import { ParticipantKind } from "@livekit/rtc-node";
-import { RoomServiceClient } from "livekit-server-sdk";
 import { fileURLToPath } from "node:url";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -33,8 +32,6 @@ type AgentDeps = {
   client: ClientRow | null;
   callerPhone: string;
   callId: string;
-  roomName: string;
-  roomServiceClient: RoomServiceClient;
 };
 
 // ---------------------------------------------------------------------------
@@ -121,10 +118,12 @@ class Agent extends voice.Agent {
           parameters: z.object({
             reason: z.string().describe("Brief reason the call is ending."),
           }),
-          execute: async () => {
+          execute: async ({ reason }, { ctx }) => {
             await finishCall(deps.callId, "answered");
-            await deps.roomServiceClient.deleteRoom(deps.roomName);
-            return { ended: true };
+            await ctx.session.generateReply({
+              instructions: "Say a brief, warm goodbye to the caller.",
+            });
+            ctx.session.shutdown({ reason });
           },
         }),
       },
@@ -136,29 +135,17 @@ class Agent extends voice.Agent {
 // Worker entry
 // ---------------------------------------------------------------------------
 
-const roomServiceClient = new RoomServiceClient(
-  env.LIVEKIT_URL,
-  env.LIVEKIT_API_KEY,
-  env.LIVEKIT_API_SECRET
-);
-
 export default defineAgent({
   prewarm: async (proc: JobProcess) => {
     proc.userData.vad = await silero.VAD.load();
   },
 
   entry: async (ctx: JobContext) => {
-    if (!ctx.room.name) {
-      console.error("[worker] Room has no name — cannot start session");
-      return;
-    }
-    const roomName = ctx.room.name;
+    await ctx.connect();
 
+    const roomName = ctx.room.name ?? "";
     const participant = await ctx.waitForParticipant();
 
-    // Extract phone numbers from SIP participant attributes.
-    // callerPhone  = the number the customer called from.
-    // calledNumber = the business's number (used for tenant resolution).
     const callerPhone =
       participant.kind === ParticipantKind.SIP
         ? (participant.attributes["sip.phoneNumber"] ?? "unknown")
@@ -176,8 +163,10 @@ export default defineAgent({
       return;
     }
 
-    const client = await resolveClientByPhone(tenant.id, callerPhone);
-    await upsertClient(tenant.id, callerPhone);
+    const [client] = await Promise.all([
+      resolveClientByPhone(tenant.id, callerPhone),
+      upsertClient(tenant.id, callerPhone),
+    ]);
 
     const call = await createCall({
       tenantId: tenant.id,
@@ -191,8 +180,6 @@ export default defineAgent({
       client,
       callerPhone,
       callId: call.id,
-      roomName: roomName,
-      roomServiceClient,
     };
 
     const session = new voice.AgentSession({
@@ -213,7 +200,6 @@ export default defineAgent({
     });
 
     await session.start({ agent: new Agent(deps), room: ctx.room });
-    await ctx.connect();
 
     const greeting =
       client?.name

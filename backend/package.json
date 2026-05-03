@@ -10,6 +10,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "agent": "tsx ./src/agent/worker.ts dev",
+    "agent:download": "tsx ./src/agent/worker.ts download-files",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "test": "echo \"No tests configured yet\" && exit 0"
