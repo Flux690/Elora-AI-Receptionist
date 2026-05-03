@@ -7,10 +7,19 @@ const client = new OpenAI({
 });
 
 export async function embedText(text: string): Promise<number[] | null> {
-  const response = await client.embeddings.create({
-    model: env.EMBEDDING_MODEL,
-    input: text,
-  });
-
-  return response.data[0].embedding;
+  try {
+    const response = await client.embeddings.create({
+      model: env.EMBEDDING_MODEL,
+      input: text,
+    });
+    const embedding = response.data?.[0]?.embedding;
+    if (!embedding?.length) {
+      console.warn("[embeddings] empty embedding returned for input:", text.slice(0, 80));
+      return null;
+    }
+    return embedding;
+  } catch (err) {
+    console.error("[embeddings] API call failed:", err);
+    return null;
+  }
 }
