@@ -8,6 +8,7 @@ export interface Escalation {
   question: string
   status: 'pending' | 'resolved'
   answer: string | null
+  callerPhone: string | null
   createdAt: string
 }
 
@@ -20,15 +21,15 @@ export interface KnowledgeItem {
 
 export interface Call {
   id: string
-  callerId: string | null
+  callerPhone: string | null
   startedAt: string
   endedAt: string | null
-  status: string
+  outcome: 'answered' | 'booked' | 'escalated' | 'abandoned' | 'error' | null
 }
 
 export interface Settings {
   name: string
   timezone: string
   systemPrompt: string
-  businessProfile: Record<string, unknown>
+  businessProfile: Record<string, string>
 }

@@ -2,10 +2,9 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from '@clerk/react'
 import AppLayout from '@/components/layout/AppLayout'
 import SignIn from '@/pages/SignIn'
-import Dashboard from '@/pages/Dashboard'
-import Escalations from '@/pages/Escalations'
+import Overview from '@/pages/Overview'
+import Inbox from '@/pages/Inbox'
 import Calls from '@/pages/Calls'
-import Knowledge from '@/pages/Knowledge'
 import Settings from '@/pages/Settings'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -27,10 +26,9 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Dashboard />} />
-        <Route path="escalations" element={<Escalations />} />
+        <Route index element={<Overview />} />
+        <Route path="inbox" element={<Inbox />} />
         <Route path="calls" element={<Calls />} />
-        <Route path="knowledge" element={<Knowledge />} />
         <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>

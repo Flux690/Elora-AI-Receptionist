@@ -1,20 +1,19 @@
 import { Outlet } from 'react-router-dom'
 import { useAuthInterceptor } from '@/hooks/useAuthInterceptor'
-import Sidebar from './Sidebar'
-import TopBar from './TopBar'
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
+import AppSidebar from './AppSidebar'
 
 export default function AppLayout() {
   useAuthInterceptor()
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <TopBar />
-        <main className="flex-1 overflow-y-auto p-6">
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>
-      </div>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }
