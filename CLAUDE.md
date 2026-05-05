@@ -2,7 +2,7 @@
 
 ## What this is
 
-Elora is a telephony-first AI receptionist for appointment-based local businesses (salons, spas, clinics). Customers call a real phone number. LiveKit SIP routes the call to the Elora agent. The agent answers questions, escalates unknowns to a human admin, and will eventually book appointments via Google Calendar.
+Elora is a telephony-first AI receptionist for appointment-based local businesses (salons, spas, clinics). Customers call a real phone number. LiveKit SIP routes the call to the Elora agent. The agent answers questions, escalates unknowns to a human admin, and books appointments via Google Calendar.
 
 It is being built as a B2B SaaS portfolio project. The data model is multi-tenant from day one — every table has a `tenant_id`, and each paying business is one tenant.
 
@@ -58,6 +58,7 @@ backend/src/
 │   ├── escalations.ts
 │   ├── knowledge.ts
 │   ├── calls.ts
+│   ├── appointments.ts
 │   └── settings.ts
 ├── db/
 │   ├── client.ts        ← Drizzle + pg Pool, exported as `db`
@@ -69,13 +70,15 @@ backend/src/
 │   ├── health.ts
 │   └── admin/
 │       ├── index.ts     ← Applies auth middleware, mounts routes
-│       └── routes.ts    ← All 7 admin route definitions
+│       └── routes.ts    ← All 9 admin route definitions
 ├── services/            ← All DB access — one file per domain
 │   ├── tenants.ts
 │   ├── clients.ts
 │   ├── calls.ts
 │   ├── escalations.ts
 │   ├── knowledge.ts
+│   ├── appointments.ts
+│   ├── calendar.ts      ← Google Calendar free/busy + event creation (no googleapis package)
 │   └── embeddings.ts
 ├── types.ts             ← AppEnv, AppContext shared Hono types
 └── env.ts               ← Zod-validated env loader
@@ -114,8 +117,18 @@ UPDATE tenants SET clerk_user_id = 'user_xxxxxxxxx' WHERE phone_number = '148430
 
 | Variable | Where | Purpose |
 |----------|-------|---------|
-| `CLERK_SECRET_KEY` | `backend/.env` | JWT verification — never expose |
+| `CLERK_SECRET_KEY` | `backend/.env` | JWT verification + Clerk API (OAuth token fetch in agent) — never expose |
 | `VITE_CLERK_PUBLISHABLE_KEY` | `frontend/.env` | `<ClerkProvider>` — safe to expose |
+| `VITE_CLERK_SIGN_IN_URL` | `frontend/.env` | Tells Clerk where sign-in page lives (needed for OAuth cancel recovery) |
+| `VITE_CLERK_SIGN_UP_URL` | `frontend/.env` | Tells Clerk where sign-up page lives |
+| `VITE_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | `frontend/.env` | Post-OAuth fallback redirect destination |
+| `VITE_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | `frontend/.env` | Post-OAuth fallback redirect destination |
+
+Note: `signInUrl`/`signUpUrl` are also set directly on `<ClerkProvider>` in `main.tsx` — props take precedence over env vars and are the authoritative source for Clerk's internal navigation.
+
+### OAuth redirect pattern (Google Calendar)
+
+`redirectUrl` passed to `reauthorize()`/`createExternalAccount()` includes `?returnTo=/appointments`. `SSOCallback` reads this param and passes it to `signInForceRedirectUrl` on `<AuthenticateWithRedirectCallback>`. Force redirect is used (not fallback) to ensure the destination is deterministic regardless of Clerk's session state.
 
 ## Agent worker patterns
 
@@ -152,6 +165,8 @@ Tools are defined in the `Agent` constructor using `llm.tool()` with Zod schemas
 tools: {
   searchKnowledge: llm.tool({ ... execute: async ({ query }) => ... }),
   createEscalation: llm.tool({ ... execute: async ({ question }, { ctx }) => ... }),
+  checkAvailability: llm.tool({ ... execute: async ({ service, startIso, endIso }) => ... }),
+  bookAppointment: llm.tool({ ... execute: async ({ service, startIso, endIso }) => ... }),
   endCall: llm.tool({ ... execute: async ({ reason }, { ctx }) => ... }),
 }
 ```
@@ -240,7 +255,7 @@ Key design notes:
 | `DATABASE_URL` | Neon Postgres connection string |
 | `LIVEKIT_URL` | Agent worker |
 | `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | Agent worker |
-| `CLERK_SECRET_KEY` | Hono auth middleware |
+| `CLERK_SECRET_KEY` | Hono auth middleware + agent worker (Clerk API for OAuth token fetch) |
 | `OPENROUTER_API_KEY` | LLM calls + embeddings |
 | `OPENROUTER_BASE_URL` | Defaults to `https://openrouter.ai/api/v1` |
 | `LLM_MODEL` | Defaults to `openai/gpt-oss-20b:free` |
@@ -250,9 +265,12 @@ Key design notes:
 
 **DB calls per call (4 total, ~80–120ms combined):**
 1. `resolveTenantByCalledNumber` — direct lookup on `tenants.phone_number`
-2. `resolveClientByPhone` — looks up returning caller (runs in parallel with 3)
-3. `upsertClient` — inserts/updates caller record (runs in parallel with 2)
+2. `resolveClientByPhone` — looks up returning caller (runs in parallel with 3 and the token fetch)
+3. `upsertClient` — inserts/updates caller record (runs in parallel with 2 and the token fetch)
 4. `createCall` — creates call record
+
+**Clerk API call (conditional, parallel with DB calls 2–3):**
+- If `tenant.googleCalendarId` is set, `clerkClient.users.getUserOauthAccessToken()` is called in the same `Promise.all` — zero added latency on the hot path.
 
 Business details baked into system prompt once at call start. Not re-fetched per turn.
 
@@ -264,7 +282,5 @@ Business details baked into system prompt once at call start. Not re-fetched per
 
 ## Phase status
 
-- **Done**: SIP wiring, Neon/Drizzle schema, service layer, tool-based agent, LiveKit inbound trunk + dispatch rule, live call test, Hono migration, Clerk auth middleware, DB cleanup (phone_numbers table dropped, google fields cleaned)
-- **Next**: Frontend — Clerk sign-in, React Router, admin dashboard views with TanStack Query
-- **Later**: Google Calendar integration (`checkAvailability`, `bookAppointment` tools) via Clerk OAuth token
+- **Done**: SIP wiring, Neon/Drizzle schema, service layer, tool-based agent, LiveKit inbound trunk + dispatch rule, live call test, Hono migration, Clerk auth middleware, DB cleanup (phone_numbers table dropped, google fields cleaned), full admin dashboard (calls, escalations, appointments, knowledge, settings, overview), Google Calendar integration (OAuth connect flow, availability checking, appointment booking)
 - **Later**: Programmatic tenant onboarding flow

@@ -83,12 +83,12 @@ export default function AppointmentsPage() {
       if (googleAccount) {
         result = await googleAccount.reauthorize({
           additionalScopes: [CALENDAR_SCOPE],
-          redirectUrl: `${window.location.origin}/sso-callback`,
+          redirectUrl: `${window.location.origin}/sso-callback?returnTo=/appointments`,
         })
       } else {
         result = await user.createExternalAccount({
           strategy: 'oauth_google',
-          redirectUrl: `${window.location.origin}/sso-callback`,
+          redirectUrl: `${window.location.origin}/sso-callback?returnTo=/appointments`,
           additionalScopes: [CALENDAR_SCOPE],
         })
       }
