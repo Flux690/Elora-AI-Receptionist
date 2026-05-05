@@ -40,7 +40,7 @@ export async function getTenantById(id: string): Promise<TenantRow | null> {
 
 export async function updateTenant(
   id: string,
-  patch: Partial<Pick<TenantRow, "name" | "systemPrompt" | "businessProfile" | "timezone">>
+  patch: Partial<Pick<TenantRow, "name" | "systemPrompt" | "businessProfile" | "timezone" | "googleCalendarId">>
 ): Promise<void> {
   await db
     .update(tenants)

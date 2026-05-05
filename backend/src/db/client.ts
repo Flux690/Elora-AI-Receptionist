@@ -5,9 +5,12 @@ import { env } from "../env.js";
 const pool = new Pool({
   connectionString: env.DATABASE_URL,
   max: 10,
-  min: 1,
-  idleTimeoutMillis: 0,
-  keepAlive: true,
+  connectionTimeoutMillis: 10_000,
+  idleTimeoutMillis: 10_000,
+});
+
+pool.on("error", (err) => {
+  console.error("[db] idle client error:", err.message);
 });
 
 export const db = drizzle(pool);

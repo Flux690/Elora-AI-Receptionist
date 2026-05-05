@@ -11,6 +11,7 @@ import {
 import * as livekit from "@livekit/agents-plugin-livekit";
 import * as openai from "@livekit/agents-plugin-openai";
 import * as silero from "@livekit/agents-plugin-silero";
+import { createClerkClient } from "@clerk/backend";
 import { ParticipantKind } from "@livekit/rtc-node";
 import { fileURLToPath } from "node:url";
 import * as fs from "node:fs";
@@ -22,6 +23,8 @@ import { createCall, finishCall } from "../services/calls.js";
 import { createEscalation } from "../services/escalations.js";
 import { searchKnowledge } from "../services/knowledge.js";
 import { resolveTenantByCalledNumber, type TenantRow } from "../services/tenants.js";
+import { createAppointment } from "../services/appointments.js";
+import { checkAvailability, createCalendarEvent } from "../services/calendar.js";
 
 // ---------------------------------------------------------------------------
 // Agent context — everything the agent needs, closed over at dispatch time
@@ -32,6 +35,8 @@ type AgentDeps = {
   client: ClientRow | null;
   callerPhone: string;
   callId: string;
+  googleAccessToken: string | null;
+  googleCalendarId: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -52,6 +57,10 @@ function buildSystemPrompt(deps: AgentDeps): string {
     .map(([k, v]) => `${k}: ${v}`)
     .join("\n");
 
+  const calendarBlock = deps.googleCalendarId
+    ? "Calendar: connected — use checkAvailability before offering times, use bookAppointment to confirm."
+    : "Calendar: not connected — if caller wants to book, create an escalation so the team follows up.";
+
   return `${basePrompt}
 
 ## Business context
@@ -61,6 +70,9 @@ ${profileSummary}
 
 ## Caller context
 ${callerBlock}
+
+## Booking
+${calendarBlock}
 
 ## Additional Rules
 ${tenant.systemPrompt}`.trim();
@@ -84,7 +96,7 @@ class Agent extends voice.Agent {
           execute: async ({ query }) => {
             const results = await searchKnowledge(deps.tenant.id, query);
             if (results.length === 0) return null;
-            return results.map((r) => r.chunkText).join("\n---\n");
+            return results.map((r) => `Q: ${r.question}\nA: ${r.answer}`).join("\n---\n");
           },
         }),
 
@@ -112,6 +124,108 @@ class Agent extends voice.Agent {
           },
         }),
 
+        checkAvailability: llm.tool({
+          description:
+            "Check available appointment slots on the business calendar. Always call this before offering specific times to a caller who wants to book.",
+          parameters: z.object({
+            service: z.string().describe("The service the caller wants to book."),
+            startIso: z
+              .string()
+              .describe(
+                "Start of the search window in ISO 8601 format, adjusted to the business timezone."
+              ),
+            endIso: z
+              .string()
+              .describe("End of the search window in ISO 8601 format."),
+          }),
+          execute: async ({ startIso, endIso }) => {
+            if (!deps.googleAccessToken || !deps.googleCalendarId) {
+              return {
+                error:
+                  "Calendar not connected. Create an escalation so the team can follow up with the caller.",
+              };
+            }
+            try {
+              const slots = await checkAvailability(
+                deps.googleAccessToken,
+                deps.googleCalendarId,
+                startIso,
+                endIso
+              );
+              return { available: slots.slice(0, 5) };
+            } catch (err) {
+              console.error("[agent] checkAvailability failed:", err);
+              return { error: "Could not check availability. Create an escalation." };
+            }
+          },
+        }),
+
+        bookAppointment: llm.tool({
+          description:
+            "Book a confirmed appointment after the caller has chosen a specific slot. Do not call this until the caller has explicitly confirmed the time.",
+          parameters: z.object({
+            service: z.string().describe("The service being booked."),
+            startIso: z.string().describe("Confirmed slot start in ISO 8601."),
+            endIso: z.string().describe("Confirmed slot end in ISO 8601."),
+          }),
+          execute: async ({ service, startIso, endIso }) => {
+            if (!deps.googleAccessToken || !deps.googleCalendarId) {
+              await createAppointment({
+                tenantId: deps.tenant.id,
+                clientId: deps.client?.id ?? null,
+                callerPhone: deps.callerPhone,
+                service,
+                startTime: new Date(startIso),
+                endTime: new Date(endIso),
+                status: "requested",
+              });
+              return {
+                booked: false,
+                reason: "Calendar not connected — appointment request saved, team will confirm.",
+              };
+            }
+            try {
+              const eventId = await createCalendarEvent(
+                deps.googleAccessToken,
+                deps.googleCalendarId,
+                {
+                  summary: `${service} — ${deps.client?.name ?? deps.callerPhone}`,
+                  startIso,
+                  endIso,
+                  timezone: deps.tenant.timezone,
+                }
+              );
+              await createAppointment({
+                tenantId: deps.tenant.id,
+                clientId: deps.client?.id ?? null,
+                callerPhone: deps.callerPhone,
+                service,
+                startTime: new Date(startIso),
+                endTime: new Date(endIso),
+                status: "confirmed",
+                googleEventId: eventId,
+              });
+              await finishCall(deps.callId, "booked");
+              return { booked: true, eventId };
+            } catch (err) {
+              console.error("[agent] bookAppointment failed:", err);
+              await createAppointment({
+                tenantId: deps.tenant.id,
+                clientId: deps.client?.id ?? null,
+                callerPhone: deps.callerPhone,
+                service,
+                startTime: new Date(startIso),
+                endTime: new Date(endIso),
+                status: "requested",
+              });
+              return {
+                booked: false,
+                reason: "Booking failed — appointment request saved, team will confirm.",
+              };
+            }
+          },
+        }),
+
         endCall: llm.tool({
           description:
             "End the phone call. Use only after the caller has clearly indicated they are done — for example, said goodbye, thank you, or that's all.",
@@ -134,6 +248,8 @@ class Agent extends voice.Agent {
 // ---------------------------------------------------------------------------
 // Worker entry
 // ---------------------------------------------------------------------------
+
+const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
 
 export default defineAgent({
   prewarm: async (proc: JobProcess) => {
@@ -163,9 +279,18 @@ export default defineAgent({
       return;
     }
 
-    const [client] = await Promise.all([
+    const [client, , googleAccessToken] = await Promise.all([
       resolveClientByPhone(tenant.id, callerPhone),
       upsertClient(tenant.id, callerPhone),
+      tenant.googleCalendarId && tenant.clerkUserId
+        ? clerkClient.users
+            .getUserOauthAccessToken(tenant.clerkUserId, "oauth_google")
+            .then((r) => r.data[0]?.token ?? null)
+            .catch((err) => {
+              console.error("[worker] Failed to fetch Google OAuth token:", err);
+              return null;
+            })
+        : Promise.resolve(null),
     ]);
 
     const call = await createCall({
@@ -180,6 +305,8 @@ export default defineAgent({
       client,
       callerPhone,
       callId: call.id,
+      googleAccessToken,
+      googleCalendarId: tenant.googleCalendarId ?? null,
     };
 
     const session = new voice.AgentSession({

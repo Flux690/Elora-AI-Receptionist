@@ -41,7 +41,15 @@ export function NavUser() {
             <ChevronsUpDown className="size-4 text-muted-foreground shrink-0" />
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="w-56">
-            <DropdownMenuItem onClick={() => openUserProfile()}>
+            <DropdownMenuItem
+              onClick={() =>
+                openUserProfile({
+                  additionalOAuthScopes: {
+                    google: ['https://www.googleapis.com/auth/calendar'],
+                  },
+                })
+              }
+            >
               <UserRound className="mr-2 size-4" />
               Account
             </DropdownMenuItem>

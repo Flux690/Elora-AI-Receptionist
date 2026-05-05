@@ -36,13 +36,6 @@ function duration(startedAt: string, endedAt: string | null): string {
   return `${Math.floor(secs / 60)}m ${secs % 60}s`
 }
 
-function startOfWeek(): Date {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  d.setDate(d.getDate() - d.getDay())
-  return d
-}
-
 export default function Overview() {
   const navigate = useNavigate()
 
@@ -52,12 +45,15 @@ export default function Overview() {
     queryKey: keys.escalations('pending'),
     queryFn: () => fetchers.escalations('pending'),
   })
+  const { data: appointments = [], isLoading: loadingAppointments } = useQuery({
+    queryKey: keys.appointments,
+    queryFn: fetchers.appointments,
+  })
 
-  const isLoading = loadingMetrics || loadingCalls || loadingEscalations
+  const isLoading = loadingMetrics || loadingCalls || loadingEscalations || loadingAppointments
 
-  const weekStart = startOfWeek()
-  const callsThisWeek = calls.filter(c => new Date(c.startedAt) >= weekStart).length
   const answeredByAI = calls.filter(c => c.outcome === 'answered' || c.outcome === 'booked').length
+  const bookedAppointments = appointments.filter(a => a.status === 'confirmed').length
   const recentCalls = calls.slice(0, 5)
   const topPending = pendingEscalations.slice(0, 3)
 
@@ -81,10 +77,10 @@ export default function Overview() {
       description: 'Need your answer',
     },
     {
-      label: 'Calls This Week',
-      value: isLoading ? '—' : callsThisWeek,
+      label: 'Booked Appointments',
+      value: isLoading ? '—' : bookedAppointments,
       icon: CalendarDays,
-      description: 'Since Monday',
+      description: 'Confirmed via calendar',
     },
   ]
 
