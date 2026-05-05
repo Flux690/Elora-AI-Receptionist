@@ -32,4 +32,16 @@ export interface Settings {
   timezone: string
   systemPrompt: string
   businessProfile: Record<string, string>
+  googleCalendarId: string | null
+}
+
+export interface Appointment {
+  id: string
+  callerPhone: string
+  service: string
+  startTime: string | null
+  endTime: string | null
+  status: 'requested' | 'confirmed' | 'cancelled'
+  googleEventId: string | null
+  createdAt: string
 }

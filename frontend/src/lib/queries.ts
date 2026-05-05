@@ -1,5 +1,5 @@
 import { apiClient } from './apiClient'
-import type { Metrics, Escalation, KnowledgeItem, Call, Settings } from '@/types/api'
+import type { Metrics, Escalation, KnowledgeItem, Call, Settings, Appointment } from '@/types/api'
 
 export const keys = {
   metrics: ['metrics'] as const,
@@ -7,6 +7,7 @@ export const keys = {
   knowledge: ['knowledge'] as const,
   calls: ['calls'] as const,
   settings: ['settings'] as const,
+  appointments: ['appointments'] as const,
 }
 
 export const fetchers = {
@@ -20,4 +21,6 @@ export const fetchers = {
     apiClient.get<Call[]>('/admin/calls').then((r) => r.data),
   settings: () =>
     apiClient.get<Settings>('/admin/settings').then((r) => r.data),
+  appointments: () =>
+    apiClient.get<Appointment[]>('/admin/appointments').then((r) => r.data),
 }

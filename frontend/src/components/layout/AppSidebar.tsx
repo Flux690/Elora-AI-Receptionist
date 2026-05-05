@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Inbox, Phone, Settings } from 'lucide-react'
+import { LayoutDashboard, Inbox, Phone, CalendarDays, Settings } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -16,6 +16,7 @@ const mainNav = [
   { label: 'Overview', icon: LayoutDashboard, to: '/', end: true },
   { label: 'Inbox', icon: Inbox, to: '/inbox', end: false },
   { label: 'Calls', icon: Phone, to: '/calls', end: false },
+  { label: 'Appointments', icon: CalendarDays, to: '/appointments', end: false },
 ]
 
 const bottomNav = [

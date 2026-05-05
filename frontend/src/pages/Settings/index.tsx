@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useUser } from '@clerk/react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,9 +20,11 @@ import type { Settings } from '@/types/api'
 import BusinessDetailsForm from './BusinessDetailsForm'
 
 const TIMEZONES = Intl.supportedValuesOf('timeZone')
+const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar'
 
 export default function SettingsPage() {
   const queryClient = useQueryClient()
+  const { user } = useUser()
   const { data } = useQuery({ queryKey: keys.settings, queryFn: fetchers.settings })
 
   const [form, setForm] = useState<Settings>({
@@ -28,7 +32,12 @@ export default function SettingsPage() {
     timezone: '',
     systemPrompt: '',
     businessProfile: {},
+    googleCalendarId: null,
   })
+
+  const googleAccount = user?.externalAccounts.find(ea => ea.provider === 'google')
+  const hasCalendarScope = googleAccount?.approvedScopes?.includes(CALENDAR_SCOPE)
+  const isCalendarConnected = !!data?.googleCalendarId && hasCalendarScope
 
   useEffect(() => {
     if (data) setForm(data)
@@ -67,7 +76,7 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="timezone">Timezone</Label>
-            <Select value={form.timezone} onValueChange={v => setForm(f => ({ ...f, timezone: v }))}>
+            <Select value={form.timezone} onValueChange={v => setForm(f => ({ ...f, timezone: v ?? '' }))}>
               <SelectTrigger id="timezone">
                 <SelectValue placeholder="Select a timezone…" />
               </SelectTrigger>
@@ -116,6 +125,25 @@ export default function SettingsPage() {
             value={form.businessProfile}
             onChange={v => setForm(f => ({ ...f, businessProfile: v }))}
           />
+        </section>
+
+        <Separator />
+
+        {/* Google Calendar */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Google Calendar</h2>
+          {isCalendarConnected ? (
+            <p className="text-sm text-foreground">
+              Connected as <span className="font-medium">{googleAccount?.emailAddress}</span>
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Not connected.{' '}
+              <Link to="/appointments" className="text-primary underline-offset-4 hover:underline">
+                Set up in Appointments →
+              </Link>
+            </p>
+          )}
         </section>
 
         <Button type="submit" disabled={mutation.isPending}>

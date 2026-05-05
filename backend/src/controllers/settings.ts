@@ -12,6 +12,7 @@ export async function getSettings(c: AppContext) {
     timezone: tenant.timezone,
     systemPrompt: tenant.systemPrompt,
     businessProfile: tenant.businessProfile,
+    googleCalendarId: tenant.googleCalendarId ?? null,
   });
 }
 
@@ -22,6 +23,7 @@ export async function updateSettings(c: AppContext) {
     timezone?: string;
     systemPrompt?: string;
     businessProfile?: Record<string, unknown>;
+    googleCalendarId?: string;
   }>();
   await updateTenant(tenantId, body);
   return c.json({ updated: true });
