@@ -1,13 +1,14 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
-import { knowledgeItems, knowledgeChunks } from "../db/schema.js";
+import { knowledgeItems } from "../db/schema.js";
 import { embedText } from "./embeddings.js";
 import type { EscalationRow } from "./escalations.js";
 
 export type KnowledgeItemRow = typeof knowledgeItems.$inferSelect;
 
 export type KnowledgeResult = {
-  chunkText: string;
+  question: string;
+  answer: string;
   similarity: number;
 };
 
@@ -15,24 +16,20 @@ export async function createKnowledgeFromEscalation(
   escalation: EscalationRow,
   answer: string
 ): Promise<void> {
-  const inserted = await db
-    .insert(knowledgeItems)
-    .values({
-      tenantId: escalation.tenantId,
-      sourceEscalationId: escalation.id,
-      question: escalation.question,
-      answer,
-    })
-    .returning({ id: knowledgeItems.id });
-
-  const itemId = inserted[0].id;
   const chunkText = `Question: ${escalation.question}\nAnswer: ${answer}`;
   const embedding = await embedText(chunkText);
 
-  await db.insert(knowledgeChunks).values({
+  if (!embedding) {
+    throw new Error(
+      `[knowledge] Failed to generate embedding for escalation ${escalation.id} — item not saved`
+    );
+  }
+
+  await db.insert(knowledgeItems).values({
     tenantId: escalation.tenantId,
-    knowledgeItemId: itemId,
-    chunkText,
+    sourceEscalationId: escalation.id,
+    question: escalation.question,
+    answer,
     embedding,
   });
 }
@@ -49,11 +46,10 @@ export async function searchKnowledge(
 
   const vectorLiteral = `[${queryEmbedding.join(",")}]`;
 
-  // Cosine similarity search filtered by tenant. Returns top 3 matches above 0.5 threshold.
   const rows = await db.execute(sql`
-    SELECT chunk_text,
+    SELECT question, answer,
            1 - (embedding <=> ${vectorLiteral}::vector) AS similarity
-    FROM knowledge_chunks
+    FROM knowledge_items
     WHERE tenant_id = ${tenantId}
       AND embedding IS NOT NULL
       AND 1 - (embedding <=> ${vectorLiteral}::vector) > 0.5
@@ -61,18 +57,25 @@ export async function searchKnowledge(
     LIMIT 3
   `);
 
-  return (rows.rows as Array<{ chunk_text: string; similarity: number }>).map((r) => ({
-    chunkText: r.chunk_text,
+  return (rows.rows as Array<{ question: string; answer: string; similarity: number }>).map((r) => ({
+    question: r.question,
+    answer: r.answer,
     similarity: r.similarity,
   }));
 }
 
-export async function listKnowledge(tenantId: string): Promise<KnowledgeItemRow[]> {
+export async function listKnowledge(tenantId: string) {
   return db
-    .select()
+    .select({
+      id: knowledgeItems.id,
+      question: knowledgeItems.question,
+      answer: knowledgeItems.answer,
+      createdAt: knowledgeItems.createdAt,
+    })
     .from(knowledgeItems)
     .where(eq(knowledgeItems.tenantId, tenantId))
-    .orderBy(desc(knowledgeItems.createdAt));
+    .orderBy(desc(knowledgeItems.createdAt))
+    .limit(100);
 }
 
 export async function deleteKnowledge(id: string, tenantId: string): Promise<void> {

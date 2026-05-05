@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { calls } from "../db/schema.js";
 
@@ -38,11 +38,17 @@ export async function finishCall(
     .where(eq(calls.id, callId));
 }
 
-export async function listCalls(tenantId: string): Promise<CallRow[]> {
-  const { desc } = await import("drizzle-orm");
+export async function listCalls(tenantId: string) {
   return db
-    .select()
+    .select({
+      id: calls.id,
+      callerPhone: calls.callerPhone,
+      startedAt: calls.startedAt,
+      endedAt: calls.endedAt,
+      outcome: calls.outcome,
+    })
     .from(calls)
     .where(eq(calls.tenantId, tenantId))
-    .orderBy(desc(calls.startedAt));
+    .orderBy(desc(calls.startedAt))
+    .limit(100);
 }

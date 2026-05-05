@@ -11,10 +11,12 @@ export async function embedText(text: string): Promise<number[] | null> {
     const response = await client.embeddings.create({
       model: env.EMBEDDING_MODEL,
       input: text,
+      encoding_format: "float",
     });
     const embedding = response.data?.[0]?.embedding;
     if (!embedding?.length) {
-      console.warn("[embeddings] empty embedding returned for input:", text.slice(0, 80));
+      console.warn("[embeddings] empty embedding returned. model:", env.EMBEDDING_MODEL);
+      console.warn("[embeddings] full response:", JSON.stringify(response, null, 2));
       return null;
     }
     return embedding;

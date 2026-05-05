@@ -47,15 +47,20 @@ export async function resolveEscalation(
   return rows[0];
 }
 
-export async function listEscalations(
-  tenantId: string,
-  status: "pending" | "resolved"
-): Promise<EscalationRow[]> {
+export async function listEscalations(tenantId: string, status: "pending" | "resolved") {
   return db
-    .select()
+    .select({
+      id: escalations.id,
+      callerPhone: escalations.callerPhone,
+      question: escalations.question,
+      status: escalations.status,
+      answer: escalations.answer,
+      createdAt: escalations.createdAt,
+    })
     .from(escalations)
     .where(and(eq(escalations.tenantId, tenantId), eq(escalations.status, status)))
-    .orderBy(desc(escalations.createdAt));
+    .orderBy(desc(escalations.createdAt))
+    .limit(100);
 }
 
 export async function getEscalationById(

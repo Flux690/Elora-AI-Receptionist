@@ -1,11 +1,13 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from '@clerk/react'
 import AppLayout from '@/components/layout/AppLayout'
 import SignIn from '@/pages/SignIn'
-import Overview from '@/pages/Overview'
-import Inbox from '@/pages/Inbox'
-import Calls from '@/pages/Calls'
-import Settings from '@/pages/Settings'
+
+const Overview = lazy(() => import('@/pages/Overview'))
+const Inbox = lazy(() => import('@/pages/Inbox'))
+const Calls = lazy(() => import('@/pages/Calls'))
+const Settings = lazy(() => import('@/pages/Settings'))
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded } = useAuth()
@@ -26,10 +28,10 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Overview />} />
-        <Route path="inbox" element={<Inbox />} />
-        <Route path="calls" element={<Calls />} />
-        <Route path="settings" element={<Settings />} />
+        <Route index element={<Suspense><Overview /></Suspense>} />
+        <Route path="inbox" element={<Suspense><Inbox /></Suspense>} />
+        <Route path="calls" element={<Suspense><Calls /></Suspense>} />
+        <Route path="settings" element={<Suspense><Settings /></Suspense>} />
       </Route>
     </Routes>
   )
