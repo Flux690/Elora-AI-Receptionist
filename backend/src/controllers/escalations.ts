@@ -26,8 +26,8 @@ export async function resolve(c: AppContext) {
     return c.json({ error: "Escalation not found" }, 404);
   }
 
-  await resolveEscalation(id, tenantId, answer);
   await createKnowledgeFromEscalation(escalation, answer);
+  await resolveEscalation(id, tenantId, answer);
 
   return c.json({ id, status: "resolved" });
 }

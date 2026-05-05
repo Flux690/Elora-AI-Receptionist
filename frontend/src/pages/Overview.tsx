@@ -46,12 +46,14 @@ function startOfWeek(): Date {
 export default function Overview() {
   const navigate = useNavigate()
 
-  const { data: metrics } = useQuery({ queryKey: keys.metrics, queryFn: fetchers.metrics })
-  const { data: calls = [] } = useQuery({ queryKey: keys.calls, queryFn: fetchers.calls })
-  const { data: pendingEscalations = [] } = useQuery({
+  const { data: metrics, isLoading: loadingMetrics } = useQuery({ queryKey: keys.metrics, queryFn: fetchers.metrics })
+  const { data: calls = [], isLoading: loadingCalls } = useQuery({ queryKey: keys.calls, queryFn: fetchers.calls })
+  const { data: pendingEscalations = [], isLoading: loadingEscalations } = useQuery({
     queryKey: keys.escalations('pending'),
     queryFn: () => fetchers.escalations('pending'),
   })
+
+  const isLoading = loadingMetrics || loadingCalls || loadingEscalations
 
   const weekStart = startOfWeek()
   const callsThisWeek = calls.filter(c => new Date(c.startedAt) >= weekStart).length
@@ -62,25 +64,25 @@ export default function Overview() {
   const kpis = [
     {
       label: 'Total Calls',
-      value: metrics?.totalCalls ?? '—',
+      value: isLoading ? '—' : (metrics?.totalCalls ?? 0),
       icon: Phone,
       description: 'All time',
     },
     {
       label: 'Answered by AI',
-      value: answeredByAI,
+      value: isLoading ? '—' : answeredByAI,
       icon: CheckCircle,
       description: 'Handled without escalation',
     },
     {
       label: 'Pending Questions',
-      value: metrics?.pendingEscalations ?? '—',
+      value: isLoading ? '—' : (metrics?.pendingEscalations ?? 0),
       icon: MessageCircleQuestion,
       description: 'Need your answer',
     },
     {
       label: 'Calls This Week',
-      value: callsThisWeek,
+      value: isLoading ? '—' : callsThisWeek,
       icon: CalendarDays,
       description: 'Since Monday',
     },
@@ -120,10 +122,10 @@ export default function Overview() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {recentCalls.length === 0 ? (
+              {isLoading || recentCalls.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
-                    No calls yet.
+                    {isLoading ? 'Loading…' : 'No calls yet.'}
                   </TableCell>
                 </TableRow>
               ) : (

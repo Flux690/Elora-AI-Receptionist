@@ -12,7 +12,7 @@ import {
 
 const vector = customType<{ data: number[] | null }>({
   dataType() {
-    return "vector(1536)";
+    return "vector(2048)";
   },
   toDriver(value) {
     if (!value) return null;
@@ -140,27 +140,11 @@ export const knowledgeItems = pgTable(
     }),
     question: text("question").notNull(),
     answer: text("answer").notNull(),
+    embedding: vector("embedding"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [index("knowledge_items_tenant_created_at_idx").on(table.tenantId, table.createdAt)]
-);
-
-export const knowledgeChunks = pgTable(
-  "knowledge_chunks",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    tenantId: uuid("tenant_id")
-      .notNull()
-      .references(() => tenants.id, { onDelete: "cascade" }),
-    knowledgeItemId: uuid("knowledge_item_id")
-      .notNull()
-      .references(() => knowledgeItems.id, { onDelete: "cascade" }),
-    chunkText: text("chunk_text").notNull(),
-    embedding: vector("embedding"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [index("knowledge_chunks_tenant_id_idx").on(table.tenantId)]
 );
 
 export const appointments = pgTable(
