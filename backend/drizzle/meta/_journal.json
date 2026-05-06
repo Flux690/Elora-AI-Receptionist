@@ -29,6 +29,13 @@
       "when": 1777964553416,
       "tag": "0003_cooing_callisto",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778021863891,
+      "tag": "0004_legal_lord_hawal",
+      "breakpoints": true
     }
   ]
 }

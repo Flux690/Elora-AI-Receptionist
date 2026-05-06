@@ -27,12 +27,24 @@ export interface Call {
   outcome: 'answered' | 'booked' | 'escalated' | 'abandoned' | 'error' | null
 }
 
+export type Vertical = 'salon' | 'spa' | 'clinic' | 'home_service'
+
 export interface Settings {
   name: string
+  vertical: Vertical
   timezone: string
-  systemPrompt: string
+  additionalInstructions: string
   businessProfile: Record<string, string>
   googleCalendarId: string | null
+  phoneNumber: string | null
+  sipDispatchRuleId: string | null
+}
+
+export interface AvailableNumber {
+  id: string
+  e164_format: string
+  locality: string
+  region: string
 }
 
 export interface Appointment {

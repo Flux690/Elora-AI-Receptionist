@@ -39,6 +39,7 @@
     "livekit-server-sdk": "^2.15.2",
     "openai": "^4.103.0",
     "pg": "^8.20.0",
+    "svix": "^1.92.2",
     "zod": "^3.25.20"
   },
   "devDependencies": {

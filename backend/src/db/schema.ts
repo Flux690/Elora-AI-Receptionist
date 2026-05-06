@@ -51,7 +51,7 @@ export const tenants = pgTable("tenants", {
   name: text("name").notNull(),
   vertical: verticalEnum("vertical").notNull(),
   timezone: text("timezone").notNull(),
-  systemPrompt: text("system_prompt").notNull(),
+  additionalInstructions: text("additional_instructions").notNull().default(''),
   businessProfile: jsonb("business_profile")
     .$type<Record<string, unknown>>()
     .notNull()
@@ -59,6 +59,7 @@ export const tenants = pgTable("tenants", {
   phoneNumber: text("phone_number").unique(),
   clerkUserId: text("clerk_user_id").unique(),
   googleCalendarId: text("google_calendar_id"),
+  sipDispatchRuleId: text("sip_dispatch_rule_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
