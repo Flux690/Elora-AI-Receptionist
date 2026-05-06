@@ -22,7 +22,7 @@ import { upsertClient, resolveClientByPhone, type ClientRow } from "../services/
 import { createCall, finishCall } from "../services/calls.js";
 import { createEscalation } from "../services/escalations.js";
 import { searchKnowledge } from "../services/knowledge.js";
-import { resolveTenantByCalledNumber, type TenantRow } from "../services/tenants.js";
+import { resolveTenantByCalledNumber, getTenantById, type TenantRow } from "../services/tenants.js";
 import { createAppointment } from "../services/appointments.js";
 import { checkAvailability, createCalendarEvent } from "../services/calendar.js";
 
@@ -74,8 +74,8 @@ ${callerBlock}
 ## Booking
 ${calendarBlock}
 
-## Additional Rules
-${tenant.systemPrompt}`.trim();
+## Additional Instructions
+${tenant.additionalInstructions}`.trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -257,6 +257,18 @@ export default defineAgent({
   },
 
   entry: async (ctx: JobContext) => {
+    // Try metadata-first resolution (per-tenant dispatch rules)
+    let tenant: TenantRow | null = null;
+    try {
+      const meta = ctx.job.metadata ? JSON.parse(ctx.job.metadata) : null;
+      if (meta?.tenantId) {
+        tenant = await getTenantById(meta.tenantId);
+        if (tenant) console.log(`[worker] resolved tenant from metadata: ${tenant.id}`);
+      }
+    } catch {
+      // malformed metadata — fall through to phone number lookup
+    }
+
     await ctx.connect();
 
     const roomName = ctx.room.name ?? "";
@@ -267,15 +279,17 @@ export default defineAgent({
         ? (participant.attributes["sip.phoneNumber"] ?? "unknown")
         : "dev-participant";
 
-    const calledNumber =
-      participant.kind === ParticipantKind.SIP
-        ? (participant.attributes["sip.trunkPhoneNumber"] ?? "")
-        : "";
-
-    const tenant = calledNumber ? await resolveTenantByCalledNumber(calledNumber) : null;
+    // Fallback: resolve by trunk phone number (platform-wide dispatch rule)
+    if (!tenant) {
+      const calledNumber =
+        participant.kind === ParticipantKind.SIP
+          ? (participant.attributes["sip.trunkPhoneNumber"] ?? "")
+          : "";
+      tenant = calledNumber ? await resolveTenantByCalledNumber(calledNumber) : null;
+    }
 
     if (!tenant) {
-      console.error(`[worker] No tenant found for called number: "${calledNumber}"`);
+      console.error("[worker] No tenant resolved — dropping call");
       return;
     }
 
