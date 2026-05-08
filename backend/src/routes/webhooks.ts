@@ -4,6 +4,11 @@ import { env } from "../env.js";
 import { db } from "../db/client.js";
 import { tenants } from "../db/schema.js";
 
+type ClerkWebhookEvent = {
+  data: { id: string };
+  type: string;
+};
+
 const webhooksRouter = new Hono();
 
 webhooksRouter.post("/clerk", async (c) => {
@@ -20,13 +25,13 @@ webhooksRouter.post("/clerk", async (c) => {
 
   const wh = new Webhook(env.CLERK_WEBHOOK_SECRET);
 
-  let evt: any;
+  let evt: ClerkWebhookEvent;
   try {
     evt = wh.verify(payload, {
       "svix-id": svix_id,
       "svix-timestamp": svix_timestamp,
       "svix-signature": svix_signature,
-    });
+    }) as ClerkWebhookEvent;
   } catch (err) {
     console.error("Webhook verification failed:", err);
     return c.json({ error: "Invalid signature" }, 400);
@@ -41,10 +46,11 @@ webhooksRouter.post("/clerk", async (c) => {
       await db.insert(tenants).values({
         clerkUserId: id,
         name: "",
-        vertical: "salon",
+        industry: "",
         timezone: "UTC",
-        additionalInstructions: "",
-        businessProfile: {},
+        description: "",
+        services: [],
+        agentProfile: { name: "", greeting: "", farewell: "", fallback: "", holdPhrase: "" },
       });
       console.log(`[Webhook] Successfully created tenant for ${id}`);
     } catch (err) {
@@ -56,3 +62,4 @@ webhooksRouter.post("/clerk", async (c) => {
 });
 
 export default webhooksRouter;
+

@@ -55,7 +55,13 @@ export async function getNextAppointment(
   clientId: string
 ): Promise<AppointmentRow | null> {
   const rows = await db
-    .select()
+    .select({
+      id: appointments.id,
+      service: appointments.service,
+      startTime: appointments.startTime,
+      endTime: appointments.endTime,
+      status: appointments.status,
+    })
     .from(appointments)
     .where(
       and(
@@ -67,5 +73,40 @@ export async function getNextAppointment(
     )
     .orderBy(asc(appointments.startTime))
     .limit(1);
+  return (rows[0] as AppointmentRow | undefined) ?? null;
+}
+
+export async function getUpcomingByPhone(tenantId: string, callerPhone: string) {
+  return db
+    .select({
+      id: appointments.id,
+      service: appointments.service,
+      startTime: appointments.startTime,
+      endTime: appointments.endTime,
+      status: appointments.status,
+      googleEventId: appointments.googleEventId,
+    })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.tenantId, tenantId),
+        eq(appointments.callerPhone, callerPhone),
+        gt(appointments.startTime, new Date()),
+        ne(appointments.status, "cancelled")
+      )
+    )
+    .orderBy(asc(appointments.startTime))
+    .limit(10);
+}
+
+export async function cancelAppointmentById(
+  appointmentId: string,
+  tenantId: string
+): Promise<AppointmentRow | null> {
+  const rows = await db
+    .update(appointments)
+    .set({ status: "cancelled" })
+    .where(and(eq(appointments.id, appointmentId), eq(appointments.tenantId, tenantId)))
+    .returning();
   return rows[0] ?? null;
 }

@@ -1,9 +1,9 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { calls } from "../db/schema.js";
+import type { TranscriptEntry, CallOutcome } from "../db/schema.js";
 
 export type CallRow = typeof calls.$inferSelect;
-export type CallOutcome = "answered" | "booked" | "escalated" | "abandoned" | "error";
 
 type CreateCallInput = {
   tenantId: string;
@@ -26,29 +26,72 @@ export async function createCall(input: CreateCallInput): Promise<CallRow> {
   return rows[0];
 }
 
+type FinishCallData = {
+  outcome: CallOutcome;
+  wasBooked: boolean;
+  wasEscalated: boolean;
+  transcript: TranscriptEntry[];
+  summary: string | null;
+  recordingUrl: string | null;
+};
+
 export async function finishCall(
   callId: string,
-  outcome: CallOutcome,
-  transcript?: string,
-  summary?: string
+  data: FinishCallData
 ): Promise<void> {
   await db
     .update(calls)
-    .set({ endedAt: new Date(), outcome, transcript, summary })
+    .set({
+      endedAt: new Date(),
+      outcome: data.outcome,
+      wasBooked: data.wasBooked,
+      wasEscalated: data.wasEscalated,
+      transcript: data.transcript,
+      summary: data.summary,
+      recordingUrl: data.recordingUrl,
+    })
     .where(eq(calls.id, callId));
 }
 
-export async function listCalls(tenantId: string) {
+export async function listCalls(
+  tenantId: string,
+  limit = 50,
+  offset = 0
+) {
   return db
     .select({
       id: calls.id,
+      clientId: calls.clientId,
       callerPhone: calls.callerPhone,
       startedAt: calls.startedAt,
       endedAt: calls.endedAt,
       outcome: calls.outcome,
+      summary: calls.summary,
     })
     .from(calls)
     .where(eq(calls.tenantId, tenantId))
     .orderBy(desc(calls.startedAt))
-    .limit(100);
+    .limit(limit)
+    .offset(offset);
+}
+
+export async function getCallById(callId: string, tenantId: string) {
+  const rows = await db
+    .select({
+      id: calls.id,
+      clientId: calls.clientId,
+      callerPhone: calls.callerPhone,
+      livekitRoomName: calls.livekitRoomName,
+      startedAt: calls.startedAt,
+      endedAt: calls.endedAt,
+      outcome: calls.outcome,
+      transcript: calls.transcript,
+      summary: calls.summary,
+      recordingUrl: calls.recordingUrl,
+    })
+    .from(calls)
+    .where(and(eq(calls.id, callId), eq(calls.tenantId, tenantId)))
+    .limit(1);
+
+  return rows[0] ?? null;
 }

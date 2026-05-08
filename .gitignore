@@ -20,6 +20,7 @@ dist-ssr/
 **/build/
 **/coverage/
 **/dist-ssr/
+*.tsbuildinfo
 
 # Logs
 logs/

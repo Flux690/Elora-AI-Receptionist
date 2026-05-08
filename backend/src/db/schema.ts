@@ -1,4 +1,5 @@
 import {
+  boolean,
   customType,
   index,
   jsonb,
@@ -9,6 +10,9 @@ import {
   uuid,
   unique,
 } from "drizzle-orm/pg-core";
+import type { ServiceItem, AgentProfile, TranscriptEntry } from "@receptionist/shared";
+export type { ServiceItem, AgentProfile, TranscriptEntry } from "@receptionist/shared";
+export type { CallOutcome } from "@receptionist/shared";
 
 const vector = customType<{ data: number[] | null }>({
   dataType() {
@@ -20,12 +24,7 @@ const vector = customType<{ data: number[] | null }>({
   },
 });
 
-export const verticalEnum = pgEnum("vertical", [
-  "salon",
-  "spa",
-  "clinic",
-  "home_service",
-]);
+
 
 export const callOutcomeEnum = pgEnum("call_outcome", [
   "answered",
@@ -49,13 +48,17 @@ export const appointmentStatusEnum = pgEnum("appointment_status", [
 export const tenants = pgTable("tenants", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
-  vertical: verticalEnum("vertical").notNull(),
+  industry: text("industry").notNull().default(""),
   timezone: text("timezone").notNull(),
-  additionalInstructions: text("additional_instructions").notNull().default(''),
-  businessProfile: jsonb("business_profile")
-    .$type<Record<string, unknown>>()
-    .notNull()
-    .default({}),
+  description: text("description").notNull().default(""),
+  services: jsonb("services").$type<ServiceItem[]>().notNull().default([]),
+  agentProfile: jsonb("agent_profile").$type<AgentProfile>().notNull().default({
+    name: "",
+    greeting: "",
+    farewell: "",
+    fallback: "",
+    holdPhrase: "",
+  }),
   phoneNumber: text("phone_number").unique(),
   clerkUserId: text("clerk_user_id").unique(),
   googleCalendarId: text("google_calendar_id"),
@@ -96,8 +99,11 @@ export const calls = pgTable(
     startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
     endedAt: timestamp("ended_at", { withTimezone: true }),
     outcome: callOutcomeEnum("outcome"),
-    transcript: text("transcript"),
+    transcript: jsonb("transcript").$type<TranscriptEntry[]>(),
     summary: text("summary"),
+    recordingUrl: text("recording_url"),
+    wasBooked: boolean("was_booked").notNull().default(false),
+    wasEscalated: boolean("was_escalated").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [index("calls_tenant_started_at_idx").on(table.tenantId, table.startedAt)]

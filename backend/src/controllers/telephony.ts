@@ -7,6 +7,7 @@ import {
   createSipDispatchRule,
   deleteSipDispatchRule,
 } from "../services/telephony.js";
+import { phoneProvisionSchema } from "../schemas.js";
 
 export async function search(c: AppContext) {
   const areaCode = c.req.query("areaCode") ?? "";
@@ -19,7 +20,9 @@ export async function provision(c: AppContext) {
   const tenant = await getTenantById(tenantId);
   if (!tenant) return c.json({ error: "Tenant not found" }, 404);
 
-  const { phoneNumber } = await c.req.json<{ phoneNumber: string }>();
+  const parsed = phoneProvisionSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400);
+  const { phoneNumber } = parsed.data;
 
   const sipDispatchRuleId = await createSipDispatchRule(tenantId);
 

@@ -36,6 +36,20 @@
       "when": 1778021863891,
       "tag": "0004_legal_lord_hawal",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1778153549555,
+      "tag": "0005_small_hellion",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1778189245893,
+      "tag": "0006_familiar_johnny_blaze",
+      "breakpoints": true
     }
   ]
 }

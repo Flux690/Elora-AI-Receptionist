@@ -68,10 +68,17 @@ export async function getEscalationById(
   tenantId: string
 ): Promise<EscalationRow | null> {
   const rows = await db
-    .select()
+    .select({
+      id: escalations.id,
+      tenantId: escalations.tenantId,
+      question: escalations.question,
+      answer: escalations.answer,
+      status: escalations.status,
+      callerPhone: escalations.callerPhone,
+    })
     .from(escalations)
     .where(and(eq(escalations.id, id), eq(escalations.tenantId, tenantId)))
     .limit(1);
 
-  return rows[0] ?? null;
+  return (rows[0] as EscalationRow | undefined) ?? null;
 }

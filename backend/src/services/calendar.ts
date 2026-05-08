@@ -78,7 +78,7 @@ export async function createCalendarEvent(
       },
       body: JSON.stringify({
         summary: event.summary,
-        description: event.description ?? "Booked via Elora AI Receptionist",
+        description: event.description ?? "Booked via AI Receptionist",
         start: { dateTime: event.startIso, timeZone: event.timezone },
         end: { dateTime: event.endIso, timeZone: event.timezone },
       }),
@@ -92,4 +92,23 @@ export async function createCalendarEvent(
 
   const data = (await res.json()) as { id: string };
   return data.id;
+}
+
+export async function deleteCalendarEvent(
+  accessToken: string,
+  calendarId: string,
+  eventId: string
+): Promise<void> {
+  const res = await fetch(
+    `${GOOGLE_CALENDAR_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  if (!res.ok && res.status !== 410) {
+    const body = await res.text();
+    throw new Error(`[calendar] deleteEvent failed: ${res.status} ${body}`);
+  }
 }

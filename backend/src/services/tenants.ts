@@ -4,33 +4,64 @@ import { tenants } from "../db/schema.js";
 
 export type TenantRow = typeof tenants.$inferSelect;
 
-export async function resolveTenantByCalledNumber(
-  calledNumber: string
-): Promise<TenantRow | null> {
-  const rows = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.phoneNumber, calledNumber))
-    .limit(1);
+/* Fields returned to the API layer (settings, onboarding, phone) */
+const tenantFields = {
+  id: tenants.id,
+  name: tenants.name,
+  industry: tenants.industry,
+  timezone: tenants.timezone,
+  description: tenants.description,
+  services: tenants.services,
+  agentProfile: tenants.agentProfile,
+  phoneNumber: tenants.phoneNumber,
+  clerkUserId: tenants.clerkUserId,
+  googleCalendarId: tenants.googleCalendarId,
+  sipDispatchRuleId: tenants.sipDispatchRuleId,
+} as const;
 
-  return rows[0] ?? null;
-}
+/* Tighter subset for the agent worker — no sipDispatchRuleId */
+const workerFields = {
+  id: tenants.id,
+  name: tenants.name,
+  industry: tenants.industry,
+  timezone: tenants.timezone,
+  description: tenants.description,
+  services: tenants.services,
+  agentProfile: tenants.agentProfile,
+  phoneNumber: tenants.phoneNumber,
+  googleCalendarId: tenants.googleCalendarId,
+  clerkUserId: tenants.clerkUserId,
+} as const;
+
+export type WorkerTenant = {
+  [K in keyof typeof workerFields]: TenantRow[K];
+};
 
 export async function resolveTenantByClerkUserId(
   clerkUserId: string
 ): Promise<TenantRow | null> {
   const rows = await db
-    .select()
+    .select(tenantFields)
     .from(tenants)
     .where(eq(tenants.clerkUserId, clerkUserId))
     .limit(1);
 
-  return rows[0] ?? null;
+  return (rows[0] as TenantRow | undefined) ?? null;
 }
 
 export async function getTenantById(id: string): Promise<TenantRow | null> {
   const rows = await db
-    .select()
+    .select(tenantFields)
+    .from(tenants)
+    .where(eq(tenants.id, id))
+    .limit(1);
+
+  return (rows[0] as TenantRow | undefined) ?? null;
+}
+
+export async function getTenantForWorker(id: string): Promise<WorkerTenant | null> {
+  const rows = await db
+    .select(workerFields)
     .from(tenants)
     .where(eq(tenants.id, id))
     .limit(1);
@@ -40,7 +71,7 @@ export async function getTenantById(id: string): Promise<TenantRow | null> {
 
 export async function createTenant(input: {
   name: string;
-  vertical: "salon" | "spa" | "clinic" | "home_service";
+  industry: string;
   timezone: string;
   clerkUserId: string;
 }): Promise<TenantRow> {
@@ -48,8 +79,9 @@ export async function createTenant(input: {
     .insert(tenants)
     .values({
       ...input,
-      additionalInstructions: "",
-      businessProfile: {},
+      description: "",
+      services: [],
+      agentProfile: { name: "", greeting: "", farewell: "", fallback: "", holdPhrase: "" },
     })
     .returning();
   return rows[0];
@@ -61,7 +93,10 @@ export async function deleteTenant(id: string): Promise<void> {
 
 export async function updateTenant(
   id: string,
-  patch: Partial<Pick<TenantRow, "name" | "vertical" | "additionalInstructions" | "businessProfile" | "timezone" | "googleCalendarId" | "phoneNumber" | "sipDispatchRuleId">>
+  patch: Partial<Pick<TenantRow,
+    "name" | "industry" | "description" | "services" | "agentProfile" |
+    "timezone" | "googleCalendarId" | "phoneNumber" | "sipDispatchRuleId"
+  >>
 ): Promise<void> {
   await db
     .update(tenants)
