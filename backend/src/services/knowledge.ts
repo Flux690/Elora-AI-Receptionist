@@ -1,8 +1,34 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { knowledgeItems } from "../db/schema.js";
-import { embedText } from "./embeddings.js";
+import OpenAI from "openai";
+import { env } from "../env.js";
 import type { EscalationRow } from "./escalations.js";
+
+const openai = new OpenAI({
+  apiKey: env.OPENROUTER_API_KEY,
+  baseURL: env.OPENROUTER_BASE_URL,
+});
+
+async function embedText(text: string): Promise<number[] | null> {
+  try {
+    const response = await openai.embeddings.create({
+      model: env.EMBEDDING_MODEL,
+      input: text,
+      encoding_format: "float",
+    });
+    const embedding = response.data?.[0]?.embedding;
+    if (!embedding?.length) {
+      console.warn("[embeddings] empty embedding returned. model:", env.EMBEDDING_MODEL);
+      console.warn("[embeddings] full response:", JSON.stringify(response, null, 2));
+      return null;
+    }
+    return embedding;
+  } catch (err) {
+    console.error("[embeddings] API call failed:", err);
+    return null;
+  }
+}
 
 export type KnowledgeItemRow = typeof knowledgeItems.$inferSelect;
 

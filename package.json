@@ -1,14 +1,15 @@
 {
-  "name": "elora-ai-receptionist",
+  "name": "ai-receptionist",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "workspaces": [
+    "shared",
     "backend",
     "frontend"
   ],
   "scripts": {
-    "typecheck": "npm run typecheck -w backend",
+    "typecheck": "npm run typecheck -w shared && npm run typecheck -w backend && npm run typecheck -w frontend",
     "dev:backend": "npm run dev -w backend",
     "dev:agent": "npm run agent -w backend",
     "dev:frontend": "npm run dev -w frontend",

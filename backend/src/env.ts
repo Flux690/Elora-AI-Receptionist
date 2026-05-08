@@ -13,6 +13,10 @@ const envSchema = z.object({
   OPENROUTER_BASE_URL: z.string().default("https://openrouter.ai/api/v1"),
   LLM_MODEL: z.string().default("openai/gpt-oss-20b:free"),
   EMBEDDING_MODEL: z.string().default("nvidia/llama-nemotron-embed-vl-1b-v2:free"),
+  R2_ACCOUNT_ID: z.string().min(1, "R2_ACCOUNT_ID is required"),
+  R2_ACCESS_KEY_ID: z.string().min(1, "R2_ACCESS_KEY_ID is required"),
+  R2_SECRET_ACCESS_KEY: z.string().min(1, "R2_SECRET_ACCESS_KEY is required"),
+  R2_BUCKET_NAME: z.string().default("call-recordings"),
 });
 
 const _env = envSchema.safeParse(process.env);
