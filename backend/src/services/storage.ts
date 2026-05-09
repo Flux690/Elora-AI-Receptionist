@@ -1,4 +1,5 @@
-import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { EgressClient, EncodedFileOutput, EncodedFileType, S3Upload } from "livekit-server-sdk";
 import { env } from "../env.js";
 
@@ -54,6 +55,14 @@ export async function startCallRecording(
 export async function stopCallRecording(egressId: string): Promise<void> {
   await egressClient.stopEgress(egressId);
   console.log(`[storage] egress stopped: ${egressId}`);
+}
+
+export async function getPresignedRecordingUrl(callId: string): Promise<string> {
+  return getSignedUrl(
+    r2,
+    new GetObjectCommand({ Bucket: env.R2_BUCKET_NAME, Key: recordingKey(callId) }),
+    { expiresIn: 3600 }
+  );
 }
 
 export async function deleteRecording(callId: string): Promise<void> {
