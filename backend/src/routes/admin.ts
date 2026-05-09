@@ -21,6 +21,7 @@ router.get("/knowledge", KnowledgeController.list);
 router.delete("/knowledge/:id", KnowledgeController.remove);
 router.get("/calls", CallsController.list);
 router.get("/calls/:id", CallsController.getById);
+router.get("/calls/:id/recording", CallsController.getRecordingUrl);
 router.get("/appointments", AppointmentsController.list);
 router.get("/settings", SettingsController.getSettings);
 router.patch("/settings", SettingsController.updateSettings);
