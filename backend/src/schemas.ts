@@ -35,6 +35,7 @@ export const onboardingCreateSchema = z.object({
   services: z.array(serviceItemSchema).default([]),
   timezone: z.string().default("UTC"),
   agentProfile: agentProfileSchema.optional(),
+  phoneNumber: z.string().min(1),
 });
 
 export const escalationResolveSchema = z.object({

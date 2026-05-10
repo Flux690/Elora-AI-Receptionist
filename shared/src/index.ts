@@ -95,5 +95,4 @@ export interface BusinessSettings {
   agentProfile: AgentProfile;
   phoneNumber: string | null;
   googleCalendarId: string | null;
-  sipDispatchRuleId: string | null;
 }

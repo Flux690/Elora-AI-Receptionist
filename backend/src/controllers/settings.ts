@@ -1,7 +1,6 @@
 import type { AppContext } from "../types.js";
 import { getTenantById, updateTenant } from "../services/tenants.js";
 import { updateSettingsSchema } from "../schemas.js";
-import { invalidateTenant } from "../agent/tts-cache.js";
 
 export async function getSettings(c: AppContext) {
   const tenantId = c.get("tenantId");
@@ -43,7 +42,6 @@ export async function updateSettings(c: AppContext) {
     const tenant = await getTenantById(tenantId);
     if (!tenant) return c.json({ error: "Tenant not found" }, 404);
     patch.agentProfile = { ...tenant.agentProfile, ...body.agent };
-    invalidateTenant(tenantId);
   }
 
   await updateTenant(tenantId, patch);
