@@ -14,7 +14,8 @@ import type {
   KnowledgeItem,
 } from '@/types/api'
 
-// ── Helpers ──────────────────────────────────────────────────────
+
+// Helpers
 
 function formatDuration(startedAt: string, endedAt: string | null): string {
   if (!endedAt) return '—'
@@ -42,7 +43,8 @@ function formatPhone(phone: string): string {
   return phone
 }
 
-// ── Status badges ─────────────────────────────────────────────────
+
+// Status badges
 
 function OutcomeBadge({ outcome }: { outcome: string | null }) {
   if (!outcome) return <span className="text-xs text-text-3">—</span>
@@ -67,7 +69,8 @@ function AppointmentBadge({ status }: { status: string }) {
   return <span className={`text-xs font-medium ${s.color}`}>{s.label}</span>
 }
 
-// ── Audio player ──────────────────────────────────────────────────
+
+// Audio player
 
 function AudioPlayer({ callId, callDetail }: { callId: string; callDetail: CallDetail }) {
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -206,7 +209,7 @@ function AudioPlayer({ callId, callDetail }: { callId: string; callDetail: CallD
               } ${entry.role === 'assistant' ? 'pl-6' : ''}`}
             >
               <span className={`mr-2 font-semibold ${entry.role === 'assistant' ? 'text-accent' : 'text-text-1'}`}>
-                {entry.role === 'assistant' ? 'Elora' : 'Caller'}
+                {entry.role === 'assistant' ? 'Agent' : 'Caller'}
               </span>
               {entry.text}
             </button>
@@ -217,7 +220,8 @@ function AudioPlayer({ callId, callDetail }: { callId: string; callDetail: CallD
   )
 }
 
-// ── Call detail drawer ────────────────────────────────────────────
+
+// Call detail drawer
 
 function CallDetailDrawer({
   callId,
@@ -277,7 +281,8 @@ function CallDetailDrawer({
   )
 }
 
-// ── Escalation drawer ─────────────────────────────────────────────
+
+// Escalation drawer
 
 function EscalationDrawer({
   escalation,
@@ -355,7 +360,8 @@ function EscalationDrawer({
   )
 }
 
-// ── Calls tab ─────────────────────────────────────────────────────
+
+// Calls tab
 
 function CallsTab({ onSelectCall }: { onSelectCall: (id: string) => void }) {
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
@@ -420,7 +426,8 @@ function CallsTab({ onSelectCall }: { onSelectCall: (id: string) => void }) {
   )
 }
 
-// ── Escalations tab ───────────────────────────────────────────────
+
+// Escalations tab
 
 function EscalationsTab({ onSelectEscalation }: { onSelectEscalation: (e: EscalationItem) => void }) {
   const [status, setStatus] = useState<EscalationStatus>('pending')
@@ -485,7 +492,8 @@ function EscalationsTab({ onSelectEscalation }: { onSelectEscalation: (e: Escala
   )
 }
 
-// ── Appointments tab ──────────────────────────────────────────────
+
+// Appointments tab
 
 function AppointmentsTab() {
   const { data, isLoading } = useQuery({
@@ -526,7 +534,8 @@ function AppointmentsTab() {
   )
 }
 
-// ── Knowledge tab ─────────────────────────────────────────────────
+
+// Knowledge tab
 
 function KnowledgeTab() {
   const qc = useQueryClient()
@@ -578,7 +587,8 @@ function KnowledgeTab() {
   )
 }
 
-// ── Main Dashboard ────────────────────────────────────────────────
+
+// Dashboard
 
 type TabId = 'calls' | 'escalations' | 'appointments' | 'knowledge'
 

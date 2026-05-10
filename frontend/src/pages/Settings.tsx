@@ -16,7 +16,8 @@ function formatPhone(phone: string): string {
   return phone
 }
 
-// ── Business tab ──────────────────────────────────────────────────
+
+// Business
 
 function BusinessTab({ settings }: { settings: Settings }) {
   const qc = useQueryClient()
@@ -124,7 +125,8 @@ function BusinessTab({ settings }: { settings: Settings }) {
   )
 }
 
-// ── Agent tab ─────────────────────────────────────────────────────
+
+// Agent
 
 function AgentTab({ settings }: { settings: Settings }) {
   const qc = useQueryClient()
@@ -169,7 +171,8 @@ function AgentTab({ settings }: { settings: Settings }) {
   )
 }
 
-// ── System tab ────────────────────────────────────────────────────
+
+// System
 
 function SystemTab({ settings }: { settings: Settings }) {
   const qc = useQueryClient()
@@ -360,9 +363,10 @@ function SystemTab({ settings }: { settings: Settings }) {
   )
 }
 
-// ── Settings page ─────────────────────────────────────────────────
 
 type SettingsTab = 'business' | 'agent' | 'system'
+
+// Settings page
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<SettingsTab>('business')
