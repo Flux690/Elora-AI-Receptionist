@@ -1,14 +1,57 @@
-export interface Metrics {
-  totalCalls: number
-  pendingEscalations: number
+export type CallOutcome = 'answered' | 'booked' | 'escalated' | 'abandoned' | 'error'
+export type EscalationStatus = 'pending' | 'resolved'
+export type AppointmentStatus = 'requested' | 'confirmed' | 'cancelled'
+export type Period = 'today' | '7d' | '30d'
+
+export interface ServiceItem {
+  name: string
+  price: string
+  description?: string
 }
 
-export interface Escalation {
+export interface AgentProfile {
+  name: string
+  greeting: string
+  farewell: string
+  fallback: string
+  holdPhrase: string
+}
+
+export interface TranscriptEntry {
+  role: 'user' | 'assistant'
+  text: string
+  startTime?: number
+}
+
+export interface DashboardMetrics {
+  totalCalls: number
+  confirmedBookings: number
+  pendingEscalations: number
+  abandonedCalls: number
+}
+
+export interface CallListItem {
   id: string
+  clientId: string | null
+  callerPhone: string
+  startedAt: string
+  endedAt: string | null
+  outcome: CallOutcome | null
+  summary: string | null
+}
+
+export interface CallDetail extends CallListItem {
+  livekitRoomName: string
+  transcript: TranscriptEntry[] | null
+  recordingUrl: string | null
+}
+
+export interface EscalationItem {
+  id: string
+  callerPhone: string
   question: string
-  status: 'pending' | 'resolved'
+  status: EscalationStatus
   answer: string | null
-  callerPhone: string | null
   createdAt: string
 }
 
@@ -19,25 +62,28 @@ export interface KnowledgeItem {
   createdAt: string
 }
 
-export interface Call {
+export interface AppointmentItem {
   id: string
-  callerPhone: string | null
-  startedAt: string
-  endedAt: string | null
-  outcome: 'answered' | 'booked' | 'escalated' | 'abandoned' | 'error' | null
+  callerPhone: string
+  service: string
+  startTime: string | null
+  endTime: string | null
+  status: AppointmentStatus
+  googleEventId: string | null
+  createdAt: string
 }
 
-export type Vertical = 'salon' | 'spa' | 'clinic' | 'home_service'
-
 export interface Settings {
-  name: string
-  vertical: Vertical
-  timezone: string
-  additionalInstructions: string
-  businessProfile: Record<string, string>
-  googleCalendarId: string | null
-  phoneNumber: string | null
-  sipDispatchRuleId: string | null
+  business: {
+    name: string
+    industry: string
+    timezone: string
+    description: string
+    services: ServiceItem[]
+    phoneNumber: string | null
+    googleCalendarId: string | null
+  }
+  agent: AgentProfile
 }
 
 export interface AvailableNumber {
@@ -45,15 +91,4 @@ export interface AvailableNumber {
   e164_format: string
   locality: string
   region: string
-}
-
-export interface Appointment {
-  id: string
-  callerPhone: string
-  service: string
-  startTime: string | null
-  endTime: string | null
-  status: 'requested' | 'confirmed' | 'cancelled'
-  googleEventId: string | null
-  createdAt: string
 }

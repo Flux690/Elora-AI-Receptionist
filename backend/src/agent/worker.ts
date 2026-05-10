@@ -5,7 +5,6 @@ import {
   cli,
   defineAgent,
   inference,
-  tts as ttsNs,
   voice,
 } from "@livekit/agents";
 import * as livekit from "@livekit/agents-plugin-livekit";
@@ -18,14 +17,13 @@ import type { CallOutcome } from "@receptionist/shared";
 import { env } from "../env.js";
 import { upsertClient } from "../services/clients.js";
 import { createCall, finishCall } from "../services/calls.js";
-import { getTenantForWorker } from "../services/tenants.js";
+import { getTenantByPhoneNumber } from "../services/tenants.js";
 import { startCallRecording, stopCallRecording, recordingKey } from "../services/storage.js";
 import type { AgentDeps, CallState } from "./types.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { createAgentTools } from "./tools.js";
 import { extractTranscript } from "./transcript.js";
 import { generateCallSummary } from "./summary.js";
-import { sayCached } from "./tts-cache.js";
 
 const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
 
@@ -35,35 +33,23 @@ export default defineAgent({
   },
 
   entry: async (ctx: JobContext) => {
-    // 1. Parse metadata → tenantId
-    let tenantId: string | null = null;
-    try {
-      const meta = ctx.job.metadata ? JSON.parse(ctx.job.metadata) : null;
-      tenantId = meta?.tenantId ?? null;
-    } catch {
-      // malformed metadata
-    }
-    if (!tenantId) {
-      console.error("[worker] No tenantId in metadata — dropping call");
-      return;
-    }
-
-    // 2. Fetch tenant
-    const tenant = await getTenantForWorker(tenantId);
-    if (!tenant) {
-      console.error(`[worker] Tenant ${tenantId} not found — dropping call`);
-      return;
-    }
-    console.log(`[worker] resolved tenant: ${tenant.id}`);
-
-    // 3-4. Connect + wait for participant
+    // 1. Connect + wait for participant
     await ctx.connect();
     const roomName = ctx.room.name ?? "";
     const participant = await ctx.waitForParticipant();
-    const callerPhone =
-      participant.kind === ParticipantKind.SIP
-        ? (participant.attributes["sip.phoneNumber"] ?? "unknown")
-        : "dev-participant";
+
+    const isSip = participant.kind === ParticipantKind.SIP;
+    const callerPhone = isSip ? (participant.attributes["sip.phoneNumber"] ?? "unknown") : "dev-participant";
+    const rawTrunk = isSip ? (participant.attributes["sip.trunkPhoneNumber"] ?? "") : "";
+    const trunkPhone = rawTrunk && !rawTrunk.startsWith("+") ? `+${rawTrunk}` : rawTrunk;
+
+    // 2. Resolve tenant by the number that was dialed
+    const tenant = trunkPhone ? await getTenantByPhoneNumber(trunkPhone) : null;
+    if (!tenant) {
+      console.error(`[worker] No tenant for trunkPhoneNumber="${rawTrunk}" (normalized: "${trunkPhone}") — dropping call`);
+      return;
+    }
+    console.log(`[worker] resolved tenant: ${tenant.id}`);
 
     // 5. Fire background Google OAuth token fetch (no await)
     const tokenPromise: Promise<string | null> =
@@ -115,7 +101,7 @@ export default defineAgent({
 
     // 10. Start session
     await session.start({
-      agent: new ReceptionistAgent(deps, agentTts),
+      agent: new ReceptionistAgent(deps),
       room: ctx.room,
     });
 
@@ -188,19 +174,19 @@ export default defineAgent({
 
     const greeting = tenant.agentProfile.greeting;
     if (greeting) {
-      sayCached(session, agentTts, `${tenant.id}:greeting`, greeting);
+      session.say(greeting);
     }
 
     // 14. Control returns to LiveKit framework — user speaks, tools fire
   },
 });
 
-// Agent class — receives deps + tts, delegates prompt and tools
+// Agent class — receives deps, delegates prompt and tools
 class ReceptionistAgent extends voice.Agent {
-  constructor(deps: AgentDeps, tts: ttsNs.TTS) {
+  constructor(deps: AgentDeps) {
     super({
       instructions: buildSystemPrompt(deps),
-      tools: createAgentTools(deps, tts),
+      tools: createAgentTools(deps),
     });
   }
 }

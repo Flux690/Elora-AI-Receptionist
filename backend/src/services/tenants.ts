@@ -4,7 +4,6 @@ import { tenants } from "../db/schema.js";
 
 export type TenantRow = typeof tenants.$inferSelect;
 
-/* Fields returned to the API layer (settings, onboarding, phone) */
 const tenantFields = {
   id: tenants.id,
   name: tenants.name,
@@ -16,54 +15,39 @@ const tenantFields = {
   phoneNumber: tenants.phoneNumber,
   clerkUserId: tenants.clerkUserId,
   googleCalendarId: tenants.googleCalendarId,
-  sipDispatchRuleId: tenants.sipDispatchRuleId,
-} as const;
-
-/* Tighter subset for the agent worker — no sipDispatchRuleId */
-const workerFields = {
-  id: tenants.id,
-  name: tenants.name,
-  industry: tenants.industry,
-  timezone: tenants.timezone,
-  description: tenants.description,
-  services: tenants.services,
-  agentProfile: tenants.agentProfile,
-  phoneNumber: tenants.phoneNumber,
-  googleCalendarId: tenants.googleCalendarId,
-  clerkUserId: tenants.clerkUserId,
 } as const;
 
 export type WorkerTenant = {
-  [K in keyof typeof workerFields]: TenantRow[K];
+  [K in keyof typeof tenantFields]: TenantRow[K];
 };
 
 export async function resolveTenantByClerkUserId(
   clerkUserId: string
-): Promise<TenantRow | null> {
+): Promise<WorkerTenant | null> {
   const rows = await db
     .select(tenantFields)
     .from(tenants)
     .where(eq(tenants.clerkUserId, clerkUserId))
     .limit(1);
 
-  return (rows[0] as TenantRow | undefined) ?? null;
+  return rows[0] ?? null;
 }
 
-export async function getTenantById(id: string): Promise<TenantRow | null> {
+export async function getTenantById(id: string): Promise<WorkerTenant | null> {
   const rows = await db
     .select(tenantFields)
     .from(tenants)
     .where(eq(tenants.id, id))
     .limit(1);
 
-  return (rows[0] as TenantRow | undefined) ?? null;
+  return rows[0] ?? null;
 }
 
-export async function getTenantForWorker(id: string): Promise<WorkerTenant | null> {
+export async function getTenantByPhoneNumber(phoneNumber: string): Promise<WorkerTenant | null> {
   const rows = await db
-    .select(workerFields)
+    .select(tenantFields)
     .from(tenants)
-    .where(eq(tenants.id, id))
+    .where(eq(tenants.phoneNumber, phoneNumber))
     .limit(1);
 
   return rows[0] ?? null;
@@ -74,16 +58,19 @@ export async function createTenant(input: {
   industry: string;
   timezone: string;
   clerkUserId: string;
-}): Promise<TenantRow> {
+  description?: string;
+  services?: import("@receptionist/shared").ServiceItem[];
+  agentProfile?: import("@receptionist/shared").AgentProfile;
+}): Promise<WorkerTenant> {
   const rows = await db
     .insert(tenants)
     .values({
-      ...input,
       description: "",
       services: [],
       agentProfile: { name: "", greeting: "", farewell: "", fallback: "", holdPhrase: "" },
+      ...input,
     })
-    .returning();
+    .returning(tenantFields);
   return rows[0];
 }
 
@@ -95,7 +82,7 @@ export async function updateTenant(
   id: string,
   patch: Partial<Pick<TenantRow,
     "name" | "industry" | "description" | "services" | "agentProfile" |
-    "timezone" | "googleCalendarId" | "phoneNumber" | "sipDispatchRuleId"
+    "timezone" | "googleCalendarId" | "phoneNumber"
   >>
 ): Promise<void> {
   await db

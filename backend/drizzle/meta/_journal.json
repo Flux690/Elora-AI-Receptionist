@@ -50,6 +50,13 @@
       "when": 1778189245893,
       "tag": "0006_familiar_johnny_blaze",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1778418871202,
+      "tag": "0007_lame_taskmaster",
+      "breakpoints": true
     }
   ]
 }

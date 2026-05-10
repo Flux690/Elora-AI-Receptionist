@@ -62,7 +62,6 @@ export const tenants = pgTable("tenants", {
   phoneNumber: text("phone_number").unique(),
   clerkUserId: text("clerk_user_id").unique(),
   googleCalendarId: text("google_calendar_id"),
-  sipDispatchRuleId: text("sip_dispatch_rule_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

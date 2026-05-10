@@ -4,38 +4,34 @@
 
 Elora is a telephony-first AI receptionist for appointment-based local businesses (salons, spas, clinics). Customers call a real phone number. LiveKit SIP routes the call to the Elora agent. The agent answers questions, escalates unknowns to a human admin, and books appointments via Google Calendar.
 
-It is being built as a B2B SaaS portfolio project. The data model is multi-tenant from day one — every table has a `tenant_id`, and each paying business is one tenant.
+Built as a B2B SaaS portfolio project. Multi-tenant from day one — every table has a `tenant_id`.
 
 ## Workspace layout
 
 ```
-/                        ← npm workspace root
+/                        ← npm workspace root (package.json, package-lock.json)
+├── shared/              ← Type contracts only — no build step, no runtime code
 ├── backend/             ← Hono API server + LiveKit agent worker (TypeScript)
 ├── frontend/            ← Admin dashboard (React + Vite)
-├── PRD-v2.md            ← Product requirements (source of truth for design decisions)
 └── CLAUDE.md            ← this file
 ```
 
+### shared/ — type contracts
+
+`shared/src/index.ts` exports domain types (`ServiceItem`, `AgentProfile`, `CallOutcome`, API response shapes, etc.) imported as `@receptionist/shared` in both backend and frontend. It has a `package.json` only to register the workspace name — no build step, no compiled output, types are consumed directly via the `exports` field pointing at the `.ts` source. TypeScript is hoisted from the root workspace; `shared/` has no `node_modules`.
+
 ## How to run things
 
-All commands from the workspace root unless noted.
+All commands from the workspace root.
 
 ```bash
-# API server (hot reload)
-npm run dev -w backend          # → http://localhost:8080
+npm run dev:backend     # API server with hot reload → http://localhost:8080
+npm run dev:agent       # LiveKit agent worker (separate process)
+npm run dev:frontend    # Frontend dev server → http://localhost:5173
 
-# LiveKit agent worker (separate process)
-npm run agent -w backend        # registers as "receptionist" with LiveKit Cloud
-
-# Production build
-npm run build -w backend
-
-# Database migrations
-npm run db:generate -w backend  # generate migration from schema changes
-npm run db:migrate -w backend   # apply migrations to Neon Postgres
-
-# Frontend dev server
-npm run dev -w frontend         # → http://localhost:5173
+# Database migrations (from root)
+npm run db:generate -w backend   # generate migration from schema changes
+npm run db:migrate -w backend    # apply migrations to Neon Postgres
 ```
 
 ## Backend architecture
@@ -43,34 +39,39 @@ npm run dev -w frontend         # → http://localhost:5173
 Two processes from one package:
 
 1. **API server** (`src/index.ts`) — Hono, serves admin dashboard at `/api/admin/*`, health at `/api/health`
-2. **Agent worker** (`src/agent/worker.ts`) — Long-running LiveKit agent process, one per deployment, handles all concurrent calls
+2. **Agent worker** (`src/agent/worker.ts`) — Long-running LiveKit agent process, handles all concurrent calls
 
-### Key directories
+### Directory structure
 
 ```
 backend/src/
 ├── agent/
-│   ├── worker.ts        ← Full agent: defineAgent, Agent class, tool definitions
-│   └── prompt.md        ← Base system prompt (business context injected at runtime)
+│   ├── worker.ts        ← Entry point: defineAgent, session setup, ReceptionistAgent class
+│   ├── tools.ts         ← All LLM tool definitions (searchKnowledge, createEscalation, etc.)
+│   ├── prompt.ts        ← buildSystemPrompt() — injects tenant/caller context at call time
+│   ├── types.ts         ← AgentDeps, CallState
+│   ├── summary.ts       ← Post-call summary generation
+│   └── transcript.ts    ← Transcript extraction from session history
 ├── controllers/         ← HTTP logic — parse input, call service, return response
-│   ├── health.ts
-│   ├── metrics.ts
-│   ├── escalations.ts
-│   ├── knowledge.ts
-│   ├── calls.ts
+│   ├── account.ts
 │   ├── appointments.ts
-│   └── settings.ts
+│   ├── calls.ts
+│   ├── escalations.ts
+│   ├── health.ts
+│   ├── knowledge.ts
+│   ├── metrics.ts
+│   ├── onboarding.ts
+│   ├── settings.ts
+│   └── telephony.ts
 ├── db/
 │   ├── client.ts        ← Drizzle + pg Pool, exported as `db`
-│   └── schema.ts        ← All 8 table definitions + enums
+│   └── schema.ts        ← All 6 table definitions + enums
 ├── middleware/
 │   └── auth.ts          ← Clerk JWT verification + tenant resolution
 ├── routes/
-│   ├── index.ts         ← Mounts /health + /admin
+│   ├── index.ts         ← Mounts /health, /onboarding, /admin
 │   ├── health.ts
-│   └── admin/
-│       ├── index.ts     ← Applies auth middleware, mounts routes
-│       └── routes.ts    ← All 9 admin route definitions
+│   └── admin.ts         ← Applies auth middleware, all admin route definitions
 ├── services/            ← All DB access — one file per domain
 │   ├── tenants.ts
 │   ├── clients.ts
@@ -78,9 +79,11 @@ backend/src/
 │   ├── escalations.ts
 │   ├── knowledge.ts
 │   ├── appointments.ts
-│   ├── calendar.ts      ← Google Calendar free/busy + event creation (no googleapis package)
-│   └── embeddings.ts
+│   ├── calendar.ts      ← Google Calendar free/busy + event creation (raw fetch, no googleapis)
+│   ├── telephony.ts     ← LiveKit phone number search/purchase/release via Twirp HTTP API
+│   └── storage.ts       ← LiveKit Egress recording start/stop + presigned URL
 ├── types.ts             ← AppEnv, AppContext shared Hono types
+├── schemas.ts           ← Zod request validation schemas
 └── env.ts               ← Zod-validated env loader
 ```
 
@@ -100,17 +103,17 @@ backend/src/
 
 All `/api/admin/*` routes go through two middleware in sequence:
 
-1. `clerkAuth` (`@hono/clerk-auth`) — verifies the Clerk JWT from the `Authorization: Bearer` header. Reads `CLERK_SECRET_KEY` from env automatically.
+1. `clerkAuth` (`@hono/clerk-auth`) — verifies the Clerk JWT from the `Authorization: Bearer` header.
 2. `requireTenant` — extracts `userId` from the verified token, looks up the tenant by `clerkUserId`, injects `tenantId` into Hono context.
 
 If no valid token → 401. If no tenant found for that userId → 404.
 
 ### Linking a tenant to a Clerk user
 
-On first sign-in the user gets a Clerk `userId`. Link it to the tenant manually in Neon until the onboarding flow is built:
+On first sign-in the user gets a Clerk `userId`. Link it to the tenant manually in Neon until the onboarding flow is used:
 
 ```sql
-UPDATE tenants SET clerk_user_id = 'user_xxxxxxxxx' WHERE phone_number = '14843040147';
+UPDATE tenants SET clerk_user_id = 'user_xxxxxxxxx' WHERE phone_number = '+14843040147';
 ```
 
 ### Environment variables for Clerk
@@ -119,16 +122,15 @@ UPDATE tenants SET clerk_user_id = 'user_xxxxxxxxx' WHERE phone_number = '148430
 |----------|-------|---------|
 | `CLERK_SECRET_KEY` | `backend/.env` | JWT verification + Clerk API (OAuth token fetch in agent) — never expose |
 | `VITE_CLERK_PUBLISHABLE_KEY` | `frontend/.env` | `<ClerkProvider>` — safe to expose |
-| `VITE_CLERK_SIGN_IN_URL` | `frontend/.env` | Tells Clerk where sign-in page lives (needed for OAuth cancel recovery) |
-| `VITE_CLERK_SIGN_UP_URL` | `frontend/.env` | Tells Clerk where sign-up page lives |
+| `VITE_CLERK_SIGN_IN_URL` | `frontend/.env` | Tells Clerk where sign-in page lives |
 | `VITE_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | `frontend/.env` | Post-OAuth fallback redirect destination |
 | `VITE_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | `frontend/.env` | Post-OAuth fallback redirect destination |
 
-Note: `signInUrl`/`signUpUrl` are also set directly on `<ClerkProvider>` in `main.tsx` — props take precedence over env vars and are the authoritative source for Clerk's internal navigation.
+`signInUrl`/`signUpUrl` are also set directly on `<ClerkProvider>` in `main.tsx` — props take precedence over env vars.
 
 ### OAuth redirect pattern (Google Calendar)
 
-`redirectUrl` passed to `reauthorize()`/`createExternalAccount()` includes `?returnTo=/appointments`. `SSOCallback` reads this param and passes it to `signInForceRedirectUrl` on `<AuthenticateWithRedirectCallback>`. Force redirect is used (not fallback) to ensure the destination is deterministic regardless of Clerk's session state.
+`redirectUrl` passed to `reauthorize()`/`createExternalAccount()` includes `?returnTo=/appointments`. `SSOCallback` reads this param and passes it to `signInForceRedirectUrl` on `<AuthenticateWithRedirectCallback>`. Force redirect is used (not fallback) to ensure deterministic destination regardless of Clerk session state.
 
 ## Agent worker patterns
 
@@ -137,7 +139,7 @@ Note: `signInUrl`/`signUpUrl` are also set directly on `<ClerkProvider>` in `mai
 | Import | Purpose |
 |--------|---------|
 | `defineAgent` | Agent factory function |
-| `voice.Agent` | Base class — `Agent extends voice.Agent` |
+| `voice.Agent` | Base class — `ReceptionistAgent extends voice.Agent` |
 | `voice.AgentSession` | Manages STT → LLM → TTS pipeline |
 | `llm.tool` | Tool definition with Zod schema |
 | `inference.STT/TTS` | Model providers via LiveKit inference |
@@ -159,87 +161,82 @@ participant.attributes["sip.trunkPhoneNumber"]
 
 ### Tool pattern
 
-Tools are defined in the `Agent` constructor using `llm.tool()` with Zod schemas. All dependencies (`tenant`, `client`, `callId`) are closed over from the `entry` function — the LLM never receives tenant IDs.
+Tools are defined in `tools.ts` via `createAgentTools(deps)`. All dependencies (`tenant`, `client`, `callId`) are closed over — the LLM never receives tenant IDs.
 
 ```ts
 tools: {
-  searchKnowledge: llm.tool({ ... execute: async ({ query }) => ... }),
-  createEscalation: llm.tool({ ... execute: async ({ question }, { ctx }) => ... }),
-  checkAvailability: llm.tool({ ... execute: async ({ service, startIso, endIso }) => ... }),
-  bookAppointment: llm.tool({ ... execute: async ({ service, startIso, endIso }) => ... }),
-  endCall: llm.tool({ ... execute: async ({ reason }, { ctx }) => ... }),
+  searchKnowledge      // RAG lookup for questions not in system prompt context
+  createEscalation     // Flag unanswerable question to admin
+  checkAvailability    // Google Calendar free/busy check
+  bookAppointment      // Create confirmed calendar event + DB appointment
+  lookupAppointments   // Caller's upcoming appointments by phone
+  cancelAppointment    // Cancel a confirmed appointment
+  endCall              // Say farewell and shut down session
 }
 ```
 
 ### Entry function order
 
 ```
-ctx.connect() → waitForParticipant() → resolve tenant → [resolveClientByPhone + upsertClient] → createCall
-→ new Agent(deps) → session.start() → session.say(greeting)
+ctx.connect() → waitForParticipant() → resolve tenant via sip.trunkPhoneNumber
+→ upsertClient → createCall → session.start() → session.say(greeting)
 ```
 
-**Why this deviates from the LiveKit docs canonical order (`session.start()` before `ctx.connect()`):**
-We need `sip.trunkPhoneNumber` from participant attributes to resolve the tenant and construct `new Agent(deps)`. The participant only exists after `ctx.connect()` + `waitForParticipant()`. This is a necessary deviation — we cannot build `Agent` without knowing the tenant first.
+**Why `ctx.connect()` comes first (deviates from LiveKit docs canonical order):** `sip.trunkPhoneNumber` is only available after `waitForParticipant()`. We need it to resolve the tenant before building `ReceptionistAgent(deps)`. Without the tenant, we can't build the system prompt or wire tools.
+
+### Hold phrase pattern
+
+`sayHold(ctx)` calls `ctx.session.say(holdPhrase)` at the start of any tool that needs time (searchKnowledge, checkAvailability, bookAppointment). This fires the instant the LLM decides to call the tool — the caller hears something immediately while the tool runs.
+
+**Important:** with a slow LLM model, the preemptive TTS connection opens when the LLM starts generating but can time out before the first token arrives, resulting in no audio. Use a fast model (e.g. `openai/gpt-4o-mini`) — the free default is too slow for reliable voice delivery.
 
 ### endCall tool pattern
 
 ```ts
-execute: async ({ reason }, { ctx }) => {
-  await finishCall(deps.callId, "answered");
-  await ctx.session.generateReply({
-    userInput: `You are about to end the call due to ${reason}, notify the user with one last message`,
-  });
-  ctx.session.shutdown({ reason });
-},
+execute: async (_params, { ctx }) => {
+  const farewell = deps.tenant.agentProfile.farewell;
+  if (farewell) ctx.session.say(farewell);
+  ctx.session.shutdown({ drain: true });
+}
 ```
 
-`ctx.session.shutdown()` is the SDK-managed lifecycle method. Never use `RoomServiceClient.deleteRoom()`.
+`ctx.session.shutdown({ drain: true })` is the SDK-managed lifecycle method. Never use `RoomServiceClient.deleteRoom()`.
 
 ## LiveKit SIP architecture
 
 ### Dispatch rules
 
-A dispatch rule is a routing object in LiveKit. Phone numbers point to a dispatch rule via `sip_dispatch_rule_id`. When a call comes in, LiveKit looks up the rule and dispatches a job to the agent worker.
+One platform-wide dispatch rule handles all tenants. All LiveKit phone numbers point to this same rule. The "inbound routing filter" on the rule must be **empty** — listing specific numbers there breaks new tenants automatically. Tenant is resolved at call time via `sip.trunkPhoneNumber` → `tenants.phone_number`.
 
-**Current setup (one platform-wide rule):**
-- One dispatch rule for all tenants
-- All phone numbers point to this same rule
-- The "inbound routing filter" on the rule must be **empty** — if you list specific numbers there, only those numbers route through it and new tenants break automatically
-- Tenant is resolved at call time via `sip.trunkPhoneNumber` → `tenants.phone_number`
+### Why not per-tenant dispatch rules
 
-**One-rule-per-tenant alternative (for future onboarding flow):**
-- Each tenant gets their own dispatch rule with `{"tenantId": "abc123"}` in dispatch metadata
-- The agent reads `ctx.job.metadata` (available before `ctx.connect()`) to get the tenant ID
-- Enables canonical `session.start()` → `ctx.connect()` order from docs
-- Only worth doing when building the programmatic onboarding flow — at that point it's one extra API call at no real cost
-
-**Dispatch metadata limitation:** Static JSON string baked into the rule at creation time. No templating. Only useful for per-tenant rules.
+LiveKit Phone Numbers (native telephony) do not expose a trunk ID — there is no inbound SIP trunk to reference in `trunk_ids` when creating a dispatch rule. Per-tenant rules require third-party SIP trunks (Twilio, Telnyx) where each number is a trunk with an ID. Since we use LiveKit's own numbers, the universal rule + runtime tenant lookup is the correct architecture.
 
 ### Phone Numbers API
 
 - Available via: HTTP Twirp API, Go SDK, LiveKit CLI
 - **NOT available in `livekit-server-sdk` Node.js** — the Node SDK only has `SipClient.createSipDispatchRule()`
-- Purchasing/assigning phone numbers from Node.js requires direct HTTP calls to the LiveKit Twirp API
-
-### Programmatic tenant onboarding flow (future)
-
-1. Create a LiveKit dispatch rule via `SipClient.createSipDispatchRule()`
-2. Purchase/assign a phone number via LiveKit HTTP API with `sip_dispatch_rule_id` pointing to the rule
-3. Insert a row into `tenants` with business details + `clerk_user_id`
-4. Set `phone_number` on the tenant row
+- Purchasing/releasing numbers from Node.js uses direct HTTP calls to the LiveKit Twirp API (`services/telephony.ts`)
 
 ## Database schema
 
-8 tables, all tenant-scoped. See [backend/src/db/schema.ts](backend/src/db/schema.ts).
+6 tables, all tenant-scoped. See [backend/src/db/schema.ts](backend/src/db/schema.ts).
+
+| Table | Purpose |
+|-------|---------|
+| `tenants` | One row per business. Holds `services` and `agentProfile` as JSONB. |
+| `clients` | Callers — resolved by phone number, upserted on each call. |
+| `calls` | One row per inbound call. Stores transcript, summary, outcome. |
+| `escalations` | Questions the agent couldn't answer, flagged for admin review. |
+| `knowledge_items` | Q&A entries with vector embeddings for semantic retrieval. |
+| `appointments` | Bookings — confirmed (Google Calendar event) or requested (no calendar). |
 
 Key design notes:
-- `tenants.phone_number` — direct column (unique), no separate phone_numbers table
-- `tenants.clerk_user_id` — links Clerk auth user to tenant; set manually until onboarding flow exists
-- `tenants.google_calendar_id` — set when tenant connects Google Calendar integration
-- `business_profile` on `tenants` is `jsonb` — structured business facts (hours, services, policies)
-- `knowledge_chunks.embedding` is `vector(1536)` — if switching embedding models, verify dimension matches
+- `tenants.services` is `jsonb` typed as `ServiceItem[]` — prices and descriptions live here, injected into the system prompt on every call
+- `tenants.agentProfile` is `jsonb` typed as `AgentProfile` — greeting, farewell, fallback, holdPhrase, agent name
+- `knowledge_items.embedding` is `vector(2048)` — match this dimension when changing embedding models
+- Embeddings are stored directly on `knowledge_items` (no separate chunks table)
 - `escalation_status` enum values are lowercase: `"pending"` / `"resolved"`
-- `knowledge_items` + `knowledge_chunks` are separate: items hold canonical Q&A, chunks hold embedded text for retrieval
 
 ## Multi-tenancy
 
@@ -253,34 +250,33 @@ Key design notes:
 | Variable | Used by |
 |----------|---------|
 | `DATABASE_URL` | Neon Postgres connection string |
-| `LIVEKIT_URL` | Agent worker |
-| `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | Agent worker |
-| `CLERK_SECRET_KEY` | Hono auth middleware + agent worker (Clerk API for OAuth token fetch) |
+| `LIVEKIT_URL` | Agent worker + telephony service |
+| `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | Agent worker + telephony service |
+| `CLERK_SECRET_KEY` | Hono auth middleware + agent worker |
+| `CLERK_WEBHOOK_SECRET` | (unused — webhook route removed) |
 | `OPENROUTER_API_KEY` | LLM calls + embeddings |
 | `OPENROUTER_BASE_URL` | Defaults to `https://openrouter.ai/api/v1` |
-| `LLM_MODEL` | Defaults to `openai/gpt-oss-20b:free` |
+| `LLM_MODEL` | Defaults to `openai/gpt-oss-20b:free` — use `openai/gpt-4o-mini` for production |
 | `EMBEDDING_MODEL` | Defaults to `nvidia/llama-nemotron-embed-vl-1b-v2:free` |
 
 ## Call performance
 
-**DB calls per call (4 total, ~80–120ms combined):**
-1. `resolveTenantByCalledNumber` — direct lookup on `tenants.phone_number`
-2. `resolveClientByPhone` — looks up returning caller (runs in parallel with 3 and the token fetch)
-3. `upsertClient` — inserts/updates caller record (runs in parallel with 2 and the token fetch)
-4. `createCall` — creates call record
+**DB calls per call (3+1, ~80–120ms combined):**
+1. `getTenantByPhoneNumber` — direct lookup on `tenants.phone_number`
+2. `upsertClient` — inserts/updates caller record
+3. `createCall` — creates call record
++ Conditional Clerk API call for Google OAuth token (parallel, zero added latency)
 
-**Clerk API call (conditional, parallel with DB calls 2–3):**
-- If `tenant.googleCalendarId` is set, `clerkClient.users.getUserOauthAccessToken()` is called in the same `Promise.all` — zero added latency on the hot path.
+Business context baked into system prompt once at call start. Not re-fetched per turn.
 
-Business details baked into system prompt once at call start. Not re-fetched per turn.
-
-**Latency profile to first audio:** ~1–1.5s
+**Latency to first audio (with a fast LLM):** ~1–1.5s
 - LiveKit dispatch: ~150ms
-- `ctx.connect()`: ~50ms
-- All 4 DB calls combined: ~80–120ms
-- TTS synthesis: ~500–800ms ← **dominant bottleneck**
+- `ctx.connect()` + DB calls: ~130–170ms
+- TTS synthesis: ~500–800ms ← dominant bottleneck
+
+**With a slow/free LLM:** preemptive TTS opens a WebSocket connection that times out before the first token arrives. The agent generates the correct text but **no audio plays**. Use a paid model for reliable voice delivery.
 
 ## Phase status
 
-- **Done**: SIP wiring, Neon/Drizzle schema, service layer, tool-based agent, LiveKit inbound trunk + dispatch rule, live call test, Hono migration, Clerk auth middleware, DB cleanup (phone_numbers table dropped, google fields cleaned), full admin dashboard (calls, escalations, appointments, knowledge, settings, overview), Google Calendar integration (OAuth connect flow, availability checking, appointment booking)
-- **Later**: Programmatic tenant onboarding flow
+- **Done**: SIP wiring, Neon/Drizzle schema, service layer, tool-based agent, LiveKit inbound dispatch rule, live call test, Clerk auth middleware, full admin dashboard, Google Calendar integration, onboarding flow (create tenant + purchase phone number in one step), agent modularization (tools/prompt/summary/transcript split out), dead code removal (sipDispatchRuleId, per-tenant dispatch rules, tts-cache, webhooks stub)
+- **Later**: Programmatic onboarding UI polish, outbound calling (LiveKit roadmap)

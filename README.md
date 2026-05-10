@@ -4,22 +4,23 @@ A telephony-first AI receptionist for appointment-based local businesses (salons
 
 Built as a B2B SaaS portfolio project. Multi-tenant from day one.
 
-## Key Features
+## Features
 
-- **Voice calls via SIP**: Real phone numbers routed through LiveKit SIP trunks to the AI agent
-- **RAG knowledge base**: Vector embeddings (pgvector) for accurate Q&A retrieval
-- **Escalation system**: Unknown questions flagged to admin; resolved answers populate the knowledge base
-- **Appointment booking**: Agent checks Google Calendar availability and books confirmed events
-- **Admin dashboard**: Calls, escalations, appointments, knowledge base, settings — all in one place
-- **Multi-tenant**: Every table is tenant-scoped; each business is one tenant
+- **Voice calls via LiveKit Phone Numbers** — real US numbers, no SIP trunk setup required
+- **Contextual answers** — services, pricing, and hours live in the system prompt; no lookup needed for common questions
+- **RAG knowledge base** — vector embeddings (pgvector) for Q&A retrieval beyond the system prompt
+- **Escalation system** — unanswerable questions flagged to admin; resolved answers auto-populate the knowledge base
+- **Appointment booking** — agent checks Google Calendar availability and books confirmed events
+- **Admin dashboard** — calls, escalations, appointments, knowledge base, and settings in one place
+- **Multi-tenant** — every table is tenant-scoped; each business is one tenant
 
 ## Project Structure
 
 ```
 /                        ← npm workspace root
+├── shared/              ← Type contracts (domain types + API shapes), no build step
 ├── backend/             ← Hono API server + LiveKit agent worker (TypeScript)
 ├── frontend/            ← Admin dashboard (React + Vite)
-├── PRD-v2.md            ← Product requirements
 └── CLAUDE.md            ← Developer guide (architecture, patterns, decisions)
 ```
 
@@ -27,40 +28,35 @@ Built as a B2B SaaS portfolio project. Multi-tenant from day one.
 
 ### Backend
 - **Runtime**: Node.js (ESM, TypeScript)
-- **API Framework**: Hono
+- **API**: Hono
 - **Database**: Neon Postgres + Drizzle ORM + pgvector
 - **Auth**: Clerk (`@hono/clerk-auth`)
-- **Voice Agent**: LiveKit Agents Framework
-  - STT: LiveKit inference
-  - LLM: OpenRouter (configurable, defaults to `openai/gpt-oss-20b`)
-  - TTS: LiveKit inference
+- **Voice Agent**: LiveKit Agents SDK
+  - STT: LiveKit inference (AssemblyAI universal-streaming)
+  - LLM: OpenRouter — default `openai/gpt-oss-20b:free`, recommend `openai/gpt-4o-mini` for production
+  - TTS: LiveKit inference (Cartesia Sonic)
   - VAD: Silero
-- **Embeddings**: OpenRouter (`nvidia/llama-nemotron-embed-vl-1b-v2` by default)
-- **Calendar**: Google Calendar API via Clerk OAuth tokens
+- **Embeddings**: OpenRouter (`nvidia/llama-nemotron-embed-vl-1b-v2:free` by default)
+- **Calendar**: Google Calendar API via Clerk OAuth tokens (raw fetch, no googleapis SDK)
+- **Telephony**: LiveKit Phone Numbers via Twirp HTTP API
 
 ### Frontend
 - **Framework**: React 19 + Vite (TypeScript)
 - **Routing**: React Router v7
 - **Auth**: `@clerk/react`
 - **Data fetching**: TanStack Query v5
-- **UI**: Tailwind v4 + shadcn + Base UI
+- **UI**: Tailwind v4 + shadcn/ui + Base UI
 - **HTTP**: Axios
 
 ## Running the Application
 
-All commands from workspace root.
-
 ```bash
-# API server (hot reload)
-npm run dev -w backend          # → http://localhost:8080
+# From workspace root
+npm run dev:backend      # API server → http://localhost:8080
+npm run dev:agent        # LiveKit agent worker (separate process)
+npm run dev:frontend     # Frontend → http://localhost:5173
 
-# LiveKit agent worker (separate process)
-npm run agent -w backend
-
-# Frontend dev server
-npm run dev -w frontend         # → http://localhost:5173
-
-# Database migrations
+# Database
 npm run db:generate -w backend
 npm run db:migrate -w backend
 ```
@@ -70,11 +66,11 @@ npm run db:migrate -w backend
 ### Backend (`backend/.env`)
 
 ```env
-DATABASE_URL=                  # Neon Postgres connection string
+DATABASE_URL=
 LIVEKIT_URL=                   # wss://your-instance.livekit.cloud
 LIVEKIT_API_KEY=
 LIVEKIT_API_SECRET=
-CLERK_SECRET_KEY=              # JWT verification + Clerk API (OAuth token fetch)
+CLERK_SECRET_KEY=
 OPENROUTER_API_KEY=
 OPENROUTER_BASE_URL=           # defaults to https://openrouter.ai/api/v1
 LLM_MODEL=                     # defaults to openai/gpt-oss-20b:free
@@ -88,25 +84,33 @@ VITE_CLERK_PUBLISHABLE_KEY=
 VITE_API_URL=http://localhost:8080/api
 VITE_CLERK_SIGN_IN_URL=/sign-in
 VITE_CLERK_SIGN_UP_URL=/sign-in
-VITE_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/appointments
-VITE_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/appointments
+VITE_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/dashboard
+VITE_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/dashboard
 ```
 
-## Admin API Endpoints
+## Admin API
 
 All routes under `/api/admin/*` require a Clerk JWT (`Authorization: Bearer`).
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/metrics` | KPI counts |
-| GET | `/admin/calls` | Call history |
-| GET | `/admin/escalations` | Escalation list |
-| POST | `/admin/escalations/:id/resolve` | Resolve escalation |
-| GET | `/admin/knowledge` | Knowledge base items |
-| DELETE | `/admin/knowledge/:id` | Delete knowledge item |
-| GET | `/admin/appointments` | Appointment list |
-| GET | `/admin/settings` | Tenant settings |
-| PATCH | `/admin/settings` | Update tenant settings |
+| GET | `/api/health` | Health check |
+| POST | `/api/onboarding` | Create tenant + purchase phone number |
+| GET | `/api/onboarding/phone/search` | Search available phone numbers by area code |
+| GET | `/api/admin/metrics` | Dashboard KPI counts |
+| GET | `/api/admin/calls` | Call history |
+| GET | `/api/admin/calls/:id` | Call detail with transcript |
+| GET | `/api/admin/escalations` | Escalation list |
+| POST | `/api/admin/escalations/:id/resolve` | Resolve escalation + populate knowledge base |
+| GET | `/api/admin/knowledge` | Knowledge base items |
+| DELETE | `/api/admin/knowledge/:id` | Delete knowledge item |
+| GET | `/api/admin/appointments` | Appointment list |
+| GET | `/api/admin/settings` | Tenant settings |
+| PATCH | `/api/admin/settings` | Update tenant settings |
+| GET | `/api/admin/telephony/numbers` | Search available numbers |
+| POST | `/api/admin/telephony/provision` | Provision a phone number |
+| DELETE | `/api/admin/telephony/release` | Release current phone number |
+| DELETE | `/api/admin/account` | Delete tenant account |
 
 ## License
 

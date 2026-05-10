@@ -1,19 +1,18 @@
-import { llm, tts as ttsNs, voice } from "@livekit/agents";
+import { llm, voice } from "@livekit/agents";
 import { z } from "zod";
 import type { AgentDeps } from "./types.js";
 import { searchKnowledge } from "../services/knowledge.js";
 import { createEscalation } from "../services/escalations.js";
 import { checkAvailability, createCalendarEvent, deleteCalendarEvent } from "../services/calendar.js";
 import { createAppointment, getUpcomingByPhone, cancelAppointmentById } from "../services/appointments.js";
-import { sayCached } from "./tts-cache.js";
 
-export function createAgentTools(deps: AgentDeps, tts: ttsNs.TTS) {
+export function createAgentTools(deps: AgentDeps) {
   const holdPhrase = deps.tenant.agentProfile.holdPhrase;
   const tenantId = deps.tenant.id;
 
   function sayHold(ctx: voice.RunContext) {
     if (!holdPhrase) return;
-    sayCached(ctx.session, tts, `${tenantId}:hold`, holdPhrase);
+    ctx.session.say(holdPhrase);
   }
 
   return {
@@ -184,7 +183,6 @@ export function createAgentTools(deps: AgentDeps, tts: ttsNs.TTS) {
         const cancelled = await cancelAppointmentById(appointmentId, tenantId);
         if (!cancelled) return { error: "Appointment not found." };
 
-        // Remove the Google Calendar event if one exists
         if (cancelled.googleEventId && deps.googleCalendarId) {
           const token = await deps.getGoogleToken();
           if (token) {
@@ -207,7 +205,7 @@ export function createAgentTools(deps: AgentDeps, tts: ttsNs.TTS) {
       execute: async (_params, { ctx }) => {
         const farewell = deps.tenant.agentProfile.farewell;
         if (farewell) {
-          await sayCached(ctx.session, tts, `${tenantId}:farewell`, farewell);
+          ctx.session.say(farewell);
         }
         ctx.session.shutdown({ drain: true });
       },

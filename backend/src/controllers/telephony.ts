@@ -1,18 +1,11 @@
 import type { AppContext } from "../types.js";
 import { getTenantById, updateTenant } from "../services/tenants.js";
-import {
-  searchPhoneNumbers,
-  purchasePhoneNumber,
-  releasePhoneNumber,
-  createSipDispatchRule,
-  deleteSipDispatchRule,
-} from "../services/telephony.js";
+import { searchPhoneNumbers, purchasePhoneNumber, releasePhoneNumber } from "../services/telephony.js";
 import { phoneProvisionSchema } from "../schemas.js";
 
 export async function search(c: AppContext) {
   const areaCode = c.req.query("areaCode") ?? "";
-  const numbers = await searchPhoneNumbers(areaCode);
-  return c.json(numbers);
+  return c.json(await searchPhoneNumbers(areaCode));
 }
 
 export async function provision(c: AppContext) {
@@ -24,23 +17,13 @@ export async function provision(c: AppContext) {
   if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400);
   const { phoneNumber } = parsed.data;
 
-  const sipDispatchRuleId = await createSipDispatchRule(tenantId);
-
+  const purchased = await purchasePhoneNumber(phoneNumber);
   try {
-    const purchased = await purchasePhoneNumber(phoneNumber, sipDispatchRuleId);
-
-    try {
-      await updateTenant(tenantId, { phoneNumber: purchased.e164_format, sipDispatchRuleId });
-      return c.json({ phoneNumber: purchased.e164_format, sipDispatchRuleId });
-    } catch (dbError) {
-      // Rollback the number if DB save fails
-      await releasePhoneNumber(purchased.e164_format).catch(e => console.error("Rollback number fail:", e));
-      throw dbError;
-    }
-  } catch (error) {
-    // Rollback the dispatch rule if anything failed
-    await deleteSipDispatchRule(sipDispatchRuleId).catch(e => console.error("Rollback rule fail:", e));
-    throw error;
+    await updateTenant(tenantId, { phoneNumber: purchased.e164_format });
+    return c.json({ phoneNumber: purchased.e164_format });
+  } catch (dbError) {
+    await releasePhoneNumber(purchased.e164_format).catch((e) => console.error("Rollback number fail:", e));
+    throw dbError;
   }
 }
 
@@ -50,8 +33,6 @@ export async function release(c: AppContext) {
   if (!tenant) return c.json({ error: "Tenant not found" }, 404);
 
   if (tenant.phoneNumber) await releasePhoneNumber(tenant.phoneNumber).catch((e) => console.error("Release fail:", e));
-  if (tenant.sipDispatchRuleId) await deleteSipDispatchRule(tenant.sipDispatchRuleId).catch((e) => console.error("Release fail:", e));
-
-  await updateTenant(tenantId, { phoneNumber: null, sipDispatchRuleId: null });
+  await updateTenant(tenantId, { phoneNumber: null });
   return c.json({ ok: true });
 }

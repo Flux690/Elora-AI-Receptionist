@@ -1,5 +1,4 @@
-import { AccessToken, SipClient } from "livekit-server-sdk";
-import { RoomConfiguration, RoomAgentDispatch } from "@livekit/protocol";
+import { AccessToken } from "livekit-server-sdk";
 import { env } from "../env.js";
 
 const LIVEKIT_HTTP = env.LIVEKIT_URL.replace("wss://", "https://").replace("ws://", "http://");
@@ -43,42 +42,13 @@ export async function searchPhoneNumbers(areaCode: string): Promise<AvailableNum
 }
 
 export async function purchasePhoneNumber(
-  phoneNumber: string,
-  sipDispatchRuleId: string
+  phoneNumber: string
 ): Promise<{ e164_format: string; status: string }> {
-  const data = await twirp("PurchasePhoneNumber", {
-    phone_numbers: [phoneNumber],
-    sip_dispatch_rule_id: sipDispatchRuleId,
-  });
+  const data = await twirp("PurchasePhoneNumber", { phone_numbers: [phoneNumber] });
   const purchased = (data.phone_numbers as Array<{ e164_format: string; status: string }>)[0];
   return purchased;
 }
 
 export async function releasePhoneNumber(phoneNumber: string): Promise<void> {
   await twirp("ReleasePhoneNumbers", { phone_numbers: [phoneNumber] });
-}
-
-const sipClient = new SipClient(env.LIVEKIT_URL, env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET);
-
-export async function createSipDispatchRule(tenantId: string): Promise<string> {
-  const rule = await sipClient.createSipDispatchRule(
-    { type: "individual", roomPrefix: "call-" },
-    {
-      name: `tenant-${tenantId}`,
-      metadata: JSON.stringify({ tenantId }),
-      roomConfig: new RoomConfiguration({
-        agents: [
-          new RoomAgentDispatch({
-            agentName: "receptionist",
-            metadata: JSON.stringify({ tenantId }),
-          }),
-        ],
-      }),
-    }
-  );
-  return rule.sipDispatchRuleId!;
-}
-
-export async function deleteSipDispatchRule(sipDispatchRuleId: string): Promise<void> {
-  await sipClient.deleteSipDispatchRule(sipDispatchRuleId);
 }
