@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/select'
 import type { AvailableNumber, ServiceItem, AgentProfile } from '@/types/api'
 
-// ── Helpers ──────────────────────────────────────────────────────
+
+// Helpers
 
 function formatE164(e164: string): string {
   const digits = e164.replace(/\D/g, '')
@@ -25,7 +26,8 @@ function formatE164(e164: string): string {
   return e164
 }
 
-// ── Constants ─────────────────────────────────────────────────────
+
+// Constants
 
 const INDUSTRIES = [
   'Hair Salon',
@@ -43,7 +45,8 @@ const INDUSTRIES = [
 
 const DEFAULT_AREA_CODE = '415'
 
-// ── Progress indicator ─────────────────────────────────────────────
+
+// Progress indicator
 
 function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
   const steps = [
@@ -94,7 +97,8 @@ function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
   )
 }
 
-// ── Service rows ──────────────────────────────────────────────────
+
+// Service rows
 
 function ServiceRows({
   services,
@@ -170,7 +174,6 @@ function ServiceRows({
   )
 }
 
-// ── Step 1 — Business ─────────────────────────────────────────────
 
 interface Step1Data {
   name: string
@@ -178,6 +181,8 @@ interface Step1Data {
   description: string
   services: ServiceItem[]
 }
+
+// Step 1 — Business
 
 function Step1({
   data,
@@ -255,7 +260,8 @@ function Step1({
   )
 }
 
-// ── Step 2 — Agent profile ─────────────────────────────────────────
+
+// Step 2 — Agent profile
 
 function Step2({
   data,
@@ -322,9 +328,10 @@ function Step2({
   )
 }
 
-// ── Step 3 — Phone ────────────────────────────────────────────────
 
 type PhonePhase = 'loading' | 'number' | 'searching' | 'selected'
+
+// Step 3 — Phone
 
 function Step3({
   onBack,
@@ -518,7 +525,8 @@ function Spinner() {
   )
 }
 
-// ── Main ──────────────────────────────────────────────────────────
+
+// Main
 
 export default function Onboarding() {
   const navigate = useNavigate()
@@ -538,8 +546,8 @@ export default function Onboarding() {
   })
 
   const [agentData, setAgentData] = useState<AgentProfile>({
-    name: 'Elora',
-    greeting: 'Thank you for calling! This is Elora, your virtual receptionist. How can I help you today?',
+    name: '',
+    greeting: '',
     farewell: 'Thanks for calling. Have a wonderful day!',
     fallback: "I'm not sure about that, but someone from our team will follow up with you shortly.",
     holdPhrase: 'Just a moment while I look that up for you.',
