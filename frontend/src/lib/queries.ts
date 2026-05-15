@@ -5,11 +5,11 @@ import type {
   KnowledgeItem,
   CallListItem,
   CallDetail,
-  Settings,
   AppointmentItem,
-  Period,
   EscalationStatus,
-} from '@/types/api'
+} from '@receptionist/shared'
+import type { Period } from './types'
+import type { AppSettings } from './settings-types'
 
 export const keys = {
   metrics: (period: Period) => ['metrics', period] as const,
@@ -42,7 +42,7 @@ export const fetchers = {
     apiClient.get<{ url: string }>(`/admin/calls/${id}/recording`).then((r) => r.data),
 
   settings: () =>
-    apiClient.get<Settings>('/admin/settings').then((r) => r.data),
+    apiClient.get<AppSettings>('/admin/settings').then((r) => r.data),
 
   appointments: () =>
     apiClient.get<AppointmentItem[]>('/admin/appointments').then((r) => r.data),

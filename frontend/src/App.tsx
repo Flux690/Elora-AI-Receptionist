@@ -1,15 +1,21 @@
 import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from '@clerk/react'
-import SignIn from '@/pages/SignIn'
-import SSOCallback from '@/pages/SSOCallback'
-import { AuthProvider } from '@/components/auth/AuthProvider'
-import { TenantGate } from '@/components/auth/TenantGate'
-import AppLayout from '@/components/layout/AppLayout'
+import { ErrorBoundary } from 'react-error-boundary'
+import { AuthProvider } from '@/features/auth/AuthProvider'
+import { TenantGate } from '@/features/auth/TenantGate'
+import AppLayout from '@/layout/AppLayout'
+import { RouteSkeleton } from '@/layout/RouteSkeleton'
+import { ErrorFallback } from '@/layout/ErrorFallback'
 
-const Dashboard = lazy(() => import('@/pages/Dashboard'))
-const Onboarding = lazy(() => import('@/pages/Onboarding'))
-const Settings = lazy(() => import('@/pages/Settings'))
+const SignIn      = lazy(() => import('@/features/public/SignInPage'))
+const SSOCallback = lazy(() => import('@/features/public/SSOCallbackPage'))
+const Home        = lazy(() => import('@/features/home/HomePage'))
+const Escalations = lazy(() => import('@/features/escalations/EscalationsPage'))
+const Appointments = lazy(() => import('@/features/appointments/AppointmentsPage'))
+const Knowledge   = lazy(() => import('@/features/knowledge/KnowledgePage'))
+const Onboarding  = lazy(() => import('@/features/onboarding/OnboardingPage'))
+const Settings    = lazy(() => import('@/features/settings/SettingsPage'))
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded } = useAuth()
@@ -20,27 +26,38 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/sign-in" element={<SignIn />} />
-      <Route path="/sso-callback" element={<SSOCallback />} />
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      <Routes>
+        <Route
+          path="/sign-in"
+          element={<Suspense fallback={<RouteSkeleton />}><SignIn /></Suspense>}
+        />
+        <Route
+          path="/sso-callback"
+          element={<Suspense fallback={<RouteSkeleton />}><SSOCallback /></Suspense>}
+        />
 
-      <Route element={
-        <ProtectedRoute>
-          <AuthProvider>
-            <TenantGate />
-          </AuthProvider>
-        </ProtectedRoute>
-      }>
-        <Route path="/onboarding" element={<Suspense><Onboarding /></Suspense>} />
+        <Route element={
+          <ProtectedRoute>
+            <AuthProvider>
+              <TenantGate />
+            </AuthProvider>
+          </ProtectedRoute>
+        }>
+          <Route
+            path="/onboarding"
+            element={<Suspense fallback={<RouteSkeleton />}><Onboarding /></Suspense>}
+          />
 
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<Suspense><Dashboard tab="calls" /></Suspense>} />
-          <Route path="/escalations" element={<Suspense><Dashboard tab="escalations" /></Suspense>} />
-          <Route path="/appointments" element={<Suspense><Dashboard tab="appointments" /></Suspense>} />
-          <Route path="/knowledge" element={<Suspense><Dashboard tab="knowledge" /></Suspense>} />
-          <Route path="/settings" element={<Suspense><Settings /></Suspense>} />
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<Home />} />
+            <Route path="/escalations" element={<Escalations />} />
+            <Route path="/appointments" element={<Appointments />} />
+            <Route path="/knowledge" element={<Knowledge />} />
+            <Route path="/settings" element={<Settings />} />
+          </Route>
         </Route>
-      </Route>
-    </Routes>
+      </Routes>
+    </ErrorBoundary>
   )
 }

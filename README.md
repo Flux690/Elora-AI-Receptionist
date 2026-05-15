@@ -4,8 +4,6 @@ An AI receptionist for appointment-based local businesses. Customers call a real
 
 Built as a multi-tenant B2B SaaS.
 
----
-
 ## Features
 
 - **Real phone calls** — LiveKit Phone Numbers, no SIP trunk setup required
@@ -17,7 +15,6 @@ Built as a multi-tenant B2B SaaS.
 - **Admin dashboard** — calls, escalations, appointments, knowledge base, and settings
 - **Multi-tenant** — every table is tenant-scoped; each business is fully isolated
 
----
 
 ## How It Works
 
@@ -30,7 +27,6 @@ Built as a multi-tenant B2B SaaS.
 7. Bookings: availability checked against Google Calendar, confirmed event created by voice
 8. On hang-up: transcript extracted, summary generated, call record finalized
 
----
 
 ## Tech Stack
 
@@ -50,7 +46,6 @@ Built as a multi-tenant B2B SaaS.
 | UI | Tailwind v4 + shadcn/ui |
 | Data fetching | TanStack Query v5 |
 
----
 
 ## Getting Started
 
@@ -106,7 +101,6 @@ npm run dev:agent      # LiveKit agent worker — keep running alongside the API
 npm run dev:frontend   # Admin dashboard → http://localhost:5173
 ```
 
----
 
 ## API Reference
 
@@ -116,7 +110,7 @@ Public:
 |---|---|---|
 | GET | `/api/health` | Liveness check |
 | POST | `/api/onboarding` | Create tenant + purchase phone number |
-| GET | `/api/onboarding/phone/search?areaCode=415` | Search available numbers |
+| GET | `/api/onboarding/phone/search?areaCode=415` | Search available numbers (`areaCode` optional) |
 
 Admin — `Authorization: Bearer <clerk_jwt>` required:
 
@@ -136,7 +130,6 @@ Admin — `Authorization: Bearer <clerk_jwt>` required:
 | DELETE | `/api/admin/telephony/release` | Release phone number |
 | DELETE | `/api/admin/account` | Delete tenant and all data |
 
----
 
 ## License
 

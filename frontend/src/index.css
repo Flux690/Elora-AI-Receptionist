@@ -2,127 +2,70 @@
 @import "tailwindcss";
 
 @theme {
-  /* ── Font ─────────────────────────────────────── */
   --font-sans: "DM Sans Variable", system-ui, sans-serif;
 
-  /* ── Weights ──────────────────────────────────── */
   --font-weight-normal:   400;
   --font-weight-medium:   500;
-  --font-weight-book:     550;
   --font-weight-semibold: 600;
   --font-weight-bold:     700;
 
-  /* ── Sizes (even px, min 12) ─────────────────── */
-  --text-xs:   12px;
-  --text-sm:   14px;
-  --text-base: 16px;
-  --text-lg:   18px;
-  --text-xl:   20px;
-  --text-2xl:  24px;
-  --text-3xl:  28px;
-  --text-4xl:  32px;
-  --text-5xl:  36px;
-
-  /* ── Line heights ─────────────────────────────── */
-  --leading-tight:   1.25;
-  --leading-snug:    1.375;
-  --leading-normal:  1.5;
-  --leading-relaxed: 1.625;
-
-  /* ── Accent ───────────────────────────────────── */
-  --color-accent:       #3D6B5E;
-  --color-accent-hover: #3D6B5EDD;
-  --color-accent-light: #3D6B5E12;
-
-  /* ── Backgrounds ──────────────────────────────── */
-  --color-bg:         #FAF9F7;
-  --color-bg-surface: #FFFFFF;
-  --color-bg-hover:   #00000009;
-  --color-bg-active:  #0000000F;
-
-  /* ── Borders ──────────────────────────────────── */
-  --color-border:        #E6E4DF;
-  --color-border-subtle: #EDECEA;
-  --color-input:         #E6E4DF;
-  --color-ring:          #3D6B5E;
-
-  /* ── shadcn semantic aliases (Tailwind v4 class resolution) ── */
-  --color-background:             #FAF9F7;
-  --color-foreground:             #1A1917;
+  /* Palette */
+  --color-background:             #FAFAFA;
+  --color-foreground:             #0F172A;
   --color-card:                   #FFFFFF;
-  --color-card-foreground:        #1A1917;
+  --color-card-foreground:        #0F172A;
   --color-popover:                #FFFFFF;
-  --color-popover-foreground:     #1A1917;
-  --color-primary:                #3D6B5E;
+  --color-popover-foreground:     #0F172A;
+  --color-primary:                #059669;
   --color-primary-foreground:     #FFFFFF;
-  --color-secondary:              #00000009;
-  --color-secondary-foreground:   #1A1917;
-  --color-muted:                  #00000009;
-  --color-muted-foreground:       #6B6963;
-  --color-accent-foreground:      #FFFFFF;
-  --color-destructive:            #B84520;
+  --color-secondary:              #F5F5F5;
+  --color-secondary-foreground:   #0F172A;
+  --color-muted:                  #F5F5F5;
+  --color-muted-foreground:       #64748B;
+  --color-accent:                 #F5F5F5;
+  --color-accent-foreground:      #0F172A;
+  --color-destructive:            #EF4444;
   --color-destructive-foreground: #FFFFFF;
+  --color-border:                 #E5E7EB;
+  --color-input:                  #D1D5DB;
+  --color-ring:                   #059669;
 
-  /* ── Text ─────────────────────────────────────── */
-  --color-text-1: #1A1917;
-  --color-text-2: #6B6963;
-  --color-text-3: #9C9A94;
+  /* Custom */
+  --color-primary-subtle:  #05966912;
+  --color-primary-hover:   #047857;
+  --color-sidebar:         #FFFFFF;
+  --color-sidebar-border:  #E5E7EB;
+  --color-sidebar-foreground: #0F172A;
+  --color-sidebar-muted:   #64748B;
+  --color-sidebar-accent:  #05966912;
 
-  /* ── Status ───────────────────────────────────── */
-  --color-status-escalated: #B84520;
-  --color-status-booked:    #3D6B5E;
-  --color-status-answered:  #6B6963;
-  --color-status-resolved:  #3D6B5E;
-  --color-status-requested: #6B6963;
-  --color-status-confirmed: #3D6B5E;
-  --color-status-cancelled: #B84520;
-  --color-status-abandoned: #9C9A94;
-  --color-status-error:     #B84520;
-  --color-status-pending:   #B84520;
+  /* Status */
+  --color-status-booked:    #059669;
+  --color-status-confirmed: #059669;
+  --color-status-resolved:  #059669;
+  --color-status-escalated: #F59E0B;
+  --color-status-pending:   #F59E0B;
+  --color-status-requested: #F59E0B;
+  --color-status-answered:  #64748B;
+  --color-status-abandoned: #94A3B8;
+  --color-status-error:     #EF4444;
+  --color-status-cancelled: #EF4444;
 
-  /* ── Radii ────────────────────────────────────── */
-  --radius-card:   10px;
-  --radius-button:  7px;
-  --radius-pill:  100px;
+  /* Radii */
+  --radius-sm:   6px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-pill:  9999px;
 
-  /* ── Shadows ──────────────────────────────────── */
-  --shadow-sm: 0 1px 3px #0000000A;
-  --shadow-md: 0 4px 16px #00000012;
-  --shadow-lg: 0 12px 40px #0000001F;
-
-  /* ── Easing ───────────────────────────────────── */
-  --ease-out:    cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-
-  /* ── Density ──────────────────────────────────── */
-  --spacing-pad:         16px;
-  --spacing-gap:         12px;
-  --spacing-pad-compact: 10px;
-  --spacing-gap-compact:  6px;
+  /* Shadows */
+  --shadow-sm: 0 1px 2px #0000000D;
+  --shadow-md: 0 4px 12px #00000012;
+  --shadow-lg: 0 12px 40px #0000001A;
 }
 
-/* ── shadcn compatibility ─────────────────────────── */
 :root {
-  --background:           var(--color-bg);
-  --foreground:           var(--color-text-1);
-  --card:                 var(--color-bg-surface);
-  --card-foreground:      var(--color-text-1);
-  --popover:              var(--color-bg-surface);
-  --popover-foreground:   var(--color-text-1);
-  --primary:              var(--color-accent);
-  --primary-foreground:   #FFFFFF;
-  --secondary:            var(--color-bg-hover);
-  --secondary-foreground: var(--color-text-1);
-  --muted:                var(--color-bg-hover);
-  --muted-foreground:     var(--color-text-2);
-  --accent:               var(--color-bg-active);
-  --accent-foreground:    var(--color-text-1);
-  --destructive:          #B84520;
-  --border:               var(--color-border);
-  --input:                var(--color-border);
-  --ring:                 var(--color-accent);
-  --radius:               7px;
-  --noise-opacity:        0.025;
+  --radius: 8px;
 }
 
 @layer base {
@@ -130,8 +73,8 @@
     box-sizing: border-box;
   }
   body {
-    background-color: var(--color-bg);
-    color: var(--color-text-1);
+    background-color: var(--color-background);
+    color: var(--color-foreground);
     font-family: var(--font-sans);
     font-feature-settings: "ss01", "cv11";
     -webkit-font-smoothing: antialiased;
@@ -139,20 +82,8 @@
   }
 }
 
-/* ── Noise texture overlay ────────────────────────── */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  opacity: var(--noise-opacity);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-}
-
-/* ── Scrollbar ────────────────────────────────────── */
+/* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-text-3); }
+::-webkit-scrollbar-thumb:hover { background: var(--color-muted-foreground); }

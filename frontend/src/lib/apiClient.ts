@@ -1,6 +1,8 @@
-import axios from 'axios'
+import axios, { type InternalAxiosRequestConfig } from 'axios'
 
-type TokenGetter = () => Promise<string | null>
+type TokenGetter = (opts?: { skipCache?: boolean }) => Promise<string | null>
+
+type RetriableConfig = InternalAxiosRequestConfig & { _retried?: boolean }
 
 let _getToken: TokenGetter | null = null
 
@@ -19,4 +21,23 @@ apiClient.interceptors.request.use(async (config) => {
   }
   return config
 })
+
+apiClient.interceptors.response.use(
+  (r) => r,
+  async (error) => {
+    const config = error.config as RetriableConfig | undefined
+    if (error.response?.status === 401 && config && !config._retried && _getToken) {
+      config._retried = true
+      try {
+        const fresh = await _getToken({ skipCache: true })
+        if (fresh) {
+          config.headers = config.headers ?? {}
+          config.headers.Authorization = `Bearer ${fresh}`
+          return apiClient.request(config)
+        }
+      } catch { /* fall through to reject */ }
+    }
+    return Promise.reject(error)
+  }
+)
 
