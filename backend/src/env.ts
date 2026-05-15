@@ -8,7 +8,6 @@ const envSchema = z.object({
   LIVEKIT_API_KEY: z.string().min(1, "LIVEKIT_API_KEY is required"),
   LIVEKIT_API_SECRET: z.string().min(1, "LIVEKIT_API_SECRET is required"),
   CLERK_SECRET_KEY: z.string().min(1, "CLERK_SECRET_KEY is required"),
-  CLERK_WEBHOOK_SECRET: z.string().min(1, "CLERK_WEBHOOK_SECRET is required"),
   OPENROUTER_API_KEY: z.string().min(1, "OPENROUTER_API_KEY is required"),
   OPENROUTER_BASE_URL: z.string().default("https://openrouter.ai/api/v1"),
   LLM_MODEL: z.string().default("openai/gpt-oss-20b:free"),

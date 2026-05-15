@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { ClerkProvider } from '@clerk/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { Toaster } from 'sonner'
 import App from './App'
 import './index.css'
 
@@ -23,9 +25,12 @@ createRoot(document.getElementById('root')!).render(
       signUpUrl="/sign-in"
     >
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
+        <TooltipProvider delay={300}>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+          <Toaster position="bottom-right" richColors closeButton />
+        </TooltipProvider>
       </QueryClientProvider>
     </ClerkProvider>
   </StrictMode>,

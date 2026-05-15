@@ -78,6 +78,8 @@ LiveKit Phone Numbers have no inbound trunk ID, making per-tenant dispatch rules
 
 The Phone Numbers API is **not in `livekit-server-sdk` (Node.js)** — purchasing and releasing numbers uses direct HTTP calls to the LiveKit Twirp API in `services/telephony.ts`.
 
+**Releasing a number**: LiveKit auto-associates every purchased number with the project's dispatch rule. Call `UpdatePhoneNumber` with `sip_dispatch_rule_id: ""` first to dissociate — skipping this returns a 400 ("would become a catch-all dispatch rule"). Field name is `phone_number` (singular string), not `phone_numbers`.
+
 ## Database — key notes
 
 - `tenants.services` — `jsonb` typed as `ServiceItem[]`; injected into system prompt on every call

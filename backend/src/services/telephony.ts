@@ -32,10 +32,10 @@ export interface AvailableNumber {
   region: string;
 }
 
-export async function searchPhoneNumbers(areaCode: string): Promise<AvailableNumber[]> {
+export async function searchPhoneNumbers(areaCode?: string): Promise<AvailableNumber[]> {
   const data = await twirp("SearchPhoneNumbers", {
     country_code: "US",
-    area_code: areaCode,
+    ...(areaCode ? { area_code: areaCode } : {}),
     limit: 10,
   });
   return (data.items as AvailableNumber[]) ?? [];
@@ -50,5 +50,11 @@ export async function purchasePhoneNumber(
 }
 
 export async function releasePhoneNumber(phoneNumber: string): Promise<void> {
+  // LiveKit requires dissociating from any dispatch rule before releasing.
+  // Without this, ReleasePhoneNumbers returns 400 when the rule would become a catch-all.
+  await twirp("UpdatePhoneNumber", {
+    phone_number: phoneNumber,
+    sip_dispatch_rule_id: "",
+  });
   await twirp("ReleasePhoneNumbers", { phone_numbers: [phoneNumber] });
 }

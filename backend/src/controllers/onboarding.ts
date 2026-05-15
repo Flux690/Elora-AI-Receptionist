@@ -11,7 +11,7 @@ const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
 export async function phoneSearch(c: Context) {
   const auth = getAuth(c);
   if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
-  const areaCode = c.req.query("areaCode") ?? "";
+  const areaCode = c.req.query("areaCode");
   return c.json(await searchPhoneNumbers(areaCode));
 }
 
