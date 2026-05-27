@@ -68,16 +68,17 @@ export function createAgentTools(deps: AgentDeps) {
           .describe("End of the search window in ISO 8601 format."),
       }),
       execute: async ({ startIso, endIso }, { ctx }) => {
+        // sayHold fires FIRST — before any await — so the caller hears it immediately
         if (!deps.googleCalendarId) {
           return {
             error: "Calendar not connected. Create an escalation so the team can follow up with the caller.",
           };
         }
+        sayHold(ctx);
         const token = await deps.getGoogleToken();
         if (!token) {
           return { error: "Calendar authentication unavailable. Create an escalation." };
         }
-        sayHold(ctx);
         try {
           const slots = await checkAvailability(token, deps.googleCalendarId, startIso, endIso);
           return { available: slots.slice(0, 5) };
@@ -97,6 +98,8 @@ export function createAgentTools(deps: AgentDeps) {
         endIso: z.string().describe("Confirmed slot end in ISO 8601."),
       }),
       execute: async ({ service, startIso, endIso }, { ctx }) => {
+        // sayHold fires FIRST — before any await — so the caller hears it immediately
+        sayHold(ctx);
         const token = await deps.getGoogleToken();
         if (!token || !deps.googleCalendarId) {
           await createAppointment({
@@ -114,7 +117,6 @@ export function createAgentTools(deps: AgentDeps) {
             reason: "Calendar not connected — appointment request saved, team will confirm.",
           };
         }
-        sayHold(ctx);
         try {
           const eventId = await createCalendarEvent(token, deps.googleCalendarId, {
             summary: `${service} — ${deps.client?.name ?? deps.callerPhone}`,
@@ -158,7 +160,8 @@ export function createAgentTools(deps: AgentDeps) {
       description:
         "Look up a caller's upcoming appointments by their phone number. Use when a caller asks about existing bookings or wants to cancel/reschedule.",
       parameters: z.object({}),
-      execute: async () => {
+      execute: async (_params, { ctx }) => {
+        sayHold(ctx);
         const upcoming = await getUpcomingByPhone(tenantId, deps.callerPhone);
         if (upcoming.length === 0) return { appointments: [], message: "No upcoming appointments found." };
         return {
@@ -179,7 +182,8 @@ export function createAgentTools(deps: AgentDeps) {
       parameters: z.object({
         appointmentId: z.string().describe("The ID of the appointment to cancel."),
       }),
-      execute: async ({ appointmentId }) => {
+      execute: async ({ appointmentId }, { ctx }) => {
+        sayHold(ctx);
         const cancelled = await cancelAppointmentById(appointmentId, tenantId);
         if (!cancelled) return { error: "Appointment not found." };
 
@@ -205,7 +209,7 @@ export function createAgentTools(deps: AgentDeps) {
       execute: async (_params, { ctx }) => {
         const farewell = deps.tenant.agentProfile.farewell;
         if (farewell) {
-          ctx.session.say(farewell);
+          ctx.session.say(farewell, { allowInterruptions: false });
         }
         ctx.session.shutdown({ drain: true });
       },

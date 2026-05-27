@@ -6,6 +6,7 @@ import type { TranscriptEntry, CallOutcome } from "../db/schema.js";
 export type CallRow = typeof calls.$inferSelect;
 
 type CreateCallInput = {
+  id?: string;          // caller-generated UUID — omit to let Postgres generate one
   tenantId: string;
   clientId?: string | null;
   callerPhone: string;
@@ -16,6 +17,7 @@ export async function createCall(input: CreateCallInput): Promise<CallRow> {
   const rows = await db
     .insert(calls)
     .values({
+      ...(input.id ? { id: input.id } : {}),
       tenantId: input.tenantId,
       clientId: input.clientId ?? null,
       callerPhone: input.callerPhone,
