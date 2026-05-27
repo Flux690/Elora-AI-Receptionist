@@ -9,12 +9,16 @@
     "frontend"
   ],
   "scripts": {
-    "typecheck": "npm run typecheck -w shared && npm run typecheck -w backend && npm run typecheck -w frontend",
+    "dev": "concurrently --names \"api,agent,ui\" --prefix-colors \"cyan,yellow,magenta\" --kill-others-on-fail \"npm run dev:backend\" \"npm run dev:agent\" \"npm run dev:frontend\"",
     "dev:backend": "npm run dev -w backend",
     "dev:agent": "npm run agent -w backend",
     "dev:frontend": "npm run dev -w frontend",
     "build": "npm run build -w frontend",
+    "typecheck": "npm run typecheck -w shared && npm run typecheck -w backend && npm run typecheck -w frontend",
     "lint": "npm run lint -w frontend",
     "test": "npm run test -w backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

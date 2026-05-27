@@ -13,8 +13,11 @@ import * as silero from "@livekit/agents-plugin-silero";
 import { createClerkClient } from "@clerk/backend";
 import { ParticipantKind } from "@livekit/rtc-node";
 import { fileURLToPath } from "node:url";
+import { eq } from "drizzle-orm";
 import type { CallOutcome } from "@receptionist/shared";
 import { env } from "../env.js";
+import { db } from "../db/client.js";
+import { calls as callsTable } from "../db/schema.js";
 import { upsertClient } from "../services/clients.js";
 import { createCall, finishCall } from "../services/calls.js";
 import { getTenantByPhoneNumber } from "../services/tenants.js";
@@ -33,7 +36,7 @@ export default defineAgent({
   },
 
   entry: async (ctx: JobContext) => {
-    // 1. Connect + wait for participant
+    // 1. Connect + wait for SIP participant
     await ctx.connect();
     const roomName = ctx.room.name ?? "";
     const participant = await ctx.waitForParticipant();
@@ -43,7 +46,7 @@ export default defineAgent({
     const rawTrunk = isSip ? (participant.attributes["sip.trunkPhoneNumber"] ?? "") : "";
     const trunkPhone = rawTrunk && !rawTrunk.startsWith("+") ? `+${rawTrunk}` : rawTrunk;
 
-    // 2. Resolve tenant by the number that was dialed
+    // 2. Resolve tenant — the ONLY query on the critical path for the greeting
     const tenant = trunkPhone ? await getTenantByPhoneNumber(trunkPhone) : null;
     if (!tenant) {
       console.error(`[worker] No tenant for trunkPhoneNumber="${rawTrunk}" (normalized: "${trunkPhone}") — dropping call`);
@@ -51,7 +54,7 @@ export default defineAgent({
     }
     console.log(`[worker] resolved tenant: ${tenant.id}`);
 
-    // 5. Fire background Google OAuth token fetch (no await)
+    // 3. Fire Google OAuth token fetch in background (no await — resolves while greeting plays)
     const tokenPromise: Promise<string | null> =
       tenant.googleCalendarId && tenant.clerkUserId
         ? clerkClient.users
@@ -63,27 +66,32 @@ export default defineAgent({
             })
         : Promise.resolve(null);
 
-    // 6. Upsert client (single query, returns full row)
-    const client = await upsertClient(tenant.id, callerPhone);
+    // 4. Generate callId locally — zero DB roundtrip needed
+    //    crypto.randomUUID() produces a valid UUID v4 without touching Postgres
+    const callId = crypto.randomUUID();
 
-    // 7-8. Build deps
+    // 5. Build deps immediately with what we have.
+    //    client starts null — set after upsertClient resolves (step 10).
+    //    Tools fire only after caller speaks + LLM responds, so client will
+    //    always be populated by the time any tool execute() runs.
     const callState: CallState = { wasBooked: false, wasEscalated: false };
     const deps: AgentDeps = {
       tenant,
-      client,
+      client: null,
       callerPhone,
-      callId: "",
+      callId,
       getGoogleToken: () => tokenPromise,
       googleCalendarId: tenant.googleCalendarId ?? null,
       callState,
     };
 
-    // 9. Create session
+    // 6. Create TTS instance
     const agentTts = new inference.TTS({
       model: "cartesia/sonic-3",
       voice: "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
     });
 
+    // 7. Create and start session
     const session = new voice.AgentSession({
       vad: ctx.proc.userData.vad as silero.VAD,
       stt: new inference.STT({ model: "assemblyai/universal-streaming", language: "en" }),
@@ -99,71 +107,66 @@ export default defineAgent({
       },
     });
 
-    // 10. Start session
     await session.start({
       agent: new ReceptionistAgent(deps),
       room: ctx.room,
     });
 
-    // 11. IMMEDIATELY register close handler (before createCall — prevents race)
+    // 8. Register close handler BEFORE any async work — prevents race conditions
     let egressId: string | null = null;
-    let callRecordingKey: string | null = null;
+    const callRecordingKey = recordingKey(callId);
 
     session.on(voice.AgentSessionEventTypes.Close, async (ev: voice.CloseEvent) => {
-      if (!deps.callId) {
-        console.warn("[worker] close fired before callId set — skipping finalization");
-        return;
+      try {
+        if (egressId) {
+          stopCallRecording(egressId).catch((err: unknown) =>
+            console.error("[worker] stop egress:", err)
+          );
+        }
+
+        const transcript = extractTranscript(session.history);
+        const isAbandoned =
+          ev.reason === voice.CloseReason.PARTICIPANT_DISCONNECTED && transcript.length <= 1;
+
+        const summary = await generateCallSummary(transcript, {
+          model: env.LLM_MODEL,
+          baseURL: env.OPENROUTER_BASE_URL,
+          apiKey: env.OPENROUTER_API_KEY,
+        });
+
+        let outcome: CallOutcome;
+        if (isAbandoned) outcome = "abandoned";
+        else if (callState.wasBooked) outcome = "booked";
+        else if (callState.wasEscalated) outcome = "escalated";
+        else outcome = "answered";
+
+        await finishCall(callId, {
+          outcome,
+          wasBooked: callState.wasBooked,
+          wasEscalated: callState.wasEscalated,
+          transcript,
+          summary,
+          recordingUrl: callRecordingKey,
+        });
+
+        console.log(`[worker] call ${callId} finalized: ${outcome}`);
+      } catch (err) {
+        console.error("[worker] CRITICAL: close handler failed — call not finalized:", callId, err);
       }
-
-      // Stop recording
-      if (egressId) {
-        stopCallRecording(egressId).catch((err: unknown) =>
-          console.error("[worker] stop egress:", err)
-        );
-      }
-
-      // Extract transcript + generate summary
-      const transcript = extractTranscript(session.history);
-      const isAbandoned =
-        ev.reason === voice.CloseReason.PARTICIPANT_DISCONNECTED && transcript.length <= 1;
-
-      const summary = await generateCallSummary(transcript, {
-        model: env.LLM_MODEL,
-        baseURL: env.OPENROUTER_BASE_URL,
-        apiKey: env.OPENROUTER_API_KEY,
-      });
-
-      // Derive primary outcome
-      let outcome: CallOutcome;
-      if (isAbandoned) outcome = "abandoned";
-      else if (callState.wasBooked) outcome = "booked";
-      else if (callState.wasEscalated) outcome = "escalated";
-      else outcome = "answered";
-
-      await finishCall(deps.callId, {
-        outcome,
-        wasBooked: callState.wasBooked,
-        wasEscalated: callState.wasEscalated,
-        transcript,
-        summary,
-        recordingUrl: callRecordingKey,
-      });
-
-      console.log(`[worker] call ${deps.callId} finalized: ${outcome}`);
     });
 
-    // 12. Create call record
-    const call = await createCall({
-      tenantId: tenant.id,
-      clientId: client.id,
-      callerPhone,
-      livekitRoomName: roomName,
-    });
-    deps.callId = call.id;
+    // 9. ── GREETING + RECORDING START SIMULTANEOUSLY ──────────────────────
+    //    Both fire here, before any DB awaits. Recording must start NOW to
+    //    capture the full greeting — starting it after Promise.all would miss
+    //    the first 200-600ms of audio while upsertClient/createCall resolve.
+    const greeting = tenant.agentProfile.greeting;
+    if (greeting) {
+      session.say(greeting, { allowInterruptions: false });
+    }
 
-    // 13. Fire egress + greeting in parallel
-    callRecordingKey = recordingKey(call.id);
-    startCallRecording(roomName, call.id)
+    // Start recording immediately — only needs roomName and callId, both
+    // already known. Does NOT need createCall to finish first.
+    startCallRecording(roomName, callId)
       .then((result) => {
         egressId = result.egressId;
         console.log(`[worker] egress started: ${egressId}`);
@@ -172,16 +175,33 @@ export default defineAgent({
         console.error("[worker] failed to start recording:", err);
       });
 
-    const greeting = tenant.agentProfile.greeting;
-    if (greeting) {
-      session.say(greeting);
-    }
+    // 10. upsertClient + createCall run concurrently WHILE greeting plays.
+    //     Both will finish well before the caller finishes speaking and any
+    //     tool fires (that chain is: caller speaks → VAD → STT → LLM → tool,
+    //     which takes at minimum 3-8 seconds after the greeting ends).
+    const [client] = await Promise.all([
+      upsertClient(tenant.id, callerPhone),
+      createCall({
+        id: callId,          // our locally-generated UUID
+        tenantId: tenant.id,
+        clientId: null,      // backfilled below after client resolves
+        callerPhone,
+        livekitRoomName: roomName,
+      }),
+    ]);
 
-    // 14. Control returns to LiveKit framework — user speaks, tools fire
+    // Populate client into deps and backfill the FK in the background
+    deps.client = client;
+    db.update(callsTable)
+      .set({ clientId: client.id })
+      .where(eq(callsTable.id, callId))
+      .catch((err: unknown) => console.error("[worker] clientId backfill failed:", err));
+
+    // 11. Control returns to LiveKit framework — caller speaks, tools fire
   },
 });
 
-// Agent class — receives deps, delegates prompt and tools
+// Agent class — receives deps, builds prompt and tools
 class ReceptionistAgent extends voice.Agent {
   constructor(deps: AgentDeps) {
     super({
