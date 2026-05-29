@@ -87,3 +87,23 @@
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-muted-foreground); }
+
+/* Test Agent live visualizer — bars inherit button text color, no background */
+.test-agent-viz {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+.test-agent-viz .lk-audio-bar {
+  width: 3px;
+  flex: none;
+  border-radius: 2px;
+  background-color: currentColor;
+  opacity: 0.5;
+  transition: opacity 0.12s ease;
+}
+.test-agent-viz .lk-audio-bar.lk-highlighted,
+.test-agent-viz .lk-audio-bar[data-lk-highlighted="true"] {
+  opacity: 1;
+}

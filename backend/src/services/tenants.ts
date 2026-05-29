@@ -58,6 +58,7 @@ export async function createTenant(input: {
   industry: string;
   timezone: string;
   clerkUserId: string;
+  phoneNumber: string;
   description?: string;
   services?: import("@receptionist/shared").ServiceItem[];
   agentProfile?: import("@receptionist/shared").AgentProfile;
@@ -81,8 +82,8 @@ export async function deleteTenant(id: string): Promise<void> {
 export async function updateTenant(
   id: string,
   patch: Partial<Pick<TenantRow,
-    "name" | "industry" | "description" | "services" | "agentProfile" |
-    "timezone" | "googleCalendarId" | "phoneNumber"
+    | "name" | "industry" | "description" | "services" | "agentProfile"
+    | "timezone" | "googleCalendarId" | "phoneNumber"
   >>
 ): Promise<void> {
   await db
