@@ -8,6 +8,7 @@ import * as AppointmentsController from "../controllers/appointments.js";
 import * as SettingsController from "../controllers/settings.js";
 import * as TelephonyController from "../controllers/telephony.js";
 import * as AccountController from "../controllers/account.js";
+import * as AgentTestController from "../controllers/agentTest.js";
 import type { AppEnv } from "../types.js";
 
 const router = new Hono<AppEnv>();
@@ -28,6 +29,7 @@ router.patch("/settings", SettingsController.updateSettings);
 router.get("/phone/search", TelephonyController.search);
 router.post("/phone/provision", TelephonyController.provision);
 router.delete("/phone", TelephonyController.release);
+router.post("/agent/test", AgentTestController.createTestSession);
 router.delete("/account", AccountController.deleteAccount);
 
 export default router;

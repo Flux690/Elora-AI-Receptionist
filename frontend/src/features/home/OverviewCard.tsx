@@ -1,8 +1,8 @@
-import { Mic, Phone } from 'lucide-react'
+import { Phone } from 'lucide-react'
 import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatPhone } from '@/lib/formatters'
+import { TestAgentControl } from './TestAgentControl'
 import type { AppSettings } from '@/lib/settings-types'
 
 interface OverviewCardProps {
@@ -40,12 +40,10 @@ export function OverviewCard({ settings }: OverviewCardProps) {
               </p>
             )}
           </div>
-          <Button variant="default" size="lg">
-            <Mic className="size-4" />
-            Test Agent
-          </Button>
+          <TestAgentControl />
         </div>
       </Card>
     </div>
   )
 }
+

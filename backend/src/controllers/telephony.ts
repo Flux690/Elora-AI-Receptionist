@@ -1,6 +1,10 @@
 import type { AppContext } from "../types.js";
 import { getTenantById, updateTenant } from "../services/tenants.js";
-import { searchPhoneNumbers, purchasePhoneNumber, releasePhoneNumber } from "../services/telephony.js";
+import {
+  searchPhoneNumbers,
+  purchasePhoneNumber,
+  releasePhoneNumber,
+} from "../services/telephony.js";
 import { phoneProvisionSchema } from "../schemas.js";
 
 export async function search(c: AppContext) {
@@ -20,11 +24,12 @@ export async function provision(c: AppContext) {
   const purchased = await purchasePhoneNumber(phoneNumber);
   try {
     await updateTenant(tenantId, { phoneNumber: purchased.e164_format });
-    return c.json({ phoneNumber: purchased.e164_format });
-  } catch (dbError) {
-    await releasePhoneNumber(purchased.e164_format).catch((e) => console.error("Rollback number fail:", e));
-    throw dbError;
+  } catch (dbErr) {
+    await releasePhoneNumber(purchased.e164_format).catch((e) => console.error("[telephony] rollback release failed:", e));
+    throw dbErr;
   }
+
+  return c.json({ phoneNumber: purchased.e164_format });
 }
 
 export async function release(c: AppContext) {
@@ -32,7 +37,12 @@ export async function release(c: AppContext) {
   const tenant = await getTenantById(tenantId);
   if (!tenant) return c.json({ error: "Tenant not found" }, 404);
 
-  if (tenant.phoneNumber) await releasePhoneNumber(tenant.phoneNumber).catch((e) => console.error("Release fail:", e));
+  if (tenant.phoneNumber) {
+    await releasePhoneNumber(tenant.phoneNumber).catch((e: unknown) =>
+      console.error("[telephony] release failed:", e)
+    );
+  }
+
   await updateTenant(tenantId, { phoneNumber: null });
   return c.json({ ok: true });
 }

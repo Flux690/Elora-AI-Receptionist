@@ -11,7 +11,6 @@ import * as livekit from "@livekit/agents-plugin-livekit";
 import * as openai from "@livekit/agents-plugin-openai";
 import * as silero from "@livekit/agents-plugin-silero";
 import { createClerkClient } from "@clerk/backend";
-import { ParticipantKind } from "@livekit/rtc-node";
 import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import type { CallOutcome } from "@receptionist/shared";
@@ -20,7 +19,7 @@ import { db } from "../db/client.js";
 import { calls as callsTable } from "../db/schema.js";
 import { upsertClient } from "../services/clients.js";
 import { createCall, finishCall } from "../services/calls.js";
-import { getTenantByPhoneNumber } from "../services/tenants.js";
+import { getTenantById, getTenantByPhoneNumber } from "../services/tenants.js";
 import { startCallRecording, stopCallRecording, recordingKey } from "../services/storage.js";
 import type { AgentDeps, CallState } from "./types.js";
 import { buildSystemPrompt } from "./prompt.js";
@@ -30,29 +29,67 @@ import { generateCallSummary } from "./summary.js";
 
 const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
 
+// ── Per-entry tenant cache ────────────────────────────────────────────────────
+// Populated lazily on first call per tenant. 5-minute TTL so config changes
+// (greeting, services, prompt) propagate without a process restart.
+const TENANT_CACHE_TTL_MS = 5 * 60 * 1000;
+const tenantCache = new Map<string, { data: import("../services/tenants.js").WorkerTenant; expiresAt: number }>();
+
+async function resolveTenant(idOrPhone: { tenantId?: string; phoneNumber?: string }) {
+  const cacheKey = idOrPhone.tenantId ?? idOrPhone.phoneNumber ?? "";
+  if (!cacheKey) return null;
+
+  const cached = tenantCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt) return cached.data;
+
+  const tenant = idOrPhone.tenantId 
+    ? await getTenantById(idOrPhone.tenantId)
+    : await getTenantByPhoneNumber(idOrPhone.phoneNumber!);
+
+  if (tenant) tenantCache.set(cacheKey, { data: tenant, expiresAt: Date.now() + TENANT_CACHE_TTL_MS });
+  return tenant;
+}
+
 export default defineAgent({
   prewarm: async (proc: JobProcess) => {
     proc.userData.vad = await silero.VAD.load();
   },
 
   entry: async (ctx: JobContext) => {
-    // 1. Connect + wait for SIP participant
+    // 1. Connect + wait for participant (SIP caller or browser test session)
     await ctx.connect();
     const roomName = ctx.room.name ?? "";
     const participant = await ctx.waitForParticipant();
 
-    const isSip = participant.kind === ParticipantKind.SIP;
-    const callerPhone = isSip ? (participant.attributes["sip.phoneNumber"] ?? "unknown") : "dev-participant";
-    const rawTrunk = isSip ? (participant.attributes["sip.trunkPhoneNumber"] ?? "") : "";
+    const isTestSession = participant.attributes["testSession"] === "true";
+
+    const callerPhone = !isTestSession ? (participant.attributes["sip.phoneNumber"] ?? "unknown") : "test";
+    const rawTrunk = !isTestSession ? (participant.attributes["sip.trunkPhoneNumber"] ?? "") : "";
     const trunkPhone = rawTrunk && !rawTrunk.startsWith("+") ? `+${rawTrunk}` : rawTrunk;
 
-    // 2. Resolve tenant — the ONLY query on the critical path for the greeting
-    const tenant = trunkPhone ? await getTenantByPhoneNumber(trunkPhone) : null;
+    // 2. Resolve tenant — zero blocking DB work on the critical path.
+    let tenant: import("../services/tenants.js").WorkerTenant | null = null;
+
+    if (isTestSession) {
+      const tenantId = participant.attributes["tenantId"];
+      if (!tenantId) {
+        console.error("[worker] no tenantId in participant attributes for test session — dropping");
+        return;
+      }
+      tenant = await resolveTenant({ tenantId });
+    } else {
+      if (!trunkPhone) {
+        console.error(`[worker] No trunkPhoneNumber found for SIP participant — dropping`);
+        return;
+      }
+      tenant = await resolveTenant({ phoneNumber: trunkPhone });
+    }
+
     if (!tenant) {
-      console.error(`[worker] No tenant for trunkPhoneNumber="${rawTrunk}" (normalized: "${trunkPhone}") — dropping call`);
+      console.error(`[worker] tenant not found — dropping`);
       return;
     }
-    console.log(`[worker] resolved tenant: ${tenant.id}`);
+    console.log(`[worker] resolved tenant: ${tenant.id}${isTestSession ? " (test session)" : ""}`);
 
     // 3. Fire Google OAuth token fetch in background (no await — resolves while greeting plays)
     const tokenPromise: Promise<string | null> =
@@ -67,7 +104,6 @@ export default defineAgent({
         : Promise.resolve(null);
 
     // 4. Generate callId locally — zero DB roundtrip needed
-    //    crypto.randomUUID() produces a valid UUID v4 without touching Postgres
     const callId = crypto.randomUUID();
 
     // 5. Build deps immediately with what we have.
@@ -114,7 +150,7 @@ export default defineAgent({
 
     // 8. Register close handler BEFORE any async work — prevents race conditions
     let egressId: string | null = null;
-    const callRecordingKey = recordingKey(callId);
+    const callRecordingKey = isTestSession ? null : recordingKey(callId);
 
     session.on(voice.AgentSessionEventTypes.Close, async (ev: voice.CloseEvent) => {
       try {
@@ -122,6 +158,12 @@ export default defineAgent({
           stopCallRecording(egressId).catch((err: unknown) =>
             console.error("[worker] stop egress:", err)
           );
+        }
+
+        // Test sessions skip DB finalization — no call row was created
+        if (isTestSession) {
+          console.log(`[worker] test session ${callId} ended`);
+          return;
         }
 
         const transcript = extractTranscript(session.history);
@@ -155,49 +197,44 @@ export default defineAgent({
       }
     });
 
-    // 9. ── GREETING + RECORDING START SIMULTANEOUSLY ──────────────────────
-    //    Both fire here, before any DB awaits. Recording must start NOW to
-    //    capture the full greeting — starting it after Promise.all would miss
-    //    the first 200-600ms of audio while upsertClient/createCall resolve.
+    // 9. ── GREETING ──────────────────────────────────────────────────────────
     const greeting = tenant.agentProfile.greeting;
     if (greeting) {
       session.say(greeting, { allowInterruptions: false });
     }
 
-    // Start recording immediately — only needs roomName and callId, both
-    // already known. Does NOT need createCall to finish first.
-    startCallRecording(roomName, callId)
-      .then((result) => {
-        egressId = result.egressId;
-        console.log(`[worker] egress started: ${egressId}`);
-      })
-      .catch((err: unknown) => {
-        console.error("[worker] failed to start recording:", err);
-      });
+    // 10. Recording + DB writes — skipped for test sessions
+    if (!isTestSession) {
+      // Start recording simultaneously with greeting
+      startCallRecording(roomName, callId)
+        .then((result) => {
+          egressId = result.egressId;
+          console.log(`[worker] egress started: ${egressId}`);
+        })
+        .catch((err: unknown) => {
+          console.error("[worker] failed to start recording:", err);
+        });
 
-    // 10. upsertClient + createCall run concurrently WHILE greeting plays.
-    //     Both will finish well before the caller finishes speaking and any
-    //     tool fires (that chain is: caller speaks → VAD → STT → LLM → tool,
-    //     which takes at minimum 3-8 seconds after the greeting ends).
-    const [client] = await Promise.all([
-      upsertClient(tenant.id, callerPhone),
-      createCall({
-        id: callId,          // our locally-generated UUID
-        tenantId: tenant.id,
-        clientId: null,      // backfilled below after client resolves
-        callerPhone,
-        livekitRoomName: roomName,
-      }),
-    ]);
+      // upsertClient + createCall run concurrently WHILE greeting plays
+      const [client] = await Promise.all([
+        upsertClient(tenant.id, callerPhone),
+        createCall({
+          id: callId,
+          tenantId: tenant.id,
+          clientId: null,
+          callerPhone,
+          livekitRoomName: roomName,
+        }),
+      ]);
 
-    // Populate client into deps and backfill the FK in the background
-    deps.client = client;
-    db.update(callsTable)
-      .set({ clientId: client.id })
-      .where(eq(callsTable.id, callId))
-      .catch((err: unknown) => console.error("[worker] clientId backfill failed:", err));
+      deps.client = client;
+      db.update(callsTable)
+        .set({ clientId: client.id })
+        .where(eq(callsTable.id, callId))
+        .catch((err: unknown) => console.error("[worker] clientId backfill failed:", err));
+    }
 
-    // 11. Control returns to LiveKit framework — caller speaks, tools fire
+    // 11. Control returns to LiveKit framework — participant speaks, tools fire
   },
 });
 

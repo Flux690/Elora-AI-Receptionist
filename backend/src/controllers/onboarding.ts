@@ -1,8 +1,12 @@
 import { getAuth } from "@clerk/hono";
 import { createClerkClient } from "@clerk/backend";
 import type { Context } from "hono";
-import { resolveTenantByClerkUserId, createTenant, updateTenant } from "../services/tenants.js";
-import { searchPhoneNumbers, purchasePhoneNumber, releasePhoneNumber } from "../services/telephony.js";
+import { createTenant } from "../services/tenants.js";
+import {
+  searchPhoneNumbers,
+  purchasePhoneNumber,
+  releasePhoneNumber,
+} from "../services/telephony.js";
 import { env } from "../env.js";
 import { onboardingCreateSchema } from "../schemas.js";
 
@@ -24,22 +28,18 @@ export async function create(c: Context) {
 
   const { phoneNumber, ...tenantData } = parsed.data;
 
-  // Upsert: webhook may or may not have pre-created the row
-  let tenant = await resolveTenantByClerkUserId(auth.userId);
-  if (tenant) {
-    await updateTenant(tenant.id, tenantData);
-  } else {
-    tenant = await createTenant({ clerkUserId: auth.userId, ...tenantData });
-  }
-
+  // 1. Purchase first — if this fails, nothing hits the DB
   const purchased = await purchasePhoneNumber(phoneNumber);
+
+  // 2. Create tenant atomically — if DB fails, release the number
   try {
-    await updateTenant(tenant.id, { phoneNumber: purchased.e164_format });
+    await createTenant({ clerkUserId: auth.userId, phoneNumber: purchased.e164_format, ...tenantData });
   } catch (dbErr) {
-    await releasePhoneNumber(purchased.e164_format).catch((e) => console.error("Rollback number fail:", e));
+    await releasePhoneNumber(purchased.e164_format).catch((e) => console.error("[onboarding] rollback release failed:", e));
     throw dbErr;
   }
 
+  // 3. Mark onboarded in Clerk
   await clerkClient.users.updateUserMetadata(auth.userId, {
     publicMetadata: { onboarded: true },
   });
