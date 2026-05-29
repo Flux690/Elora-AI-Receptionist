@@ -12,6 +12,7 @@ Built as a multi-tenant B2B SaaS.
 - **Appointment booking** — checks Google Calendar availability and creates confirmed events by voice
 - **Escalation loop** — unanswerable questions flagged for admin review; resolved answers auto-populate the knowledge base
 - **Call recordings** — every call recorded with full transcript and AI-generated summary
+- **In-browser agent test** — talk to your agent live from the dashboard, no phone call (no recording, no call log)
 - **Admin dashboard** — calls, escalations, appointments, knowledge base, and settings
 - **Multi-tenant** — every table is tenant-scoped; each business is fully isolated
 
@@ -96,6 +97,9 @@ npm run db:migrate -w backend
 ### Run
 
 ```bash
+npm run dev            # runs all three below at once via concurrently
+
+# …or run them in separate terminals:
 npm run dev:backend    # API server → http://localhost:8080
 npm run dev:agent      # LiveKit agent worker — keep running alongside the API
 npm run dev:frontend   # Admin dashboard → http://localhost:5173
@@ -118,7 +122,8 @@ Admin — `Authorization: Bearer <clerk_jwt>` required:
 |---|---|---|
 | GET | `/api/admin/metrics?period=30d` | KPI counts |
 | GET | `/api/admin/calls` | Paginated call history |
-| GET | `/api/admin/calls/:id` | Call detail with transcript + recording |
+| GET | `/api/admin/calls/:id` | Call detail with transcript |
+| GET | `/api/admin/calls/:id/recording` | Presigned recording URL |
 | GET | `/api/admin/escalations?status=pending` | Escalation list |
 | POST | `/api/admin/escalations/:id/resolve` | Resolve + add to knowledge base |
 | GET | `/api/admin/knowledge` | Knowledge base items |
@@ -126,8 +131,10 @@ Admin — `Authorization: Bearer <clerk_jwt>` required:
 | GET | `/api/admin/appointments` | Appointment list |
 | GET | `/api/admin/settings` | Tenant settings |
 | PATCH | `/api/admin/settings` | Update settings |
-| POST | `/api/admin/telephony/provision` | Purchase phone number |
-| DELETE | `/api/admin/telephony/release` | Release phone number |
+| GET | `/api/admin/phone/search?areaCode=415` | Search available numbers (`areaCode` optional) |
+| POST | `/api/admin/phone/provision` | Purchase phone number |
+| DELETE | `/api/admin/phone` | Release phone number |
+| POST | `/api/admin/agent/test` | Create a browser test session (room + join token) |
 | DELETE | `/api/admin/account` | Delete tenant and all data |
 
 
