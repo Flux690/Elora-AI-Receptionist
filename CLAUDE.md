@@ -9,12 +9,18 @@ Multi-tenant B2B SaaS. Every DB table has `tenant_id`. Every service function ta
 ## Commands
 
 ```bash
+npm run dev             # all three below at once, via concurrently (api, agent, ui)
+
 npm run dev:backend     # API server → http://localhost:8080
 npm run dev:agent       # LiveKit agent worker (separate process, keep alongside API)
 npm run dev:frontend    # Admin dashboard → http://localhost:5173
 
 npm run db:generate -w backend   # generate migration from schema changes
 npm run db:migrate -w backend    # apply to Neon Postgres
+
+npm run typecheck       # tsc --noEmit across shared, backend, frontend
+npm run build           # build frontend
+npm run lint            # lint frontend
 ```
 
 ## Architecture
@@ -29,7 +35,7 @@ Two processes from `backend/`:
 ## Layering rules
 
 - **Routes** — path + method + handler reference only. No logic.
-- **Controllers** — parse input, call service, return response. No try/catch — errors bubble to global `onError` in `index.ts`.
+- **Controllers** — parse input, call service, return response. No try/catch — errors bubble to global `onError` in `index.ts`. Sole exception: `onboarding`/`telephony` wrap phone-number provisioning to release the purchased number on a later failure, then re-throw (so the error still bubbles).
 - **Services** — all DB access. Exception: `controllers/metrics.ts` uses `db` directly for aggregate queries.
 - Use `AppEnv` / `AppContext` from `src/types.ts` on all admin routes and controllers so `c.get('tenantId')` is type-safe.
 
@@ -50,13 +56,24 @@ Google Calendar OAuth: `redirectUrl` includes `?returnTo=/appointments`. `SSOCal
 `sip.trunkPhoneNumber` (the dialed number, used for tenant lookup) is only available after `waitForParticipant()`. We must connect first to get the participant, then resolve the tenant before building `ReceptionistAgent(deps)`.
 
 ```
-ctx.connect() → waitForParticipant() → getTenantByPhoneNumber(trunkPhone)
-→ upsertClient → createCall → session.start() → session.say(greeting)
+ctx.connect() → waitForParticipant() → resolveTenant (trunkPhone, or tenantId for test)
+→ session.start() → session.say(greeting)
+→ [background, after greeting fires] startCallRecording + upsertClient + createCall
 ```
+
+DB writes and recording are deliberately deferred until after the greeting plays — they're off the critical path so the caller hears audio with zero blocking DB roundtrips.
 
 SIP attribute names:
 - `participant.attributes["sip.phoneNumber"]` — caller's number (who is calling)
 - `participant.attributes["sip.trunkPhoneNumber"]` — number that was dialed (tenant lookup key)
+
+### Test sessions (browser)
+
+The worker serves two participant types. Real SIP calls resolve the tenant from `sip.trunkPhoneNumber`. **Browser test sessions** (`POST /api/admin/agent/test`) carry `testSession: "true"` and `tenantId` in participant attributes — the worker branches on `testSession`, resolves the tenant by ID, and **skips recording and all DB writes** (no call/client rows, no egress). Test rooms use explicit agent dispatch via the join token's `RoomConfiguration` (`RoomAgentDispatch`), not the universal SIP dispatch rule.
+
+Frontend uses the LiveKit Session API (`useSession` + `SessionProvider` from `@livekit/components-react`), not `LiveKitRoom`. The session lifecycle effect must be StrictMode-safe — defer `session.end()` so a throwaway dev unmount doesn't kill the live connection.
+
+Tenant lookups in the worker are cached per-key (id or phone) with a 5-minute TTL so config changes propagate without a restart.
 
 ### Tools
 
