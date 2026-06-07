@@ -224,11 +224,7 @@ export default defineAgent({
         const isAbandoned =
           ev.reason === voice.CloseReason.PARTICIPANT_DISCONNECTED && transcript.length <= 1;
 
-        const summary = await generateCallSummary(transcript, {
-          model: env.SUMMARY_LLM_MODEL,
-          baseURL: env.OPENROUTER_BASE_URL,
-          apiKey: env.OPENROUTER_API_KEY,
-        });
+        const summary = await generateCallSummary(transcript);
 
         let outcome: CallOutcome;
         if (isAbandoned) outcome = "abandoned";

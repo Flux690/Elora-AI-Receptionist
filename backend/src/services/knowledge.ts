@@ -1,18 +1,13 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { knowledgeItems } from "../db/schema.js";
-import OpenAI from "openai";
 import { env } from "../env.js";
+import { openrouter } from "../llm.js";
 import type { EscalationRow } from "./escalations.js";
-
-const openai = new OpenAI({
-  apiKey: env.OPENROUTER_API_KEY,
-  baseURL: env.OPENROUTER_BASE_URL,
-});
 
 async function embedText(text: string): Promise<number[] | null> {
   try {
-    const response = await openai.embeddings.create({
+    const response = await openrouter.embeddings.create({
       model: env.EMBEDDING_MODEL,
       input: text,
       encoding_format: "float",
