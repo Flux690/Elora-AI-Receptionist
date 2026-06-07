@@ -1,7 +1,7 @@
 import {
-  boolean,
   customType,
   index,
+  uniqueIndex,
   jsonb,
   pgEnum,
   pgTable,
@@ -10,13 +10,15 @@ import {
   uuid,
   unique,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import type { ServiceItem, AgentProfile, TranscriptEntry } from "@receptionist/shared";
 export type { ServiceItem, AgentProfile, TranscriptEntry } from "@receptionist/shared";
 export type { CallOutcome } from "@receptionist/shared";
+import { env } from "../env.js";
 
 const vector = customType<{ data: number[] | null }>({
   dataType() {
-    return "vector(2048)";
+    return `vector(${env.EMBEDDING_DIMENSIONS})`;
   },
   toDriver(value) {
     if (!value) return null;
@@ -101,8 +103,6 @@ export const calls = pgTable(
     transcript: jsonb("transcript").$type<TranscriptEntry[]>(),
     summary: text("summary"),
     recordingUrl: text("recording_url"),
-    wasBooked: boolean("was_booked").notNull().default(false),
-    wasEscalated: boolean("was_escalated").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [index("calls_tenant_started_at_idx").on(table.tenantId, table.startedAt)]
@@ -131,6 +131,9 @@ export const escalations = pgTable(
       table.status,
       table.createdAt
     ),
+    uniqueIndex("escalations_call_question_dedup_idx")
+      .on(table.callId, sql`lower(${table.question})`)
+      .where(sql`${table.callId} IS NOT NULL`),
   ]
 );
 
@@ -150,7 +153,12 @@ export const knowledgeItems = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index("knowledge_items_tenant_created_at_idx").on(table.tenantId, table.createdAt)]
+  (table) => [
+    index("knowledge_items_tenant_created_at_idx").on(table.tenantId, table.createdAt),
+    index("knowledge_items_embedding_hnsw_idx")
+      .using("hnsw", table.embedding.op("vector_cosine_ops"))
+      .with({ m: 16, ef_construction: 64 }),
+  ]
 );
 
 export const appointments = pgTable(

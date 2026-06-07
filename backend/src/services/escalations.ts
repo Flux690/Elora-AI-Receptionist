@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { escalations } from "../db/schema.js";
 
@@ -16,6 +16,23 @@ type CreateEscalationInput = {
 export async function createEscalation(
   input: CreateEscalationInput
 ): Promise<EscalationRow> {
+  // Dedup: within the same call, the same question (case-insensitive) should not
+  // be escalated twice. Return the existing row instead of inserting a duplicate.
+  if (input.callId) {
+    const existing = await db
+      .select()
+      .from(escalations)
+      .where(
+        and(
+          eq(escalations.callId, input.callId),
+          sql`lower(${escalations.question}) = lower(${input.question})`
+        )
+      )
+      .limit(1);
+
+    if (existing[0]) return existing[0];
+  }
+
   const rows = await db
     .insert(escalations)
     .values({
