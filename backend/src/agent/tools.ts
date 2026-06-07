@@ -26,7 +26,12 @@ export function createAgentTools(deps: AgentDeps) {
         sayHold(ctx);
         const results = await searchKnowledge(tenantId, query);
         if (results.length === 0) return null;
-        return results.map((r) => `Q: ${r.question}\nA: ${r.answer}`).join("\n---\n");
+        return results
+          .map((r) => {
+            const confidence = r.similarity >= 0.85 ? "high" : "medium";
+            return `[confidence: ${confidence}]\nQ: ${r.question}\nA: ${r.answer}`;
+          })
+          .join("\n---\n");
       },
     }),
 
