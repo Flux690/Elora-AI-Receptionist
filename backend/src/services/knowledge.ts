@@ -23,6 +23,13 @@ async function embedText(text: string): Promise<number[] | null> {
       console.warn("[embeddings] full response:", JSON.stringify(response, null, 2));
       return null;
     }
+    if (embedding.length !== env.EMBEDDING_DIMENSIONS) {
+      console.error(
+        `[embeddings] dimension mismatch: model returned ${embedding.length} but EMBEDDING_DIMENSIONS=${env.EMBEDDING_DIMENSIONS}. ` +
+        `Update EMBEDDING_DIMENSIONS to match the model or change EMBEDDING_MODEL.`
+      );
+      return null;
+    }
     return embedding;
   } catch (err) {
     console.error("[embeddings] API call failed:", err);
@@ -78,7 +85,7 @@ export async function searchKnowledge(
     FROM knowledge_items
     WHERE tenant_id = ${tenantId}
       AND embedding IS NOT NULL
-      AND 1 - (embedding <=> ${vectorLiteral}::vector) > 0.5
+      AND 1 - (embedding <=> ${vectorLiteral}::vector) > 0.65
     ORDER BY embedding <=> ${vectorLiteral}::vector
     LIMIT 3
   `);

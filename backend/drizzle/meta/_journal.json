@@ -57,6 +57,13 @@
       "when": 1778418871202,
       "tag": "0007_lame_taskmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1780838704961,
+      "tag": "0008_flowery_ravenous",
+      "breakpoints": true
     }
   ]
 }

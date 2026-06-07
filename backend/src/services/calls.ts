@@ -30,8 +30,6 @@ export async function createCall(input: CreateCallInput): Promise<CallRow> {
 
 type FinishCallData = {
   outcome: CallOutcome;
-  wasBooked: boolean;
-  wasEscalated: boolean;
   transcript: TranscriptEntry[];
   summary: string | null;
   recordingUrl: string | null;
@@ -46,8 +44,6 @@ export async function finishCall(
     .set({
       endedAt: new Date(),
       outcome: data.outcome,
-      wasBooked: data.wasBooked,
-      wasEscalated: data.wasEscalated,
       transcript: data.transcript,
       summary: data.summary,
       recordingUrl: data.recordingUrl,
