@@ -6,10 +6,14 @@ const SUMMARY_PROMPT = `Summarize this phone call in 3-4 sentences. Focus on:
 - Any follow-ups needed (escalations, callbacks, pending bookings)
 Keep it factual and concise. Do not use bullet points.`;
 
+const MIN_SUMMARY_ENTRIES = 3;
+
 export async function generateCallSummary(
   transcript: TranscriptEntry[],
   config: { model: string; baseURL: string; apiKey: string }
 ): Promise<string> {
+  if (transcript.length < MIN_SUMMARY_ENTRIES) return "";
+
   const formatted = transcript
     .map((entry) => `${entry.role === "user" ? "Caller" : "Agent"}: ${entry.text}`)
     .join("\n");

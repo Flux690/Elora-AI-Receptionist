@@ -29,11 +29,32 @@ import { generateCallSummary } from "./summary.js";
 
 const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
 
-// ── Per-entry tenant cache ────────────────────────────────────────────────────
-// Populated lazily on first call per tenant. 5-minute TTL so config changes
-// (greeting, services, prompt) propagate without a process restart.
+// ── LRU cache ─────────────────────────────────────────────────────────────────
+// Map preserves insertion order, so the first key is always the least-recently-used.
+class LRUCache<K, V> {
+  private readonly map = new Map<K, V>();
+  constructor(private readonly maxSize: number) {}
+
+  get(key: K): V | undefined {
+    if (!this.map.has(key)) return undefined;
+    const value = this.map.get(key)!;
+    this.map.delete(key);
+    this.map.set(key, value);
+    return value;
+  }
+
+  set(key: K, value: V): void {
+    if (this.map.has(key)) this.map.delete(key);
+    else if (this.map.size >= this.maxSize) this.map.delete(this.map.keys().next().value as K);
+    this.map.set(key, value);
+  }
+}
+
+// ── Tenant cache ──────────────────────────────────────────────────────────────
+// 5-minute TTL so config changes propagate without a restart.
+// Capped at 500 entries to prevent unbounded memory growth in production.
 const TENANT_CACHE_TTL_MS = 5 * 60 * 1000;
-const tenantCache = new Map<string, { data: import("../services/tenants.js").WorkerTenant; expiresAt: number }>();
+const tenantCache = new LRUCache<string, { data: import("../services/tenants.js").WorkerTenant; expiresAt: number }>(500);
 
 async function resolveTenant(idOrPhone: { tenantId?: string; phoneNumber?: string }) {
   const cacheKey = idOrPhone.tenantId ?? idOrPhone.phoneNumber ?? "";
@@ -42,12 +63,52 @@ async function resolveTenant(idOrPhone: { tenantId?: string; phoneNumber?: strin
   const cached = tenantCache.get(cacheKey);
   if (cached && Date.now() < cached.expiresAt) return cached.data;
 
-  const tenant = idOrPhone.tenantId 
+  const tenant = idOrPhone.tenantId
     ? await getTenantById(idOrPhone.tenantId)
     : await getTenantByPhoneNumber(idOrPhone.phoneNumber!);
 
   if (tenant) tenantCache.set(cacheKey, { data: tenant, expiresAt: Date.now() + TENANT_CACHE_TTL_MS });
   return tenant;
+}
+
+// ── Google OAuth token cache ──────────────────────────────────────────────────
+// Google access tokens are valid for 60 minutes; cache for 50 to avoid expiry
+// races. Clerk refreshes under the hood when we call getUserOauthAccessToken —
+// caching skips that network round-trip on every inbound call.
+const OAUTH_TOKEN_CACHE_TTL_MS = 50 * 60 * 1000;
+const oauthTokenCache = new LRUCache<string, { token: string; expiresAt: number }>(200);
+
+async function getGoogleOAuthToken(clerkUserId: string): Promise<string | null> {
+  const cached = oauthTokenCache.get(clerkUserId);
+  if (cached && Date.now() < cached.expiresAt) return cached.token;
+
+  try {
+    const r = await clerkClient.users.getUserOauthAccessToken(clerkUserId, "google");
+    const token = r.data[0]?.token ?? null;
+    if (token) oauthTokenCache.set(clerkUserId, { token, expiresAt: Date.now() + OAUTH_TOKEN_CACHE_TTL_MS });
+    return token;
+  } catch (err) {
+    console.error("[worker] Failed to fetch Google OAuth token:", err);
+    return null;
+  }
+}
+
+// ── Egress stop with retry ────────────────────────────────────────────────────
+// A single failed stopEgress leaves the LiveKit egress running and billing.
+// Retry up to maxAttempts with linear backoff before logging a leak warning.
+async function stopEgressWithRetry(egressId: string, maxAttempts = 3): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await stopCallRecording(egressId);
+      return;
+    } catch (err) {
+      if (attempt === maxAttempts) {
+        console.error(`[worker] stopEgress failed after ${maxAttempts} attempts — egress ${egressId} may be leaking:`, err);
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+    }
+  }
 }
 
 export default defineAgent({
@@ -91,16 +152,11 @@ export default defineAgent({
     }
     console.log(`[worker] resolved tenant: ${tenant.id}${isTestSession ? " (test session)" : ""}`);
 
-    // 3. Fire Google OAuth token fetch in background (no await — resolves while greeting plays)
+    // 3. Fire Google OAuth token fetch in background (no await — resolves while greeting plays).
+    //    Token is cached at module level with a 50-minute TTL so repeat calls skip the network.
     const tokenPromise: Promise<string | null> =
       tenant.googleCalendarId && tenant.clerkUserId
-        ? clerkClient.users
-            .getUserOauthAccessToken(tenant.clerkUserId, "google")
-            .then((r) => r.data[0]?.token ?? null)
-            .catch((err: unknown) => {
-              console.error("[worker] Failed to fetch Google OAuth token:", err);
-              return null;
-            })
+        ? getGoogleOAuthToken(tenant.clerkUserId)
         : Promise.resolve(null);
 
     // 4. Generate callId locally — zero DB roundtrip needed
@@ -155,9 +211,7 @@ export default defineAgent({
     session.on(voice.AgentSessionEventTypes.Close, async (ev: voice.CloseEvent) => {
       try {
         if (egressId) {
-          stopCallRecording(egressId).catch((err: unknown) =>
-            console.error("[worker] stop egress:", err)
-          );
+          stopEgressWithRetry(egressId);
         }
 
         // Test sessions skip DB finalization — no call row was created
@@ -171,7 +225,7 @@ export default defineAgent({
           ev.reason === voice.CloseReason.PARTICIPANT_DISCONNECTED && transcript.length <= 1;
 
         const summary = await generateCallSummary(transcript, {
-          model: env.LLM_MODEL,
+          model: env.SUMMARY_LLM_MODEL,
           baseURL: env.OPENROUTER_BASE_URL,
           apiKey: env.OPENROUTER_API_KEY,
         });
@@ -184,8 +238,6 @@ export default defineAgent({
 
         await finishCall(callId, {
           outcome,
-          wasBooked: callState.wasBooked,
-          wasEscalated: callState.wasEscalated,
           transcript,
           summary,
           recordingUrl: callRecordingKey,
