@@ -3,25 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "shared",
-    "backend",
-    "frontend"
-  ],
   "scripts": {
-    "dev": "concurrently --names \"api,agent,ui\" --prefix-colors \"cyan,yellow,magenta\" --kill-others-on-fail \"npm run dev:backend\" \"npm run dev:agent\" \"npm run dev:frontend\"",
-    "dev:backend": "npm run dev -w backend",
-    "dev:agent": "npm run agent -w backend",
-    "dev:frontend": "npm run dev -w frontend",
-    "build": "npm run build -w frontend",
-    "typecheck": "npm run typecheck -w shared && npm run typecheck -w backend && npm run typecheck -w frontend",
-    "lint": "npm run lint -w frontend",
-    "test": "npm run test -w backend"
+    "dev": "concurrently --names \"api,agent,ui\" --prefix-colors \"cyan,yellow,magenta\" --kill-others \"pnpm --dir backend exec tsx watch src/index.ts\" \"pnpm --dir backend exec tsx src/agent/worker.ts dev\" \"pnpm -F frontend dev\"",
+    "dev:backend": "pnpm -F backend dev",
+    "dev:agent": "pnpm -F backend agent",
+    "dev:frontend": "pnpm -F frontend dev",
+    "build": "pnpm -F frontend build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -F frontend lint",
+    "test": "pnpm -F backend test"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
-  },
-  "dependencies": {
-    "livekit-server-sdk": "^2.15.4"
+    "concurrently": "9.2.1"
   }
 }
