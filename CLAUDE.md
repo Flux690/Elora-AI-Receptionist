@@ -1,4 +1,4 @@
-# DeskRoute — Codebase Guide
+# DeskRoute - Codebase Guide
 
 ## What this is
 
@@ -9,47 +9,49 @@ Multi-tenant B2B SaaS. Every DB table has `tenant_id`. Every service function ta
 ## Commands
 
 ```bash
-npm run dev             # all three below at once, via concurrently (api, agent, ui)
+pnpm dev             # all three below at once, via concurrently (api, agent, ui)
 
-npm run dev:backend     # API server → http://localhost:8080
-npm run dev:agent       # LiveKit agent worker (separate process, keep alongside API)
-npm run dev:frontend    # Admin dashboard → http://localhost:5173
+pnpm dev:backend     # API server → http://localhost:8080
+pnpm dev:agent       # LiveKit agent worker (separate process, keep alongside API)
+pnpm dev:frontend    # Admin dashboard → http://localhost:5173
 
-npm run db:generate -w backend   # generate migration from schema changes
-npm run db:migrate -w backend    # apply to Neon Postgres
+pnpm -F backend db:generate   # generate migration from schema changes
+pnpm -F backend db:migrate    # apply to Neon Postgres
 
-npm run typecheck       # tsc --noEmit across shared, backend, frontend
-npm run build           # build frontend
-npm run lint            # lint frontend
+pnpm typecheck       # tsc --noEmit across shared, backend, frontend
+pnpm build           # build frontend
+pnpm lint            # lint frontend
 ```
 
 ## Architecture
 
 Two processes from `backend/`:
 
-1. **API server** (`src/index.ts`) — Hono, serves `/api/admin/*`, `/api/health`, `/api/onboarding`
-2. **Agent worker** (`src/agent/worker.ts`) — long-running LiveKit process, handles all concurrent calls
+1. **API server** (`src/index.ts`) - Hono, serves `/api/admin/*`, `/api/health`, `/api/onboarding`
+2. **Agent worker** (`src/agent/worker.ts`) - long-running LiveKit process, handles all concurrent calls
 
-`shared/src/index.ts` exports domain types as `@receptionist/shared`. No build step — consumed directly from `.ts` source via the `exports` field. TypeScript is hoisted to root; `shared/` has no `node_modules`.
+`shared/src/index.ts` exports domain types as `@receptionist/shared`. No build step - consumed directly from `.ts` source via the `exports` field. Each workspace has its own `node_modules`; `shared/` has only `typescript` as a devDependency.
+
+`src/llm.ts` exports a single `openrouter` client (OpenAI SDK pointed at OpenRouter's base URL). Import this everywhere LLM or embedding API calls are needed - do not instantiate `new OpenAI(...)` elsewhere in the codebase.
 
 ## Layering rules
 
-- **Routes** — path + method + handler reference only. No logic.
-- **Controllers** — parse input, call service, return response. No try/catch — errors bubble to global `onError` in `index.ts`. Sole exception: `onboarding`/`telephony` wrap phone-number provisioning to release the purchased number on a later failure, then re-throw (so the error still bubbles).
-- **Services** — all DB access. Exception: `controllers/metrics.ts` uses `db` directly for aggregate queries.
+- **Routes** - path + method + handler reference only. No logic.
+- **Controllers** - parse input, call service, return response. No try/catch - errors bubble to global `onError` in `index.ts`. Sole exception: `onboarding`/`telephony` wrap phone-number provisioning to release the purchased number on a later failure, then re-throw (so the error still bubbles).
+- **Services** - all DB access. Exception: `controllers/metrics.ts` uses `db` directly for aggregate queries.
 - Use `AppEnv` / `AppContext` from `src/types.ts` on all admin routes and controllers so `c.get('tenantId')` is type-safe.
 
 ## Auth
 
 All `/api/admin/*` routes go through two middleware in sequence:
-1. `clerkAuth` (`@hono/clerk-auth`) — verifies Clerk JWT from `Authorization: Bearer`
-2. `requireTenant` — extracts `userId`, looks up tenant by `clerkUserId`, injects `tenantId` into Hono context
+1. `clerkAuth` (`@hono/clerk-auth`) - verifies Clerk JWT from `Authorization: Bearer`
+2. `requireTenant` - extracts `userId`, looks up tenant by `clerkUserId`, injects `tenantId` into Hono context
 
-Clerk redirect env vars are NOT used — `signInUrl`, `signUpUrl`, `afterSignOutUrl` are hardcoded as props on `<ClerkProvider>` in `main.tsx`.
+Clerk redirect env vars are NOT used - `signInUrl`, `signUpUrl`, `afterSignOutUrl` are hardcoded as props on `<ClerkProvider>` in `main.tsx`.
 
-Google Calendar OAuth: `redirectUrl` includes `?returnTo=/appointments`. `SSOCallback` reads this param and passes it to `signInForceRedirectUrl` (force redirect, not fallback — ensures deterministic destination regardless of Clerk session state).
+Google Calendar OAuth: `redirectUrl` includes `?returnTo=/appointments`. `SSOCallback` reads this param and passes it to `signInForceRedirectUrl` (force redirect, not fallback - ensures deterministic destination regardless of Clerk session state).
 
-## Agent worker — non-obvious patterns
+## Agent worker - non-obvious patterns
 
 ### Why `ctx.connect()` comes before everything
 
@@ -61,23 +63,23 @@ ctx.connect() → waitForParticipant() → resolveTenant (trunkPhone, or tenantI
 → [background, after greeting fires] startCallRecording + upsertClient + createCall
 ```
 
-DB writes and recording are deliberately deferred until after the greeting plays — they're off the critical path so the caller hears audio with zero blocking DB roundtrips.
+DB writes and recording are deliberately deferred until after the greeting plays - they're off the critical path so the caller hears audio with zero blocking DB roundtrips.
 
 SIP attribute names:
-- `participant.attributes["sip.phoneNumber"]` — caller's number (who is calling)
-- `participant.attributes["sip.trunkPhoneNumber"]` — number that was dialed (tenant lookup key)
+- `participant.attributes["sip.phoneNumber"]` - caller's number (who is calling)
+- `participant.attributes["sip.trunkPhoneNumber"]` - number that was dialed (tenant lookup key)
 
 ### Test sessions (browser)
 
-The worker serves two participant types. Real SIP calls resolve the tenant from `sip.trunkPhoneNumber`. **Browser test sessions** (`POST /api/admin/agent/test`) carry `testSession: "true"` and `tenantId` in participant attributes — the worker branches on `testSession`, resolves the tenant by ID, and **skips recording and all DB writes** (no call/client rows, no egress). Test rooms use explicit agent dispatch via the join token's `RoomConfiguration` (`RoomAgentDispatch`), not the universal SIP dispatch rule.
+The worker serves two participant types. Real SIP calls resolve the tenant from `sip.trunkPhoneNumber`. **Browser test sessions** (`POST /api/admin/agent/test`) carry `testSession: "true"` and `tenantId` in participant attributes - the worker branches on `testSession`, resolves the tenant by ID, and **skips recording and all DB writes** (no call/client rows, no egress). Test rooms use explicit agent dispatch via the join token's `RoomConfiguration` (`RoomAgentDispatch`), not the universal SIP dispatch rule.
 
-Frontend uses the LiveKit Session API (`useSession` + `SessionProvider` from `@livekit/components-react`), not `LiveKitRoom`. The session lifecycle effect must be StrictMode-safe — defer `session.end()` so a throwaway dev unmount doesn't kill the live connection.
+Frontend uses the LiveKit Session API (`useSession` + `SessionProvider` from `@livekit/components-react`), not `LiveKitRoom`. The session lifecycle effect must be StrictMode-safe - defer `session.end()` so a throwaway dev unmount doesn't kill the live connection.
 
-Tenant lookups in the worker are cached per-key (id or phone) with a 5-minute TTL so config changes propagate without a restart.
+Tenant lookups in the worker are cached per-key (id or phone) with a 5-minute TTL so config changes propagate without a restart. OAuth tokens for Google Calendar are cached for 50 minutes (tokens are valid 60 min), max 200 entries.
 
 ### Tools
 
-`createAgentTools(deps)` closes over `tenant`, `client`, `callId`. The LLM never receives or chooses tenant IDs — backend code always injects them.
+`createAgentTools(deps)` closes over `tenant`, `client`, `callId`. The LLM never receives or chooses tenant IDs - backend code always injects them.
 
 Hold phrase: call `ctx.session.say(holdPhrase)` at the start of any slow tool. Fires the instant the LLM decides to invoke the tool, so the caller hears something immediately while it runs.
 
@@ -85,22 +87,24 @@ Hold phrase: call `ctx.session.say(holdPhrase)` at the start of any slow tool. F
 
 ### LLM model matters for voice
 
-With a slow LLM (>5s to first token), preemptive TTS opens a WebSocket that times out before the first token arrives — the agent produces correct text but **no audio plays**. Use `openai/gpt-4o-mini` or faster. The free default is not viable for voice delivery.
+With a slow LLM (>5s to first token), preemptive TTS opens a WebSocket that times out before the first token arrives - the agent produces correct text but **no audio plays**. Use `openai/gpt-4o-mini` or faster. The free default is not viable for voice delivery.
 
-## LiveKit SIP — single dispatch rule
+## LiveKit SIP - single dispatch rule
 
-One platform-wide dispatch rule handles all tenants. The inbound routing filter must be **empty** — listing specific numbers there breaks new tenants. Tenant is resolved at runtime via `sip.trunkPhoneNumber` → `tenants.phone_number`.
+One platform-wide dispatch rule handles all tenants. The inbound routing filter must be **empty** - listing specific numbers there breaks new tenants. Tenant is resolved at runtime via `sip.trunkPhoneNumber` → `tenants.phone_number`.
 
 LiveKit Phone Numbers have no inbound trunk ID, making per-tenant dispatch rules (which require `trunk_ids`) impossible with native numbers. Universal rule + runtime lookup is the correct architecture for LiveKit-hosted telephony.
 
-The Phone Numbers API is **not in `livekit-server-sdk` (Node.js)** — purchasing and releasing numbers uses direct HTTP calls to the LiveKit Twirp API in `services/telephony.ts`.
+The Phone Numbers API is **not in `livekit-server-sdk` (Node.js)** - purchasing and releasing numbers uses direct HTTP calls to the LiveKit Twirp API in `services/telephony.ts`.
 
-**Releasing a number**: LiveKit auto-associates every purchased number with the project's dispatch rule. Call `UpdatePhoneNumber` with `sip_dispatch_rule_id: ""` first to dissociate — skipping this returns a 400 ("would become a catch-all dispatch rule"). Field name is `phone_number` (singular string), not `phone_numbers`.
+**Releasing a number**: LiveKit auto-associates every purchased number with the project's dispatch rule. Call `UpdatePhoneNumber` with `sip_dispatch_rule_id: ""` first to dissociate - skipping this returns a 400 ("would become a catch-all dispatch rule"). Field name is `phone_number` (singular string), not `phone_numbers`.
 
-## Database — key notes
+## Database - key notes
 
-- `tenants.services` — `jsonb` typed as `ServiceItem[]`; injected into system prompt on every call
-- `tenants.agentProfile` — `jsonb` typed as `AgentProfile`; holds greeting, farewell, fallback, holdPhrase, name
-- `knowledge_items.embedding` — `vector(2048)`; match this dimension when changing embedding models
-- Embeddings stored directly on `knowledge_items` — no separate chunks table
+- `tenants.services` - `jsonb` typed as `ServiceItem[]`; injected into system prompt on every call
+- `tenants.agentProfile` - `jsonb` typed as `AgentProfile`; holds greeting, farewell, fallback, holdPhrase, name
+- `knowledge_items.embedding` - `vector(1536)`; must match `EMBEDDING_DIMENSIONS` env var and the embedding model's actual output dimension
+- Embeddings stored directly on `knowledge_items` - no separate chunks table; HNSW index (m=16, ef_construction=64, cosine ops)
 - Escalation status enum values are lowercase: `"pending"` / `"resolved"`
+- Escalation dedup index: `(callId, lower(question))` where `callId IS NOT NULL` - prevents the same question being escalated twice in one call
+- Recordings stored in Cloudflare R2 as `recordings/{callId}.ogg`
