@@ -8,6 +8,7 @@ overrides:
 
 allowBuilds:
   '@ffmpeg-installer/darwin-arm64': true
+  '@ffmpeg-installer/linux-arm64': set this to true or false
   esbuild: true
   msw: true
   onnxruntime-node: true
