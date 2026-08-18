@@ -8,6 +8,7 @@ overrides:
 
 allowBuilds:
   '@ffmpeg-installer/darwin-arm64': true
+  '@livekit/local-inference': true
   esbuild: true
   msw: true
   onnxruntime-node: true
