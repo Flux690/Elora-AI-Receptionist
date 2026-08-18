@@ -1,10 +1,6 @@
 import type { AppContext } from "../types.js";
-import {
-  listEscalations,
-  resolveEscalation,
-  getEscalationById,
-} from "../services/escalations.js";
-import { createKnowledgeFromEscalation } from "../services/knowledge.js";
+import { listEscalations, getEscalationById } from "../services/escalations.js";
+import { resolveEscalationWithKnowledge } from "../services/knowledge.js";
 import { escalationResolveSchema } from "../schemas.js";
 
 export async function list(c: AppContext) {
@@ -24,8 +20,9 @@ export async function resolve(c: AppContext) {
     return c.json({ error: "Escalation not found" }, 404);
   }
 
-  await createKnowledgeFromEscalation(escalation, parsed.data.answer);
-  await resolveEscalation(id, tenantId, parsed.data.answer);
+  // One transaction: a knowledge row without a resolved escalation (or the
+  // reverse) is the broken state this replaces.
+  await resolveEscalationWithKnowledge(escalation, tenantId, parsed.data.answer);
 
   return c.json({ id, status: "resolved" });
 }

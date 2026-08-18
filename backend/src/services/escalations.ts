@@ -8,31 +8,30 @@ type CreateEscalationInput = {
   tenantId: string;
   callId?: string | null;
   clientId?: string | null;
-  callerPhone: string;
+  callerPhone: string | null;
   question: string;
   transcriptExcerpt?: string | null;
 };
 
+/**
+ * Escalate a question, at most once per (call, question) pair.
+ *
+ * Insert-first rather than check-then-act. The previous SELECT-then-INSERT was a
+ * race: two tool calls in one turn both miss the SELECT, both INSERT, and the
+ * partial unique index on (call_id, lower(question)) makes the second one throw
+ * — out of the tool, mid-call (PLAN.md 1.7.4).
+ *
+ * That race is not theoretical, and it got *more* likely with the pool changes
+ * in db/client.ts: on a cold pool, connection-establishment latency staggers the
+ * SELECTs and hides it (8 concurrent calls → 0 failures), but on a warm pool the
+ * same 8 calls produce 7 unique-violation failures.
+ *
+ * `onConflictDoNothing` returns an empty result when the row already existed, so
+ * the SELECT below is the fallback that fetches the winner's row — not a guard.
+ */
 export async function createEscalation(
   input: CreateEscalationInput
 ): Promise<EscalationRow> {
-  // Dedup: within the same call, the same question (case-insensitive) should not
-  // be escalated twice. Return the existing row instead of inserting a duplicate.
-  if (input.callId) {
-    const existing = await db
-      .select()
-      .from(escalations)
-      .where(
-        and(
-          eq(escalations.callId, input.callId),
-          sql`lower(${escalations.question}) = lower(${input.question})`
-        )
-      )
-      .limit(1);
-
-    if (existing[0]) return existing[0];
-  }
-
   const rows = await db
     .insert(escalations)
     .values({
@@ -44,9 +43,31 @@ export async function createEscalation(
       transcriptExcerpt: input.transcriptExcerpt ?? null,
       status: "pending",
     })
+    .onConflictDoNothing()
     .returning();
 
-  return rows[0];
+  if (rows[0]) return rows[0];
+
+  // Lost the race (or a duplicate within the same call). Fetch the row that won.
+  // Only reachable when callId is set — the unique index is partial on
+  // call_id IS NOT NULL, so a null callId can never conflict.
+  const existing = await db
+    .select()
+    .from(escalations)
+    .where(
+      and(
+        eq(escalations.callId, input.callId!),
+        sql`lower(${escalations.question}) = lower(${input.question})`
+      )
+    )
+    .limit(1);
+
+  if (!existing[0]) {
+    throw new Error(
+      `[escalations] insert conflicted but no existing row found for call ${input.callId}`
+    );
+  }
+  return existing[0];
 }
 
 export async function resolveEscalation(
@@ -84,18 +105,16 @@ export async function getEscalationById(
   id: string,
   tenantId: string
 ): Promise<EscalationRow | null> {
+  // Full row, not a projection. This previously selected six columns and cast
+  // the result to EscalationRow, so resolvedAt, callId, clientId,
+  // transcriptExcerpt and createdAt were undefined at runtime while the type
+  // claimed they were present. There is no wide column on this table, so there
+  // is nothing to save by projecting.
   const rows = await db
-    .select({
-      id: escalations.id,
-      tenantId: escalations.tenantId,
-      question: escalations.question,
-      answer: escalations.answer,
-      status: escalations.status,
-      callerPhone: escalations.callerPhone,
-    })
+    .select()
     .from(escalations)
     .where(and(eq(escalations.id, id), eq(escalations.tenantId, tenantId)))
     .limit(1);
 
-  return (rows[0] as EscalationRow | undefined) ?? null;
+  return rows[0] ?? null;
 }
