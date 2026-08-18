@@ -1,0 +1,25 @@
+# Local test database only. Production runs on Neon.
+#
+# Port 5433 on the host so this never collides with a local Postgres on 5432.
+# The pgvector image ships the extension but does NOT create it — that is the
+# job of the first migration (see PLAN.md 1.6.1), which is exactly what the
+# migration test in src/db/migrations.int.test.ts proves.
+services:
+  test-db:
+    image: pgvector/pgvector:pg17
+    container_name: deskroute-test-db
+    environment:
+      POSTGRES_USER: deskroute
+      POSTGRES_PASSWORD: deskroute
+      POSTGRES_DB: deskroute_test
+    ports:
+      - "5433:5432"
+    # tmpfs: the whole database lives in RAM. Tests are faster and every
+    # `docker compose down` is a guaranteed clean slate.
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deskroute -d deskroute_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
