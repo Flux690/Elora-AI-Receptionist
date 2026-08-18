@@ -30,6 +30,44 @@ describe("CORS", () => {
     expect(allowed).not.toBe("https://evil.example");
   });
 
+  it("allows whatever port Vite actually grabbed", async () => {
+    // Regression: the allowlist was pinned to 5173, so when 5173 was busy and
+    // Vite fell back to 5174 the whole dashboard failed to load with an opaque
+    // CORS error.
+    for (const port of [5174, 5175, 4173]) {
+      const res = await app.request("/api/health", {
+        headers: { Origin: `http://localhost:${port}` },
+      });
+      expect(res.headers.get("access-control-allow-origin")).toBe(
+        `http://localhost:${port}`
+      );
+    }
+  });
+
+  it("allows 127.0.0.1 as well as localhost", async () => {
+    const res = await app.request("/api/health", {
+      headers: { Origin: "http://127.0.0.1:5174" },
+    });
+    expect(res.headers.get("access-control-allow-origin")).toBe("http://127.0.0.1:5174");
+  });
+
+  it("does not extend the localhost exception to a production allowlist", async () => {
+    // A deployed config lists real hostnames, so localhost must NOT slip in.
+    const prod = createApp({ allowedOrigins: ["https://app.deskroute.com"] });
+
+    const local = await prod.request("/api/health", {
+      headers: { Origin: "http://localhost:5174" },
+    });
+    expect(local.headers.get("access-control-allow-origin")).toBeNull();
+
+    const real = await prod.request("/api/health", {
+      headers: { Origin: "https://app.deskroute.com" },
+    });
+    expect(real.headers.get("access-control-allow-origin")).toBe(
+      "https://app.deskroute.com"
+    );
+  });
+
   it("does not send a wildcard on preflight for admin routes", async () => {
     const res = await app.request("/api/admin/settings", {
       method: "OPTIONS",
