@@ -1,7 +1,6 @@
 import { llm, voice } from "@livekit/agents";
 import { z } from "zod";
 import type { AgentDeps } from "./types.js";
-import { searchKnowledge } from "../services/knowledge.js";
 import { createEscalation } from "../services/escalations.js";
 import { checkAvailability, createCalendarEvent, deleteCalendarEvent } from "../services/calendar.js";
 import { createAppointment, getUpcomingByPhone, cancelAppointmentById } from "../services/appointments.js";
@@ -16,28 +15,9 @@ export function createAgentTools(deps: AgentDeps) {
   }
 
   return {
-    searchKnowledge: llm.tool({
-      description:
-        "Search the knowledge base for an answer to a caller's question about the business — services, pricing, hours, policies, or anything else not already known from context.",
-      parameters: z.object({
-        query: z.string().describe("The caller's question, verbatim or closely paraphrased."),
-      }),
-      execute: async ({ query }, { ctx }) => {
-        sayHold(ctx);
-        const results = await searchKnowledge(tenantId, query);
-        if (results.length === 0) return null;
-        return results
-          .map((r) => {
-            const confidence = r.similarity >= 0.85 ? "high" : "medium";
-            return `[confidence: ${confidence}]\nQ: ${r.question}\nA: ${r.answer}`;
-          })
-          .join("\n---\n");
-      },
-    }),
-
     createEscalation: llm.tool({
       description:
-        "Escalate a question you cannot answer to the business team. Use this when search_knowledge returns nothing useful and you cannot answer from context. Do not escalate the same question twice.",
+        "Escalate a question you cannot answer to the business team. Use this when the answer is not in your instructions or knowledge base. Do not escalate the same question twice.",
       parameters: z.object({
         question: z.string().describe("The caller's question, as asked."),
         transcriptExcerpt: z
@@ -124,7 +104,7 @@ export function createAgentTools(deps: AgentDeps) {
         }
         try {
           const eventId = await createCalendarEvent(token, deps.googleCalendarId, {
-            summary: `${service} — ${deps.client?.name ?? deps.callerPhone}`,
+            summary: `${service} — ${deps.client?.name ?? deps.callerPhone ?? "caller ID withheld"}`,
             startIso,
             endIso,
             timezone: deps.tenant.timezone,
@@ -166,6 +146,17 @@ export function createAgentTools(deps: AgentDeps) {
         "Look up a caller's upcoming appointments by their phone number. Use when a caller asks about existing bookings or wants to cancel/reschedule.",
       parameters: z.object({}),
       execute: async (_params, { ctx }) => {
+        // Anonymous caller: there is no identity to look up. Ask for a number
+        // rather than querying with a placeholder — a shared placeholder key is
+        // how one caller's appointments got read to another (PLAN.md 1.8.1).
+        if (!deps.callerPhone) {
+          return {
+            appointments: [],
+            message:
+              "This caller's number is withheld, so their bookings cannot be looked up. " +
+              "Ask the caller to read out the phone number their appointment was booked under.",
+          };
+        }
         sayHold(ctx);
         const upcoming = await getUpcomingByPhone(tenantId, deps.callerPhone);
         if (upcoming.length === 0) return { appointments: [], message: "No upcoming appointments found." };
