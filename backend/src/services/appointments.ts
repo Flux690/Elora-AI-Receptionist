@@ -7,7 +7,7 @@ export type AppointmentRow = typeof appointments.$inferSelect;
 type CreateAppointmentInput = {
   tenantId: string;
   clientId: string | null;
-  callerPhone: string;
+  callerPhone: string | null;
   service: string;
   startTime: Date;
   endTime: Date;
@@ -76,6 +76,13 @@ export async function getNextAppointment(
   return (rows[0] as AppointmentRow | undefined) ?? null;
 }
 
+/**
+ * Upcoming appointments for a caller, by their phone number.
+ *
+ * Takes a non-null `callerPhone` by design. An anonymous caller has no identity
+ * to look up, and querying with a placeholder is exactly the bug in PLAN.md
+ * 1.8.1 — callers must handle null before reaching here.
+ */
 export async function getUpcomingByPhone(tenantId: string, callerPhone: string) {
   return db
     .select({

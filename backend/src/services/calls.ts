@@ -9,7 +9,7 @@ type CreateCallInput = {
   id?: string;          // caller-generated UUID — omit to let Postgres generate one
   tenantId: string;
   clientId?: string | null;
-  callerPhone: string;
+  callerPhone: string | null;
   livekitRoomName: string;
 };
 

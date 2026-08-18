@@ -3,10 +3,20 @@ import { clients } from "../db/schema.js";
 
 export type ClientRow = typeof clients.$inferSelect;
 
+/**
+ * Records that this caller was seen. Returns `null` when the caller withheld
+ * their number — an anonymous caller has no identity to key a client row on.
+ *
+ * `clients.phone_number` stays NOT NULL precisely because of this: rather than
+ * storing a nullable or placeholder identity that later reads as "the anonymous
+ * caller", we store no row at all. See PLAN.md 1.8.1.
+ */
 export async function upsertClient(
   tenantId: string,
-  callerPhone: string
-): Promise<ClientRow> {
+  callerPhone: string | null
+): Promise<ClientRow | null> {
+  if (!callerPhone) return null;
+
   const now = new Date();
 
   const rows = await db
@@ -22,5 +32,5 @@ export async function upsertClient(
     })
     .returning();
 
-  return rows[0];
+  return rows[0]!;
 }
