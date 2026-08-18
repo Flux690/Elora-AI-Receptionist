@@ -14,11 +14,24 @@ import { sql } from "drizzle-orm";
 import type { ServiceItem, AgentProfile, TranscriptEntry } from "@receptionist/shared";
 export type { ServiceItem, AgentProfile, TranscriptEntry } from "@receptionist/shared";
 export type { CallOutcome } from "@receptionist/shared";
-import { env } from "../env.js";
+
+/**
+ * Fixed at 1536 (the output width of text-embedding-3-small). Deliberately NOT
+ * read from env.EMBEDDING_DIMENSIONS: deriving DDL from the environment means
+ * the same schema file emits different columns in different environments, which
+ * is how migration 0008 came to drop and recreate this column and silently
+ * destroy every stored embedding.
+ *
+ * EMBEDDING_DIMENSIONS survives as the runtime assertion in
+ * services/knowledge.ts, which checks what the model actually returned. Changing
+ * this width is an explicit, written migration that re-embeds — never a config
+ * side effect.
+ */
+const EMBEDDING_DIMENSIONS = 1536;
 
 const vector = customType<{ data: number[] | null }>({
   dataType() {
-    return `vector(${env.EMBEDDING_DIMENSIONS})`;
+    return `vector(${EMBEDDING_DIMENSIONS})`;
   },
   toDriver(value) {
     if (!value) return null;
@@ -95,7 +108,7 @@ export const calls = pgTable(
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
     clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
-    callerPhone: text("caller_phone").notNull(),
+    callerPhone: text("caller_phone"),
     livekitRoomName: text("livekit_room_name").notNull(),
     startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
     endedAt: timestamp("ended_at", { withTimezone: true }),
@@ -117,7 +130,7 @@ export const escalations = pgTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     callId: uuid("call_id").references(() => calls.id, { onDelete: "set null" }),
     clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
-    callerPhone: text("caller_phone").notNull(),
+    callerPhone: text("caller_phone"),
     question: text("question").notNull(),
     transcriptExcerpt: text("transcript_excerpt"),
     status: escalationStatusEnum("status").notNull().default("pending"),
@@ -169,7 +182,7 @@ export const appointments = pgTable(
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
     clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
-    callerPhone: text("caller_phone").notNull(),
+    callerPhone: text("caller_phone"),
     service: text("service").notNull(),
     startTime: timestamp("start_time", { withTimezone: true }),
     endTime: timestamp("end_time", { withTimezone: true }),

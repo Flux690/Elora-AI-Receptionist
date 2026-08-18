@@ -1,6 +1,6 @@
 {
-  "id": "14daa0df-adbd-4ef2-80c4-56f4e290280a",
-  "prevId": "68e7718f-60c4-4351-ab5f-b8db24bef9fe",
+  "id": "31aac9a7-d62c-47fb-94da-f13548dfc499",
+  "prevId": "9507821a-8c29-4d5c-ae61-db5f2438e333",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -31,7 +31,7 @@
           "name": "caller_phone",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "service": {
           "name": "service",
@@ -163,7 +163,7 @@
           "name": "caller_phone",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "livekit_room_name": {
           "name": "livekit_room_name",
@@ -193,12 +193,18 @@
         },
         "transcript": {
           "name": "transcript",
-          "type": "text",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
         "summary": {
           "name": "summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recording_url": {
+          "name": "recording_url",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -404,7 +410,7 @@
           "name": "caller_phone",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "question": {
           "name": "question",
@@ -473,6 +479,28 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "escalations_call_question_dedup_idx": {
+          "name": "escalations_call_question_dedup_idx",
+          "columns": [
+            {
+              "expression": "call_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"question\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"escalations\".\"call_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -522,100 +550,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.knowledge_chunks": {
-      "name": "knowledge_chunks",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "knowledge_item_id": {
-          "name": "knowledge_item_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "chunk_text": {
-          "name": "chunk_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "embedding": {
-          "name": "embedding",
-          "type": "vector(1536)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "knowledge_chunks_tenant_id_idx": {
-          "name": "knowledge_chunks_tenant_id_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "knowledge_chunks_tenant_id_tenants_id_fk": {
-          "name": "knowledge_chunks_tenant_id_tenants_id_fk",
-          "tableFrom": "knowledge_chunks",
-          "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "knowledge_chunks_knowledge_item_id_knowledge_items_id_fk": {
-          "name": "knowledge_chunks_knowledge_item_id_knowledge_items_id_fk",
-          "tableFrom": "knowledge_chunks",
-          "tableTo": "knowledge_items",
-          "columnsFrom": [
-            "knowledge_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.knowledge_items": {
       "name": "knowledge_items",
       "schema": "",
@@ -650,6 +584,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "embedding": {
+          "name": "embedding",
+          "type": "vector(1536)",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -687,6 +627,25 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "knowledge_items_embedding_hnsw_idx": {
+          "name": "knowledge_items_embedding_hnsw_idx",
+          "columns": [
+            {
+              "expression": "embedding",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "vector_cosine_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "hnsw",
+          "with": {
+            "m": 16,
+            "ef_construction": 64
+          }
         }
       },
       "foreignKeys": {
@@ -740,12 +699,12 @@
           "primaryKey": false,
           "notNull": true
         },
-        "vertical": {
-          "name": "vertical",
-          "type": "vertical",
-          "typeSchema": "public",
+        "industry": {
+          "name": "industry",
+          "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "''"
         },
         "timezone": {
           "name": "timezone",
@@ -753,21 +712,35 @@
           "primaryKey": false,
           "notNull": true
         },
-        "system_prompt": {
-          "name": "system_prompt",
+        "description": {
+          "name": "description",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "''"
         },
-        "business_profile": {
-          "name": "business_profile",
+        "services": {
+          "name": "services",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'{}'::jsonb"
+          "default": "'[]'::jsonb"
+        },
+        "agent_profile": {
+          "name": "agent_profile",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{\"name\":\"\",\"greeting\":\"\",\"farewell\":\"\",\"fallback\":\"\",\"holdPhrase\":\"\"}'::jsonb"
         },
         "phone_number": {
           "name": "phone_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "clerk_user_id": {
+          "name": "clerk_user_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -803,6 +776,13 @@
           "columns": [
             "phone_number"
           ]
+        },
+        "tenants_clerk_user_id_unique": {
+          "name": "tenants_clerk_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "clerk_user_id"
+          ]
         }
       },
       "policies": {},
@@ -837,16 +817,6 @@
       "values": [
         "pending",
         "resolved"
-      ]
-    },
-    "public.vertical": {
-      "name": "vertical",
-      "schema": "public",
-      "values": [
-        "salon",
-        "spa",
-        "clinic",
-        "home_service"
       ]
     }
   },

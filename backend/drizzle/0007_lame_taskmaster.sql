@@ -1,1 +1,0 @@
-ALTER TABLE "tenants" DROP COLUMN "sip_dispatch_rule_id";
