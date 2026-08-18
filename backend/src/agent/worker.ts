@@ -4,26 +4,27 @@ import {
   ServerOptions,
   cli,
   defineAgent,
-  inference,
   voice,
 } from "@livekit/agents";
-import * as livekit from "@livekit/agents-plugin-livekit";
-import * as openai from "@livekit/agents-plugin-openai";
 import * as silero from "@livekit/agents-plugin-silero";
 import { createClerkClient } from "@clerk/backend";
 import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import type { CallOutcome } from "@receptionist/shared";
 import { env } from "../env.js";
-import { db } from "../db/client.js";
+import { db, startDbKeepWarm } from "../db/client.js";
 import { calls as callsTable } from "../db/schema.js";
 import { upsertClient } from "../services/clients.js";
 import { createCall, finishCall } from "../services/calls.js";
 import { getTenantById, getTenantByPhoneNumber } from "../services/tenants.js";
-import { startCallRecording, stopCallRecording, recordingKey } from "../services/storage.js";
+import { listKnowledgeForPrompt } from "../services/knowledge.js";
+import { startCallRecording, stopCallRecording } from "../services/storage.js";
 import type { AgentDeps, CallState } from "./types.js";
-import { buildSystemPrompt } from "./prompt.js";
-import { createAgentTools } from "./tools.js";
+import type { KnowledgeEntry } from "./prompt.js";
+import { buildSessionConfig, buildKeyterms } from "./session-config.js";
+import { resolveCallerPhone } from "./caller.js";
+import { ReceptionistAgent } from "./receptionist.js";
+import { CallMetrics } from "./metrics.js";
 import { extractTranscript } from "./transcript.js";
 import { generateCallSummary } from "./summary.js";
 
@@ -54,21 +55,46 @@ class LRUCache<K, V> {
 // 5-minute TTL so config changes propagate without a restart.
 // Capped at 500 entries to prevent unbounded memory growth in production.
 const TENANT_CACHE_TTL_MS = 5 * 60 * 1000;
-const tenantCache = new LRUCache<string, { data: import("../services/tenants.js").WorkerTenant; expiresAt: number }>(500);
 
-async function resolveTenant(idOrPhone: { tenantId?: string; phoneNumber?: string }) {
+type ResolvedTenant = {
+  tenant: import("../services/tenants.js").WorkerTenant;
+  knowledge: KnowledgeEntry[];
+};
+
+// Tenant and knowledge are cached together: both are read on every call, both
+// go into the system prompt, and both should expire at the same moment so a
+// config change and a new knowledge item propagate on the same 5-minute cycle.
+const tenantCache = new LRUCache<string, ResolvedTenant & { expiresAt: number }>(500);
+
+async function resolveTenant(idOrPhone: {
+  tenantId?: string;
+  phoneNumber?: string;
+}): Promise<ResolvedTenant | null> {
   const cacheKey = idOrPhone.tenantId ?? idOrPhone.phoneNumber ?? "";
   if (!cacheKey) return null;
 
   const cached = tenantCache.get(cacheKey);
-  if (cached && Date.now() < cached.expiresAt) return cached.data;
+  if (cached && Date.now() < cached.expiresAt) {
+    return { tenant: cached.tenant, knowledge: cached.knowledge };
+  }
 
   const tenant = idOrPhone.tenantId
     ? await getTenantById(idOrPhone.tenantId)
     : await getTenantByPhoneNumber(idOrPhone.phoneNumber!);
 
-  if (tenant) tenantCache.set(cacheKey, { data: tenant, expiresAt: Date.now() + TENANT_CACHE_TTL_MS });
-  return tenant;
+  if (!tenant) return null;
+
+  // Second round trip on a cache miss only. The tenant id is not known until
+  // the first query resolves, so these cannot be parallelised on the
+  // phone-number path.
+  const knowledge = await listKnowledgeForPrompt(tenant.id);
+
+  tenantCache.set(cacheKey, {
+    tenant,
+    knowledge,
+    expiresAt: Date.now() + TENANT_CACHE_TTL_MS,
+  });
+  return { tenant, knowledge };
 }
 
 // ── Google OAuth token cache ──────────────────────────────────────────────────
@@ -113,6 +139,10 @@ async function stopEgressWithRetry(egressId: string, maxAttempts = 3): Promise<v
 
 export default defineAgent({
   prewarm: async (proc: JobProcess) => {
+    // Keeps the pg pool warm and the Neon compute out of autosuspend, so the
+    // first call after a quiet spell does not pay a cold start before the
+    // greeting. See startDbKeepWarm() for why this is an experiment.
+    startDbKeepWarm();
     proc.userData.vad = await silero.VAD.load();
   },
 
@@ -124,12 +154,18 @@ export default defineAgent({
 
     const isTestSession = participant.attributes["testSession"] === "true";
 
-    const callerPhone = !isTestSession ? (participant.attributes["sip.phoneNumber"] ?? "unknown") : "test";
+    const callerPhone = resolveCallerPhone(participant.attributes, isTestSession);
     const rawTrunk = !isTestSession ? (participant.attributes["sip.trunkPhoneNumber"] ?? "") : "";
     const trunkPhone = rawTrunk && !rawTrunk.startsWith("+") ? `+${rawTrunk}` : rawTrunk;
 
-    // 2. Resolve tenant — zero blocking DB work on the critical path.
-    let tenant: import("../services/tenants.js").WorkerTenant | null = null;
+    // 2. Resolve tenant. This DOES block the critical path on a cache miss —
+    //    the first call after a restart or a 5-minute gap awaits a DB round trip
+    //    before session.start(), so the caller hears silence for its duration.
+    //    Mitigated by the LRU below and by startDbKeepWarm() keeping the pool and
+    //    the Neon compute alive; not eliminated. (The previous comment here
+    //    claimed "zero blocking DB work on the critical path", 14 lines above an
+    //    awaited lookup.)
+    let resolved: ResolvedTenant | null = null;
 
     if (isTestSession) {
       const tenantId = participant.attributes["tenantId"];
@@ -137,19 +173,20 @@ export default defineAgent({
         console.error("[worker] no tenantId in participant attributes for test session — dropping");
         return;
       }
-      tenant = await resolveTenant({ tenantId });
+      resolved = await resolveTenant({ tenantId });
     } else {
       if (!trunkPhone) {
         console.error(`[worker] No trunkPhoneNumber found for SIP participant — dropping`);
         return;
       }
-      tenant = await resolveTenant({ phoneNumber: trunkPhone });
+      resolved = await resolveTenant({ phoneNumber: trunkPhone });
     }
 
-    if (!tenant) {
+    if (!resolved) {
       console.error(`[worker] tenant not found — dropping`);
       return;
     }
+    const { tenant, knowledge } = resolved;
     console.log(`[worker] resolved tenant: ${tenant.id}${isTestSession ? " (test session)" : ""}`);
 
     // 3. Fire Google OAuth token fetch in background (no await — resolves while greeting plays).
@@ -174,45 +211,52 @@ export default defineAgent({
       callId,
       getGoogleToken: () => tokenPromise,
       googleCalendarId: tenant.googleCalendarId ?? null,
+      knowledge,
       callState,
     };
 
-    // 6. Create TTS instance
-    const agentTts = new inference.TTS({
-      model: "cartesia/sonic-3",
-      voice: "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
+    // 6. Build the pipeline. See session-config.ts for why turnDetection is
+    //    left unset and why noise cancellation is SIP-only.
+    const { sessionOptions, inputOptions } = buildSessionConfig({
+      isTestSession,
+      vad: ctx.proc.userData.vad as silero.VAD,
+      keyterms: buildKeyterms(tenant.name, tenant.services.map((s) => s.name)),
     });
 
     // 7. Create and start session
-    const session = new voice.AgentSession({
-      vad: ctx.proc.userData.vad as silero.VAD,
-      stt: new inference.STT({ model: "assemblyai/universal-streaming", language: "en" }),
-      llm: new openai.LLM({
-        model: env.LLM_MODEL,
-        baseURL: env.OPENROUTER_BASE_URL,
-        apiKey: env.OPENROUTER_API_KEY,
-      }),
-      tts: agentTts,
-      turnHandling: {
-        turnDetection: new livekit.turnDetector.MultilingualModel(),
-        preemptiveGeneration: { preemptiveTts: true },
-      },
-    });
+    const session = new voice.AgentSession(sessionOptions);
 
     await session.start({
       agent: new ReceptionistAgent(deps),
       room: ctx.room,
+      inputOptions,
     });
 
-    // 8. Register close handler BEFORE any async work — prevents race conditions
+    // 8. Per-turn latency accounting. Registered before the greeting so the
+    //    first turn is captured. See metrics.ts — until this existed, every
+    //    latency claim about this agent was inference rather than measurement.
+    const callMetrics = new CallMetrics();
+    session.on(voice.AgentSessionEventTypes.MetricsCollected, (ev) => {
+      callMetrics.record(ev.metrics);
+    });
+
+    // 9. Register close handler BEFORE any async work — prevents race conditions
     let egressId: string | null = null;
-    const callRecordingKey = isTestSession ? null : recordingKey(callId);
+    // Set only when egress actually starts. Previously computed unconditionally,
+    // so a failed startCallRecording still wrote a recording_url and the
+    // dashboard handed out a presigned URL to an object that was never uploaded
+    // (PLAN.md 1.8.2).
+    let callRecordingKey: string | null = null;
 
     session.on(voice.AgentSessionEventTypes.Close, async (ev: voice.CloseEvent) => {
       try {
         if (egressId) {
-          stopEgressWithRetry(egressId);
+          // Awaited: this handler may be the last thing running before the
+          // process exits, and a dropped promise leaves the egress billing.
+          await stopEgressWithRetry(egressId);
         }
+
+        callMetrics.logSummary(callId, tenant.id);
 
         // Test sessions skip DB finalization — no call row was created
         if (isTestSession) {
@@ -227,7 +271,8 @@ export default defineAgent({
         const summary = await generateCallSummary(transcript);
 
         let outcome: CallOutcome;
-        if (isAbandoned) outcome = "abandoned";
+        if (ev.reason === voice.CloseReason.ERROR) outcome = "error";
+        else if (isAbandoned) outcome = "abandoned";
         else if (callState.wasBooked) outcome = "booked";
         else if (callState.wasEscalated) outcome = "escalated";
         else outcome = "answered";
@@ -242,6 +287,19 @@ export default defineAgent({
         console.log(`[worker] call ${callId} finalized: ${outcome}`);
       } catch (err) {
         console.error("[worker] CRITICAL: close handler failed — call not finalized:", callId, err);
+        // Without this the row keeps a null outcome and null ended_at, which is
+        // indistinguishable from a call still in progress. Best-effort: if this
+        // write fails too there is nothing further to try.
+        if (!isTestSession) {
+          await finishCall(callId, {
+            outcome: "error",
+            transcript: [],
+            summary: null,
+            recordingUrl: callRecordingKey,
+          }).catch((writeErr: unknown) =>
+            console.error("[worker] could not mark call as errored:", callId, writeErr)
+          );
+        }
       }
     });
 
@@ -257,9 +315,11 @@ export default defineAgent({
       startCallRecording(roomName, callId)
         .then((result) => {
           egressId = result.egressId;
+          callRecordingKey = result.recordingKey;
           console.log(`[worker] egress started: ${egressId}`);
         })
         .catch((err: unknown) => {
+          // callRecordingKey stays null, so finishCall writes no recording_url.
           console.error("[worker] failed to start recording:", err);
         });
 
@@ -276,25 +336,18 @@ export default defineAgent({
       ]);
 
       deps.client = client;
-      db.update(callsTable)
-        .set({ clientId: client.id })
-        .where(eq(callsTable.id, callId))
-        .catch((err: unknown) => console.error("[worker] clientId backfill failed:", err));
+      // No client row for an anonymous caller, so nothing to backfill.
+      if (client) {
+        db.update(callsTable)
+          .set({ clientId: client.id })
+          .where(eq(callsTable.id, callId))
+          .catch((err: unknown) => console.error("[worker] clientId backfill failed:", err));
+      }
     }
 
     // 11. Control returns to LiveKit framework — participant speaks, tools fire
   },
 });
-
-// Agent class — receives deps, builds prompt and tools
-class ReceptionistAgent extends voice.Agent {
-  constructor(deps: AgentDeps) {
-    super({
-      instructions: buildSystemPrompt(deps),
-      tools: createAgentTools(deps),
-    });
-  }
-}
 
 cli.runApp(
   new ServerOptions({
