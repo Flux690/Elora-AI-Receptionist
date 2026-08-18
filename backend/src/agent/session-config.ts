@@ -1,5 +1,4 @@
 import { inference, voice } from "@livekit/agents";
-import * as openai from "@livekit/agents-plugin-openai";
 import type * as silero from "@livekit/agents-plugin-silero";
 import { TelephonyBackgroundVoiceCancellation } from "@livekit/noise-cancellation-node";
 import { env } from "../env.js";
@@ -59,11 +58,14 @@ export function buildSessionConfig({
   const sessionOptions: voice.AgentSessionOptions = {
     vad,
     stt: new inference.STT({ model: STT_MODEL, language: "en" }),
-    llm: new openai.LLM({
-      model: env.LLM_MODEL,
-      baseURL: env.OPENROUTER_BASE_URL,
-      apiKey: env.OPENROUTER_API_KEY,
-    }),
+    // LiveKit Inference rather than OpenRouter. The OpenRouter account has
+    // never held credits, so every paid model returns 402 and the agent simply
+    // never speaks; the LiveKit plan's included inference allowance works
+    // today. It also puts the LLM on the same gateway as STT and TTS, removing
+    // a network hop from the live-call path and gaining server-side failover.
+    // Overturns the "LLM via OpenRouter" line in PLAN.md, whose stated reason —
+    // model flexibility — assumed credits existed.
+    llm: new inference.LLM({ model: env.LLM_MODEL as inference.LLMModels }),
     tts: new inference.TTS({ model: TTS_MODEL, voice: TTS_VOICE }),
     // One keyterm set, applied to whichever STT accepts a term list.
     keytermsOptions: { keyterms },

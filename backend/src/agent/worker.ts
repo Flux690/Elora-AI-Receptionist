@@ -240,7 +240,25 @@ export default defineAgent({
       callMetrics.record(ev.metrics);
     });
 
-    // 9. Register close handler BEFORE any async work — prevents race conditions
+    // 9. Surface pipeline failures. Without this an LLM/STT/TTS error is
+    //    swallowed: a 402 from the model provider showed up only as a
+    //    suspiciously fast performLLMInference and an agent that never spoke,
+    //    with nothing in the logs to say why. A receptionist that cannot think
+    //    should be loud about it.
+    session.on(voice.AgentSessionEventTypes.Error, (ev) => {
+      const err = ev.error;
+      // InterruptionDetectionError carries no nested `error`, unlike the
+      // STT/TTS/LLM variants.
+      const cause = "error" in err ? err.error : err;
+      console.error(
+        `[worker] PIPELINE ERROR call=${callId} tenant=${tenant.id} ` +
+          `type=${err.type} source=${ev.source?.label ?? "unknown"} ` +
+          `recoverable=${err.recoverable}:`,
+        cause instanceof Error ? cause.message : cause
+      );
+    });
+
+    // 10. Register close handler BEFORE any async work — prevents race conditions
     let egressId: string | null = null;
     // Set only when egress actually starts. Previously computed unconditionally,
     // so a failed startCallRecording still wrote a recording_url and the

@@ -20,7 +20,12 @@ const envSchema = z.object({
   CLERK_SECRET_KEY: z.string().min(1),
   OPENROUTER_API_KEY: z.string().min(1),
   OPENROUTER_BASE_URL: z.string().url(),
+  /**
+   * LiveKit Inference model id (e.g. "openai/gpt-4o-mini",
+   * "google/gemini-3.5-flash") — NOT an OpenRouter slug.
+   */
   LLM_MODEL: z.string().min(1),
+  /** LiveKit Inference model id for post-call summaries. */
   SUMMARY_LLM_MODEL: z.string().min(1),
   EMBEDDING_MODEL: z.string().min(1),
   EMBEDDING_DIMENSIONS: z.coerce.number().int().positive(),
