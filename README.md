@@ -7,8 +7,8 @@ Built as a multi-tenant B2B SaaS.
 ## Features
 
 - **Real phone calls** - LiveKit Phone Numbers, no SIP trunk setup required
-- **Answers from context** - services, pricing, and business details baked into the system prompt at call start; no RAG needed for common questions
-- **Knowledge base** - pgvector semantic search for questions beyond the prompt
+- **Answers from context** - services, pricing, business details *and the whole knowledge base* baked into the system prompt at call start, so no tool call and no retrieval round trip
+- **Knowledge base** - question/answer pairs built from resolved escalations, inlined into the prompt (pgvector and the HNSW index remain for when a tenant outgrows the prompt)
 - **Appointment booking** - checks Google Calendar availability and creates confirmed events by voice
 - **Escalation loop** - unanswerable questions flagged for admin review; resolved answers auto-populate the knowledge base
 - **Call recordings** - every call recorded with full transcript and AI-generated summary
@@ -22,9 +22,9 @@ Built as a multi-tenant B2B SaaS.
 1. Customer calls the business's US phone number
 2. LiveKit routes the call to the AI agent worker via SIP
 3. Agent resolves the tenant from the number dialed, builds a system prompt with business context, and greets the caller
-4. STT → LLM → TTS pipeline handles the conversation; Silero VAD detects end of turn
-5. Pricing and hours answered directly from the system prompt - no tool calls needed
-6. Unknown questions: semantic search checks the knowledge base; no match → question flagged for admin
+4. STT → LLM → TTS pipeline handles the conversation; the audio turn detector decides when the caller has finished
+5. Pricing, hours and knowledge-base answers come straight from the system prompt - no tool calls needed
+6. Genuinely unknown questions are flagged for admin review
 7. Bookings: availability checked against Google Calendar, confirmed event created by voice
 8. On hang-up: transcript extracted, summary generated, call record finalized
 
@@ -55,10 +55,13 @@ Built as a multi-tenant B2B SaaS.
 | Database | Neon Postgres + Drizzle ORM + pgvector |
 | Auth | Clerk |
 | Voice pipeline | LiveKit Agents SDK |
-| STT | AssemblyAI universal-streaming |
-| LLM | OpenRouter - `openai/gpt-4o-mini` recommended |
-| TTS | Cartesia Sonic 3 |
+| STT | AssemblyAI universal-3-5-pro (LiveKit Inference) |
+| LLM | LiveKit Inference by default; OpenRouter via `LLM_PROVIDER` |
+| TTS | Cartesia Sonic 3.5 (LiveKit Inference) |
 | Embeddings | OpenAI text-embedding-3-small (via OpenRouter) |
+| Noise cancellation | Krisp telephony model, SIP calls only |
+| Turn detection | LiveKit audio turn detector (`inference.TurnDetector`) |
+| Tests | Vitest + Docker `pgvector/pgvector:pg17` |
 | VAD | Silero |
 | Telephony | LiveKit Phone Numbers |
 | Calendar | Google Calendar API |
@@ -77,7 +80,8 @@ Built as a multi-tenant B2B SaaS.
 - [Clerk](https://clerk.com) application with Google OAuth enabled
 - [Neon](https://neon.tech) Postgres database (pgvector extension enabled)
 - [Cloudflare R2](https://developers.cloudflare.com/r2/) bucket for call recordings
-- [OpenRouter](https://openrouter.ai) API key
+- [OpenRouter](https://openrouter.ai) API key (embeddings; also an optional LLM gateway, which needs credits)
+- [Docker](https://www.docker.com) for the test database
 
 ### Install
 
@@ -100,10 +104,15 @@ LIVEKIT_API_SECRET=
 
 CLERK_SECRET_KEY=
 
-OPENROUTER_API_KEY=
+DASHBOARD_ORIGINS=             # optional, comma-separated; defaults to http://localhost:5173
+                               # any localhost port is accepted when a localhost origin is listed
+
+LLM_PROVIDER=                  # "livekit" (default) or "openrouter"
+LLM_MODEL=                     # id in the selected provider's format, e.g. google/gemini-3.5-flash
+SUMMARY_LLM_MODEL=             # model for post-call summaries (can match LLM_MODEL)
+
+OPENROUTER_API_KEY=            # required for embeddings; also used when LLM_PROVIDER=openrouter
 OPENROUTER_BASE_URL=           # https://openrouter.ai/api/v1
-LLM_MODEL=
-SUMMARY_LLM_MODEL=             # model used for post-call summaries (can match LLM_MODEL)
 
 EMBEDDING_MODEL=openai/text-embedding-3-small
 EMBEDDING_DIMENSIONS=1536      # text-embedding-3-small outputs 1536 dimensions
@@ -123,8 +132,20 @@ VITE_API_URL=http://localhost:8080/api
 ### Database
 
 ```bash
-pnpm -F backend db:generate
-pnpm -F backend db:migrate
+pnpm -F backend db:generate   # generate a migration from schema changes
+pnpm -F backend db:migrate    # apply to Neon
+```
+
+The migration chain creates the `vector` extension itself, so it runs against
+any empty Postgres - no manual console step.
+
+### Tests
+
+```bash
+docker compose up -d          # throwaway Postgres on host port 5433
+pnpm -F backend test          # unit + agent tests (no DB, no network)
+pnpm -F backend test:int      # service tests against the Docker Postgres
+pnpm typecheck                # tsc --noEmit across all workspaces
 ```
 
 ### Run

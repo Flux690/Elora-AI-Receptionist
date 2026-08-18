@@ -21,7 +21,18 @@ pnpm -F backend db:migrate    # apply to Neon Postgres
 pnpm typecheck       # tsc --noEmit across shared, backend, frontend
 pnpm build           # build frontend
 pnpm lint            # lint frontend
+
+docker compose up -d          # throwaway Postgres for tests, host port 5433
+pnpm -F backend test          # unit + agent tests (no DB, no network)
+pnpm -F backend test:int      # service tests against the Docker Postgres
+pnpm -F backend test:live     # real-LLM tests; costs tokens, excluded from CI
 ```
+
+Tests are three vitest projects split by filename: `*.test.ts` (unit),
+`*.int.test.ts` (needs Docker), `*.live.test.ts` (needs real credentials).
+Test env lives in `backend/vitest.config.ts`, not a `.env.test` — `.gitignore`
+would swallow the latter. `test:int` pins the test `DATABASE_URL` inline so it
+can never reach production Neon.
 
 ## Architecture
 
@@ -32,7 +43,14 @@ Two processes from `backend/`:
 
 `shared/src/index.ts` exports domain types as `@receptionist/shared`. No build step - consumed directly from `.ts` source via the `exports` field. Each workspace has its own `node_modules`; `shared/` has only `typescript` as a devDependency.
 
-`src/llm.ts` exports a single `openrouter` client (OpenAI SDK pointed at OpenRouter's base URL). Import this everywhere LLM or embedding API calls are needed - do not instantiate `new OpenAI(...)` elsewhere in the codebase.
+`src/llm.ts` exports a single `openrouter` client (OpenAI SDK pointed at OpenRouter's base URL). It is now used **only for embeddings** - do not instantiate `new OpenAI(...)` elsewhere.
+
+Chat models go through `buildLLM()` in `src/agent/session-config.ts`, shared by the in-call session and the post-call summariser so the two cannot drift. `LLM_PROVIDER` selects the gateway:
+
+- `livekit` (default) - LiveKit Inference, the same gateway as STT and TTS, so one less network hop and server-side failover. Metered against the plan's included allowance, which is a **hard cap** on the free Build plan.
+- `openrouter` - wider model choice, but **requires credits on the account**. With none, OpenRouter yields an empty stream and no exception, so the agent answers the greeting and then silently says nothing.
+
+`LLM_MODEL` / `SUMMARY_LLM_MODEL` must use the id format of whichever gateway is selected.
 
 ## Layering rules
 
@@ -77,6 +95,16 @@ Frontend uses the LiveKit Session API (`useSession` + `SessionProvider` from `@l
 
 Tenant lookups in the worker are cached per-key (id or phone) with a 5-minute TTL so config changes propagate without a restart. OAuth tokens for Google Calendar are cached for 50 minutes (tokens are valid 60 min), max 200 entries.
 
+### Voice pipeline - configured by omission
+
+`buildSessionConfig()` in `src/agent/session-config.ts` builds the session as a pure function, so the pipeline is assertable without booting a worker.
+
+**Leave `turnHandling.turnDetection` undefined.** That makes the SDK auto-provision the audio `inference.TurnDetector` *and*, because it is a streaming detector, drop the endpointing floor from 500/3000ms to 300/2500ms. Setting anything there - including the old `livekit.turnDetector.MultilingualModel()` - forfeits both. Confirmed at runtime by `initializing inference runner: lk_eot_audio`.
+
+**Telephony noise cancellation is SIP-only.** `TelephonyBackgroundVoiceCancellation()` is tuned for 8kHz phone audio; browser test sessions come from a laptop mic and must not get it. It runs *before* VAD, STT and turn detection, so it is a turn-detection accuracy fix rather than an audio nicety.
+
+Service and business names are fed to STT as keyterms via `keytermsOptions` - the vocabulary a streaming recogniser mangles most.
+
 ### Tools
 
 `createAgentTools(deps)` closes over `tenant`, `client`, `callId`. The LLM never receives or chooses tenant IDs - backend code always injects them.
@@ -87,13 +115,23 @@ Hold phrase: call `ctx.session.say(holdPhrase)` at the start of any slow tool. F
 
 ### LLM model matters for voice
 
-With a slow LLM (>5s to first token), preemptive TTS opens a WebSocket that times out before the first token arrives - the agent produces correct text but **no audio plays**. Use `openai/gpt-4o-mini` or faster. The free default is not viable for voice delivery.
+With a slow LLM (>5s to first token), preemptive TTS opens a WebSocket that times out before the first token arrives - the agent produces correct text but **no audio plays**.
+
+Measured time to first token through LiveKit Inference (3 samples, from India): `openai/gpt-4o-mini` 935/1616/822ms, `google/gemini-3.5-flash` 1628/1859/1268ms. Never assume - `MetricsCollected` is wired, so `grep '\[metrics\]'` in the worker log gives real p50/p95 per call.
+
+Note the greeting is **not** affected by model choice: `session.say()` sends a fixed string straight to TTS and never touches the LLM. Model choice only changes the pause *after* the caller speaks.
 
 ## LiveKit SIP - single dispatch rule
 
 One platform-wide dispatch rule handles all tenants. The inbound routing filter must be **empty** - listing specific numbers there breaks new tenants. Tenant is resolved at runtime via `sip.trunkPhoneNumber` → `tenants.phone_number`.
 
-LiveKit Phone Numbers have no inbound trunk ID, making per-tenant dispatch rules (which require `trunk_ids`) impossible with native numbers. Universal rule + runtime lookup is the correct architecture for LiveKit-hosted telephony.
+LiveKit Phone Numbers have no inbound trunk ID, making per-tenant dispatch rules impossible with native numbers. Universal rule + runtime lookup is the correct architecture for LiveKit-hosted telephony.
+
+**This was tried and reverted - do not retry it.** The deleted code is at `3680fb8^:backend/src/services/telephony.ts`. It called `createSipDispatchRule` with **no `trunkIds`**, and the docs state that omitting `trunk_ids` makes a rule match *all* inbound trunks. So every per-tenant rule was a wildcard: the first worked, the second collided, and every new tenant failed with a catch-all error.
+
+There is no way to scope it either. A dispatch rule's `inbound_numbers` filters the **caller's** number (an allowlist of who may call), not the dialed number. The dialed-number filter lives on the **trunk** - and LiveKit-hosted numbers expose no trunk to reference.
+
+**Still true after Twilio.** Owning a trunk makes per-tenant rules technically possible, but the platform runs one trunk, not one per tenant. It would buy a single cached DB lookup at the cost of two LiveKit objects per customer to keep in sync.
 
 The Phone Numbers API is **not in `livekit-server-sdk` (Node.js)** - purchasing and releasing numbers uses direct HTTP calls to the LiveKit Twirp API in `services/telephony.ts`.
 
@@ -105,6 +143,8 @@ The Phone Numbers API is **not in `livekit-server-sdk` (Node.js)** - purchasing 
 - `tenants.agentProfile` - `jsonb` typed as `AgentProfile`; holds greeting, farewell, fallback, holdPhrase, name
 - `knowledge_items.embedding` - `vector(1536)`; must match `EMBEDDING_DIMENSIONS` env var and the embedding model's actual output dimension
 - Embeddings stored directly on `knowledge_items` - no separate chunks table; HNSW index (m=16, ef_construction=64, cosine ops)
+- **The knowledge base is inlined into the system prompt at call start, not retrieved.** There is no `searchKnowledge` tool - it cost two extra LLM round trips plus an embedding call and a vector query per question. `listKnowledgeForPrompt()` is the read; `searchKnowledge()` still exists but is unused, kept as the Tier 2 path for when the base exceeds ~300 items (at which point the lookup moves to an on-turn hook, **not** back into a tool)
+- `caller_phone` is **nullable** on `calls`, `escalations` and `appointments`. A withheld caller ID means no identity - never a placeholder string. See `agent/caller.ts`
 - Escalation status enum values are lowercase: `"pending"` / `"resolved"`
 - Escalation dedup index: `(callId, lower(question))` where `callId IS NOT NULL` - prevents the same question being escalated twice in one call
 - Recordings stored in Cloudflare R2 as `recordings/{callId}.ogg`
