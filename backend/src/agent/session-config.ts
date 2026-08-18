@@ -1,4 +1,5 @@
-import { inference, voice } from "@livekit/agents";
+import { inference, llm, voice } from "@livekit/agents";
+import * as openai from "@livekit/agents-plugin-openai";
 import type * as silero from "@livekit/agents-plugin-silero";
 import { TelephonyBackgroundVoiceCancellation } from "@livekit/noise-cancellation-node";
 import { env } from "../env.js";
@@ -37,6 +38,29 @@ export type SessionConfig = {
 };
 
 /**
+ * Builds the LLM client for whichever gateway LLM_PROVIDER selects.
+ *
+ * Defaults to LiveKit Inference: it shares the gateway with STT and TTS, so the
+ * LLM loses a network hop on the live-call path and gains server-side failover.
+ *
+ * OpenRouter stays a one-line switch rather than a code change, because it
+ * offers models LiveKit Inference does not and PLAN.md explicitly wanted that
+ * flexibility. It needs credits on the account — without them every request is
+ * a 402 and the agent silently never speaks, which is exactly how this ended up
+ * being configurable.
+ */
+export function buildLLM(model: string): llm.LLM {
+  if (env.LLM_PROVIDER === "openrouter") {
+    return new openai.LLM({
+      model,
+      baseURL: env.OPENROUTER_BASE_URL,
+      apiKey: env.OPENROUTER_API_KEY,
+    });
+  }
+  return new inference.LLM({ model: model as inference.LLMModels });
+}
+
+/**
  * Business name plus service names, de-duplicated and trimmed. Kept separate
  * from buildSessionConfig so the worker can derive it from the tenant without
  * this module needing to know about tenants.
@@ -58,14 +82,7 @@ export function buildSessionConfig({
   const sessionOptions: voice.AgentSessionOptions = {
     vad,
     stt: new inference.STT({ model: STT_MODEL, language: "en" }),
-    // LiveKit Inference rather than OpenRouter. The OpenRouter account has
-    // never held credits, so every paid model returns 402 and the agent simply
-    // never speaks; the LiveKit plan's included inference allowance works
-    // today. It also puts the LLM on the same gateway as STT and TTS, removing
-    // a network hop from the live-call path and gaining server-side failover.
-    // Overturns the "LLM via OpenRouter" line in PLAN.md, whose stated reason —
-    // model flexibility — assumed credits existed.
-    llm: new inference.LLM({ model: env.LLM_MODEL as inference.LLMModels }),
+    llm: buildLLM(env.LLM_MODEL),
     tts: new inference.TTS({ model: TTS_MODEL, voice: TTS_VOICE }),
     // One keyterm set, applied to whichever STT accepts a term list.
     keytermsOptions: { keyterms },

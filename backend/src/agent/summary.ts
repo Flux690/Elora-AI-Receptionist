@@ -1,6 +1,7 @@
-import { inference, llm } from "@livekit/agents";
+import { llm } from "@livekit/agents";
 import type { TranscriptEntry } from "../db/schema.js";
 import { env } from "../env.js";
+import { buildLLM } from "./session-config.js";
 
 const SUMMARY_PROMPT = `Summarize this phone call in 3-4 sentences. Focus on:
 - What the caller wanted
@@ -11,7 +12,7 @@ Keep it factual and concise. Do not use bullet points.`;
 const MIN_SUMMARY_ENTRIES = 3;
 
 /**
- * Post-call summary, via LiveKit Inference.
+ * Post-call summary, through whichever gateway LLM_PROVIDER selects.
  *
  * Moved off OpenRouter along with the in-call model: that account has never
  * held credits, so this silently returned "" on every call. LiveKit Inference
@@ -29,9 +30,7 @@ export async function generateCallSummary(transcript: TranscriptEntry[]): Promis
     .map((entry) => `${entry.role === "user" ? "Caller" : "Agent"}: ${entry.text}`)
     .join("\n");
 
-  const model = new inference.LLM({
-    model: env.SUMMARY_LLM_MODEL as inference.LLMModels,
-  });
+  const model = buildLLM(env.SUMMARY_LLM_MODEL);
 
   const chatCtx = llm.ChatContext.empty();
   chatCtx.addMessage({ role: "system", content: SUMMARY_PROMPT });
@@ -44,7 +43,17 @@ export async function generateCallSummary(transcript: TranscriptEntry[]): Promis
       const delta = chunk.delta?.content;
       if (delta) text += delta;
     }
-    return text.trim();
+    const summary = text.trim();
+    if (!summary) {
+      // The model streamed nothing at all. Providers do not always throw on
+      // failure — an OpenRouter 402 yields an empty stream and no exception —
+      // so silence here is a signal, not a normal outcome.
+      console.warn(
+        `[summary] model ${env.SUMMARY_LLM_MODEL} via ${env.LLM_PROVIDER} returned nothing; ` +
+          `check provider credits or quota`
+      );
+    }
+    return summary;
   } catch (err) {
     // A missing summary is not worth failing call finalization over — the
     // transcript, outcome and recording are all still written.

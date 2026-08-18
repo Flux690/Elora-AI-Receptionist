@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { buildSessionConfig } from "./session-config.js";
 
 /**
@@ -49,6 +49,34 @@ describe("buildSessionConfig", () => {
     it("does NOT apply it to browser test sessions", () => {
       const { inputOptions } = buildSessionConfig({ isTestSession: true, vad });
       expect(inputOptions.noiseCancellation).toBeUndefined();
+    });
+  });
+
+  describe("LLM provider switch", () => {
+    /**
+     * Both gateways stay reachable by config rather than by code edit. The
+     * default is LiveKit Inference; OpenRouter needs credits on the account,
+     * and without them every request is a 402 and the agent silently never
+     * speaks — which is what made this worth making switchable.
+     */
+    it("defaults to LiveKit Inference", async () => {
+      vi.resetModules();
+      const { buildLLM } = await import("./session-config.js");
+      const { inference } = await import("@livekit/agents");
+
+      expect(buildLLM("openai/gpt-4o-mini")).toBeInstanceOf(inference.LLM);
+    });
+
+    it("uses OpenRouter when LLM_PROVIDER says so", async () => {
+      vi.resetModules();
+      vi.stubEnv("LLM_PROVIDER", "openrouter");
+      const { buildLLM } = await import("./session-config.js");
+      const openai = await import("@livekit/agents-plugin-openai");
+
+      expect(buildLLM("anthropic/claude-haiku-4.5")).toBeInstanceOf(openai.LLM);
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
     });
   });
 

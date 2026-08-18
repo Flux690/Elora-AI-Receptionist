@@ -21,8 +21,23 @@ const envSchema = z.object({
   OPENROUTER_API_KEY: z.string().min(1),
   OPENROUTER_BASE_URL: z.string().url(),
   /**
-   * LiveKit Inference model id (e.g. "openai/gpt-4o-mini",
-   * "google/gemini-3.5-flash") — NOT an OpenRouter slug.
+   * Which gateway serves the in-call and summariser models.
+   *
+   * "livekit"    — LiveKit Inference. Same gateway as STT and TTS, so one less
+   *                network hop and server-side failover. Metered against the
+   *                plan's included allowance, which is a hard cap on Build.
+   * "openrouter" — OpenRouter. Wider model choice across providers, but needs
+   *                credits on the account: without them every request is a 402
+   *                and the agent silently never speaks.
+   *
+   * LLM_MODEL and SUMMARY_LLM_MODEL must use the matching id format for
+   * whichever is selected.
+   */
+  LLM_PROVIDER: z.enum(["livekit", "openrouter"]).default("livekit"),
+  /**
+   * Model id for the in-call brain, in the selected provider's format —
+   * e.g. "google/gemini-3.5-flash" on livekit,
+   * "anthropic/claude-haiku-4.5" on openrouter.
    */
   LLM_MODEL: z.string().min(1),
   /** LiveKit Inference model id for post-call summaries. */
