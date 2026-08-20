@@ -2,6 +2,7 @@ import { llm, voice } from "@livekit/agents";
 import { z } from "zod";
 import type { AgentDeps } from "./types.js";
 import { createEscalation } from "../services/escalations.js";
+import { setClientName } from "../services/clients.js";
 import { checkAvailability, createCalendarEvent, deleteCalendarEvent } from "../services/calendar.js";
 import { createAppointment, getUpcomingByPhone, cancelAppointmentById } from "../services/appointments.js";
 
@@ -27,9 +28,16 @@ export function createAgentTools(deps: AgentDeps) {
       }),
       execute: async ({ question, transcriptExcerpt }, { ctx }) => {
         ctx.speechHandle.allowInterruptions = false;
+        // DB writes are deferred until after the greeting, so the calls row may
+        // not exist yet — and escalations.call_id is a foreign key to it. Wait
+        // for it rather than moving the write onto the path to first audio.
+        // Normally resolved seconds ago, so this costs nothing (PLAN.md 1.7.3).
+        const callRowExists = await deps.callRowReady;
         await createEscalation({
           tenantId,
-          callId: deps.callId,
+          // Unlinked rather than lost: without the row, the FK would reject the
+          // insert and the tool would throw mid-call.
+          callId: callRowExists ? deps.callId : null,
           clientId: deps.client?.id ?? null,
           callerPhone: deps.callerPhone,
           question,
@@ -37,6 +45,26 @@ export function createAgentTools(deps: AgentDeps) {
         });
         deps.callState.wasEscalated = true;
         return { escalated: true };
+      },
+    }),
+
+    rememberCallerName: llm.tool({
+      description:
+        "Save the caller's name once they have given it, so they are recognised on future calls and their bookings are titled correctly. Call this at most once per call, and only with a name the caller actually stated.",
+      parameters: z.object({
+        name: z.string().describe("The caller's name exactly as they gave it."),
+      }),
+      execute: async ({ name }) => {
+        // No client row for an anonymous caller, so there is nothing to attach
+        // a name to. Say nothing to the caller about it.
+        if (!deps.client) return { saved: false };
+
+        const updated = await setClientName(tenantId, deps.client.id, name);
+        if (!updated) return { saved: false };
+
+        // Keep in-memory deps in step so the rest of this call uses the name.
+        deps.client = updated;
+        return { saved: true };
       },
     }),
 

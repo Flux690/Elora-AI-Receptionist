@@ -33,6 +33,8 @@ export function makeAgentDeps(overrides: Partial<AgentDeps> = {}): AgentDeps {
     getGoogleToken: async () => null,
     googleCalendarId: null,
     knowledge: [],
+    // Fixtures default to the row already existing, which is the normal case.
+    callRowReady: Promise.resolve(true),
     callState: { wasBooked: false, wasEscalated: false },
     ...overrides,
   };

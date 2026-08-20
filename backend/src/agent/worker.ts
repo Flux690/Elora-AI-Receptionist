@@ -204,6 +204,17 @@ export default defineAgent({
     //    Tools fire only after caller speaks + LLM responds, so client will
     //    always be populated by the time any tool execute() runs.
     const callState: CallState = { wasBooked: false, wasEscalated: false };
+
+    // Deferred rather than started here: creating it now keeps the DB write off
+    // the path to first audio, while still giving tools something to await.
+    // Test sessions never write a call row, so they resolve false immediately.
+    let markCallRowReady: (created: boolean) => void = () => {};
+    const callRowReady = isTestSession
+      ? Promise.resolve(false)
+      : new Promise<boolean>((resolve) => {
+          markCallRowReady = resolve;
+        });
+
     const deps: AgentDeps = {
       tenant,
       client: null,
@@ -212,6 +223,7 @@ export default defineAgent({
       getGoogleToken: () => tokenPromise,
       googleCalendarId: tenant.googleCalendarId ?? null,
       knowledge,
+      callRowReady,
       callState,
     };
 
@@ -342,16 +354,26 @@ export default defineAgent({
         });
 
       // upsertClient + createCall run concurrently WHILE greeting plays
-      const [client] = await Promise.all([
-        upsertClient(tenant.id, callerPhone),
-        createCall({
-          id: callId,
-          tenantId: tenant.id,
-          clientId: null,
-          callerPhone,
-          livekitRoomName: roomName,
-        }),
-      ]);
+      let client: Awaited<ReturnType<typeof upsertClient>> = null;
+      try {
+        [client] = await Promise.all([
+          upsertClient(tenant.id, callerPhone),
+          createCall({
+            id: callId,
+            tenantId: tenant.id,
+            clientId: null,
+            callerPhone,
+            livekitRoomName: roomName,
+          }),
+        ]);
+        markCallRowReady(true);
+      } catch (err) {
+        // Unblock anything awaiting the row rather than leaving tools hanging
+        // for the rest of the call. They fall back to an unlinked escalation.
+        markCallRowReady(false);
+        console.error("[worker] call row creation failed:", callId, err);
+        throw err;
+      }
 
       deps.client = client;
       // No client row for an anonymous caller, so nothing to backfill.

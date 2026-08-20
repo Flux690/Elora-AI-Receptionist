@@ -1,4 +1,5 @@
 import { db } from "../db/client.js";
+import { and, eq } from "drizzle-orm";
 import { clients } from "../db/schema.js";
 
 export type ClientRow = typeof clients.$inferSelect;
@@ -33,4 +34,31 @@ export async function upsertClient(
     .returning();
 
   return rows[0]!;
+}
+
+/**
+ * Records the caller's name against their client row.
+ *
+ * `clients.name` existed but nothing ever wrote it, so the prompt's "returning
+ * client" branch was unreachable and calendar events were always titled with a
+ * phone number (PLAN.md 1.8.4).
+ *
+ * The Python SDK has GetNameTask for this; in Node the agent asks and calls a
+ * tool. Scoped by tenant so one tenant cannot rename another's client.
+ */
+export async function setClientName(
+  tenantId: string,
+  clientId: string,
+  name: string
+): Promise<ClientRow | null> {
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+
+  const rows = await db
+    .update(clients)
+    .set({ name: trimmed, updatedAt: new Date() })
+    .where(and(eq(clients.id, clientId), eq(clients.tenantId, tenantId)))
+    .returning();
+
+  return rows[0] ?? null;
 }

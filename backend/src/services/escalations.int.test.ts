@@ -113,3 +113,48 @@ describe("createEscalation", () => {
     expect(stored).not.toBeNull();
   });
 });
+
+describe("escalation before the call row exists (PLAN.md 1.7.3)", () => {
+  /**
+   * DB writes are deferred until after the greeting so the caller hears audio
+   * with no blocking round trip. That leaves a window where the agent is live
+   * but `calls` has no row — and escalations.call_id is a foreign key to it.
+   *
+   * The old reasoning was that tools only fire after the caller speaks, so the
+   * window could never be hit. That is wrong on two counts: preemptive
+   * generation exists specifically to start work before the turn is confirmed,
+   * and allowInterruptions:false on the greeting blocks interruption of
+   * *speech*, not speech-to-text.
+   */
+  it("rejects an escalation naming a call row that does not exist", async () => {
+    const tenant = await makeTenant();
+    const ghostCallId = "00000000-0000-4000-8000-000000000000";
+
+    // This is the mid-call throw the guard prevents.
+    await expect(
+      createEscalation({
+        tenantId: tenant.id,
+        callId: ghostCallId,
+        callerPhone: "+14155550123",
+        question: "Are you open Sunday?",
+      })
+    ).rejects.toThrow();
+  });
+
+  it("records the escalation unlinked when the call row is unavailable", async () => {
+    const tenant = await makeTenant();
+
+    // What the tool does when callRowReady resolves false: keep the question,
+    // drop the link, rather than losing the escalation entirely.
+    const row = await createEscalation({
+      tenantId: tenant.id,
+      callId: null,
+      callerPhone: "+14155550123",
+      question: "Are you open Sunday?",
+    });
+
+    expect(row.callId).toBeNull();
+    expect(row.question).toBe("Are you open Sunday?");
+    expect(row.status).toBe("pending");
+  });
+});

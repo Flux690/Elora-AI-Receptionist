@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getUpcomingByPhone } from "./appointments.js";
-import { upsertClient } from "./clients.js";
+import { upsertClient, setClientName } from "./clients.js";
 import { db } from "../db/client.js";
 import { clients } from "../db/schema.js";
 import { eq } from "drizzle-orm";
@@ -81,5 +81,34 @@ describe("upsertClient", () => {
 
     const rows = await db.select().from(clients).where(eq(clients.tenantId, tenant.id));
     expect(rows).toHaveLength(1);
+  });
+});
+
+describe("setClientName", () => {
+  it("records a name so the caller is recognised next time", async () => {
+    const tenant = await makeTenant();
+    const client = await upsertClient(tenant.id, "+14155550123");
+
+    const updated = await setClientName(tenant.id, client!.id, "  Sarah  ");
+
+    expect(updated?.name).toBe("Sarah");
+  });
+
+  it("ignores a blank name rather than wiping an existing one", async () => {
+    const tenant = await makeTenant();
+    const client = await upsertClient(tenant.id, "+14155550123");
+    await setClientName(tenant.id, client!.id, "Sarah");
+
+    expect(await setClientName(tenant.id, client!.id, "   ")).toBeNull();
+
+    const [row] = await db.select().from(clients).where(eq(clients.id, client!.id));
+    expect(row!.name).toBe("Sarah");
+  });
+
+  it("will not rename another tenant's client", async () => {
+    const [owner, attacker] = await Promise.all([makeTenant(), makeTenant()]);
+    const client = await upsertClient(owner.id, "+14155550123");
+
+    expect(await setClientName(attacker.id, client!.id, "Mallory")).toBeNull();
   });
 });
