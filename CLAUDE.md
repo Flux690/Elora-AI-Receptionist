@@ -127,7 +127,7 @@ One platform-wide dispatch rule handles all tenants. The inbound routing filter 
 
 LiveKit Phone Numbers have no inbound trunk ID, making per-tenant dispatch rules impossible with native numbers. Universal rule + runtime lookup is the correct architecture for LiveKit-hosted telephony.
 
-**This was tried and reverted - do not retry it.** The deleted code is at `3680fb8^:backend/src/services/telephony.ts`. It called `createSipDispatchRule` with **no `trunkIds`**, and the docs state that omitting `trunk_ids` makes a rule match *all* inbound trunks. So every per-tenant rule was a wildcard: the first worked, the second collided, and every new tenant failed with a catch-all error.
+**This was tried and reverted - do not retry it.** The deleted code is at `d52d3b0^:backend/src/services/telephony.ts`. It called `createSipDispatchRule` with **no `trunkIds`**, and the docs state that omitting `trunk_ids` makes a rule match *all* inbound trunks. So every per-tenant rule was a wildcard: the first worked, the second collided, and every new tenant failed with a catch-all error.
 
 There is no way to scope it either. A dispatch rule's `inbound_numbers` filters the **caller's** number (an allowlist of who may call), not the dialed number. The dialed-number filter lives on the **trunk** - and LiveKit-hosted numbers expose no trunk to reference.
 
