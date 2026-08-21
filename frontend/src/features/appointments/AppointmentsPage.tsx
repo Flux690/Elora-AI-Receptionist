@@ -37,11 +37,6 @@ export default function AppointmentsPage() {
 
   return (
     <PageContainer size="page" className="flex flex-col flex-1">
-      <div className="text-sm text-muted-foreground">Appointments</div>
-      <h1 className="mt-4 mb-6 text-xl font-semibold tracking-tight text-foreground">
-        Booked by your agent
-      </h1>
-
       {!isLoading && appointments.length === 0 && (
         <EmptyState
           icon={Calendar}

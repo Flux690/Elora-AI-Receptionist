@@ -1,15 +1,16 @@
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Skeleton } from '@/components/ui/skeleton'
+import { FilterPills } from '@/components/ui/filter-pills'
 import { cn } from '@/lib/utils'
 import { keys, fetchers } from '@/lib/queries'
 import type { Period } from '@/lib/types'
 
-const PERIODS: { id: Period; label: string }[] = [
+const PERIODS = [
   { id: 'today', label: 'Today' },
   { id: '7d',    label: '7 days' },
   { id: '30d',   label: '30 days' },
-]
+] as const satisfies readonly { id: Period; label: string }[]
 
 function isPeriod(v: string | null): v is Period {
   return v === 'today' || v === '7d' || v === '30d'
@@ -57,29 +58,9 @@ export function CallStats() {
 
   return (
     <section>
-      <div className="mb-4 flex items-end justify-between">
-        <h2 className="text-base font-semibold tracking-tight text-foreground">
-          {period === 'today' ? 'Today' : period === '7d' ? 'Last 7 days' : 'Last 30 days'}
-        </h2>
-
-        {/* The selected segment rises to a card; the track it sits in is sunk. */}
-        <div className="flex gap-0.5 rounded-lg bg-sunk p-0.5">
-          {PERIODS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setPeriod(p.id)}
-              className={cn(
-                'rounded-md px-3 py-1 text-sm transition-colors',
-                period === p.id
-                  ? 'bg-card font-medium text-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* No heading. The selected pill already says which period this is —
+          a title repeating it would be the same word twice. */}
+      <FilterPills options={PERIODS} value={period} onChange={setPeriod} className="mb-5" />
 
       {/* No dividers. Four figures on a stage are already four figures; a rule
           between each one is a line doing work that spacing does. */}

@@ -13,19 +13,12 @@ export default function HomePage() {
 
   return (
     <PageContainer size="page">
-      <div className="text-sm text-muted-foreground">Home</div>
-
-      <div className="mt-4 flex flex-col gap-8">
+      <div className="flex flex-col gap-8">
         <OverviewHeader settings={settings} />
 
         <CallStats />
 
-        <section>
-          <h2 className="mb-3 text-base font-semibold tracking-tight text-foreground">
-            Recent calls
-          </h2>
-          <CallsTable />
-        </section>
+        <CallsTable />
       </div>
     </PageContainer>
   )

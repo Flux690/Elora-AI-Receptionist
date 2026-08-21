@@ -33,17 +33,17 @@ export default function CallDetailPage() {
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ChevronLeft className="size-3.5" />
-        Home
+        Back to calls
       </Link>
 
       {isLoading || !call ? (
-        <div className="mt-5 flex flex-col gap-4">
+        <div className="mt-6 flex flex-col gap-4">
           <Skeleton className="h-7 w-52" />
           <Skeleton className="h-14 w-full" />
           <Skeleton className="h-52 w-full" />
         </div>
       ) : (
-        <div className="mt-5 flex gap-10">
+        <div className="mt-6 flex gap-10">
           <div className="w-[540px] shrink-0">
             <div className="flex items-start justify-between gap-4">
               <div>

@@ -7,6 +7,7 @@ import type { EscalationItem, EscalationStatus } from '@receptionist/shared'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
+import { FilterPills } from '@/components/ui/filter-pills'
 import { PageContainer } from '@/layout/PageContainer'
 import { EmptyState } from '@/layout/EmptyState'
 import { apiClient } from '@/lib/apiClient'
@@ -14,11 +15,10 @@ import { keys, fetchers } from '@/lib/queries'
 import { formatPhone, formatDateTime } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 
-const STATUSES: EscalationStatus[] = ['pending', 'resolved']
-const STATUS_LABEL: Record<EscalationStatus, string> = {
-  pending: 'Waiting',
-  resolved: 'Answered',
-}
+const STATUSES = [
+  { id: 'pending', label: 'Waiting' },
+  { id: 'resolved', label: 'Answered' },
+] as const satisfies readonly { id: EscalationStatus; label: string }[]
 
 function isStatus(v: string | null): v is EscalationStatus {
   return v === 'pending' || v === 'resolved'
@@ -119,29 +119,7 @@ export default function EscalationsPage() {
 
   return (
     <PageContainer size="page" className="flex flex-1 flex-col">
-      <div className="text-sm text-muted-foreground">Escalations</div>
-
-      <div className="mt-4 flex items-end justify-between">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          Questions your agent could not answer
-        </h1>
-        <div className="flex gap-0.5 rounded-lg bg-sunk p-0.5">
-          {STATUSES.map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatus(s)}
-              className={cn(
-                'rounded-md px-3 py-1 text-sm transition-colors',
-                status === s
-                  ? 'bg-card font-medium text-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {STATUS_LABEL[s]}
-            </button>
-          ))}
-        </div>
-      </div>
+      <FilterPills options={STATUSES} value={status} onChange={setStatus} />
 
       {isLoading ? (
         <div className="mt-6 flex flex-col gap-3">
@@ -152,12 +130,8 @@ export default function EscalationsPage() {
       ) : escalations.length === 0 ? (
         <EmptyState
           icon={Inbox}
-          title={status === 'pending' ? 'Nothing waiting on you' : 'Nothing answered yet'}
-          description={
-            status === 'pending'
-              ? 'When your agent does not know how to answer something, it appears here.'
-              : 'Answers you give will be listed here once you save them.'
-          }
+          title="Escalations"
+          description="When a caller asks something your agent has no answer for, it lands here. Answer it once and your agent has it for every caller after that." 
         />
       ) : (
         /* List and detail. Selection is carried by a fill, not a border or a

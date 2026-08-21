@@ -32,8 +32,7 @@ export default function SettingsPage() {
 
   return (
     <PageContainer size="form">
-      <div className="text-sm text-muted-foreground">Settings</div>
-      <h1 className="mt-4 mb-6 text-xl font-semibold tracking-tight text-foreground">Settings</h1>
+
 
       <Tabs
         value={tab}

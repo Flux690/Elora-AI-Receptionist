@@ -32,14 +32,7 @@ export default function KnowledgePage() {
 
   return (
     <PageContainer size="page" className="flex flex-col flex-1">
-      <div className="text-sm text-muted-foreground">Knowledge</div>
-      <h1 className="mt-4 mb-2 text-xl font-semibold tracking-tight text-foreground">
-        What your agent knows
-      </h1>
-      <p className="mb-6 text-sm text-muted-foreground">
-        Every answer here came from an escalation you resolved. Delete one and
-        that question gets escalated again next time it comes up.
-      </p>
+
 
       {!isLoading && items.length === 0 && (
         <EmptyState
