@@ -2,17 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useUser } from '@clerk/react'
 import { Calendar } from 'lucide-react'
 import type { AppointmentItem } from '@receptionist/shared'
-import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { PageContainer } from '@/layout/PageContainer'
 import { EmptyState } from '@/layout/EmptyState'
 import { keys, fetchers } from '@/lib/queries'
@@ -46,7 +37,10 @@ export default function AppointmentsPage() {
 
   return (
     <PageContainer size="page" className="flex flex-col flex-1">
-      <h1 className="mb-6 text-lg font-semibold text-foreground">Appointments</h1>
+      <div className="text-sm text-muted-foreground">Appointments</div>
+      <h1 className="mt-4 mb-6 text-xl font-semibold tracking-tight text-foreground">
+        Booked by your agent
+      </h1>
 
       {!isLoading && appointments.length === 0 && (
         <EmptyState
@@ -63,35 +57,33 @@ export default function AppointmentsPage() {
       )}
 
       {!isLoading && appointments.length > 0 && (
-        <Card className="overflow-hidden p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="text-sm font-medium text-muted-foreground">Service</TableHead>
-                <TableHead className="text-sm font-medium text-muted-foreground">Caller</TableHead>
-                <TableHead className="text-sm font-medium text-muted-foreground">Date / Time</TableHead>
-                <TableHead className="text-sm font-medium text-muted-foreground">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {appointments.map((a: AppointmentItem) => (
-                <TableRow key={a.id}>
-                  <TableCell className="text-sm font-medium text-foreground">{a.service}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatPhone(a.callerPhone)}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {a.startTime ? formatDateTime(a.startTime) : 'Time TBD'}
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge value={a.status} config={appointmentStatusConfig} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+        <div>
+          <div className="grid grid-cols-[1fr_150px_200px_110px] gap-5 px-2.5 pb-2 text-sm text-muted-foreground">
+            <div>Service</div>
+            <div>Caller</div>
+            <div>Date &amp; time</div>
+            <div className="justify-self-end">Status</div>
+          </div>
+          {appointments.map((a: AppointmentItem) => (
+            <div
+              key={a.id}
+              className="grid h-12 grid-cols-[1fr_150px_200px_110px] items-center gap-5 border-t border-border px-2.5"
+            >
+              <span className="truncate text-sm font-medium text-foreground">{a.service}</span>
+              <span className="text-sm text-muted-foreground tabular-nums">
+                {a.callerPhone ? formatPhone(a.callerPhone) : 'Withheld'}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {a.startTime ? formatDateTime(a.startTime) : 'Time to be confirmed'}
+              </span>
+              <span className="justify-self-end">
+                <StatusBadge value={a.status} config={appointmentStatusConfig} />
+              </span>
+            </div>
+          ))}
+        </div>
       )}
+
     </PageContainer>
   )
 }

@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Trash2, BookOpen } from 'lucide-react'
 import { toast } from 'sonner'
 import type { KnowledgeItem } from '@receptionist/shared'
-import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PageContainer } from '@/layout/PageContainer'
@@ -33,7 +32,14 @@ export default function KnowledgePage() {
 
   return (
     <PageContainer size="page" className="flex flex-col flex-1">
-      <h1 className="mb-6 text-lg font-semibold text-foreground">Knowledge</h1>
+      <div className="text-sm text-muted-foreground">Knowledge</div>
+      <h1 className="mt-4 mb-2 text-xl font-semibold tracking-tight text-foreground">
+        What your agent knows
+      </h1>
+      <p className="mb-6 text-sm text-muted-foreground">
+        Every answer here came from an escalation you resolved. Delete one and
+        that question gets escalated again next time it comes up.
+      </p>
 
       {!isLoading && items.length === 0 && (
         <EmptyState
@@ -44,15 +50,17 @@ export default function KnowledgePage() {
       )}
 
       {!isLoading && items.length > 0 && (
-        <Card className="overflow-hidden p-0">
-          <div className="flex flex-col divide-y divide-border">
+        <div className="flex flex-col gap-2">
             {items.map((item: KnowledgeItem) => (
-              <div key={item.id} className="flex items-start gap-3 px-5 py-4">
+              <div
+                key={item.id}
+                className="flex items-start gap-3 rounded-lg border border-input bg-card p-4"
+              >
                 <div className="flex-1 min-w-0">
-                  <p className="text-base font-medium text-foreground leading-snug">
+                  <p className="text-sm font-medium leading-snug text-foreground">
                     {item.question}
                   </p>
-                  <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                     {item.answer}
                   </p>
                 </div>
@@ -68,8 +76,7 @@ export default function KnowledgePage() {
                 </Button>
               </div>
             ))}
-          </div>
-        </Card>
+        </div>
       )}
 
       <ConfirmDialog
