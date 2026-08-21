@@ -131,7 +131,7 @@ export default function EscalationsPage() {
   const escalations = data ?? []
 
   return (
-    <PageContainer size="md" className="flex flex-col flex-1">
+    <PageContainer size="page" className="flex flex-col flex-1">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-foreground">Escalations</h1>
         <div className="flex gap-2">

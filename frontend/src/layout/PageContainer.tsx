@@ -1,11 +1,17 @@
 import { cn } from '@/lib/utils'
 
-type Size = 'sm' | 'md' | 'lg'
+type Size = 'page' | 'form'
 
+/**
+ * The two measures in the product, and nothing else names a width.
+ *
+ * `form` is 880px because a settings row has to read as a line of prose —
+ * label on the left, control on the right, close enough together that the eye
+ * does not have to travel. `page` is a touch wider for lists and tables.
+ */
 const sizeWidth: Record<Size, string> = {
-  sm: 'max-w-2xl',
-  md: 'max-w-4xl',
-  lg: 'max-w-5xl',
+  page: 'max-w-[900px]',
+  form: 'max-w-[880px]',
 }
 
 interface PageContainerProps {
@@ -14,13 +20,9 @@ interface PageContainerProps {
   size?: Size
 }
 
-/**
- * Standard top-level wrapper for every routed page.
- * Replaces the `mx-auto max-w-... px-8 py-8` repeated across all pages.
- */
-export function PageContainer({ children, className, size = 'lg' }: PageContainerProps) {
+export function PageContainer({ children, className, size = 'page' }: PageContainerProps) {
   return (
-    <div className={cn('w-full mx-auto px-8 py-8', sizeWidth[size], className)}>
+    <div className={cn('mx-auto w-full px-5 py-6', sizeWidth[size], className)}>
       {children}
     </div>
   )

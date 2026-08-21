@@ -15,6 +15,31 @@ function isPeriod(v: string | null): v is Period {
   return v === 'today' || v === '7d' || v === '30d'
 }
 
+interface FigureProps {
+  label: string
+  value: number | undefined
+  /** Only the count that needs a person is coloured. */
+  waiting?: boolean
+}
+
+function Figure({ label, value, waiting }: FigureProps) {
+  return (
+    <div>
+      <div className={cn('text-sm', waiting ? 'text-accent-ink' : 'text-muted-foreground')}>
+        {label}
+      </div>
+      <div
+        className={cn(
+          'mt-1.5 text-2xl font-semibold tabular-nums tracking-tight',
+          waiting ? 'text-accent-ink' : 'text-foreground',
+        )}
+      >
+        {value ?? 0}
+      </div>
+    </div>
+  )
+}
+
 export function CallStats() {
   const [params, setParams] = useSearchParams()
   const period: Period = isPeriod(params.get('period')) ? (params.get('period') as Period) : '30d'
@@ -30,78 +55,51 @@ export function CallStats() {
     queryFn: () => fetchers.metrics(period),
   })
 
-  const KPI_LABELS = ['Total Calls', 'Bookings', 'Escalations', 'Abandoned']
+  return (
+    <section>
+      <div className="mb-4 flex items-end justify-between">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">
+          {period === 'today' ? 'Today' : period === '7d' ? 'Last 7 days' : 'Last 30 days'}
+        </h2>
 
-  if (isLoading) {
-    return (
-      <section>
-        <div className="mb-4 flex items-center justify-between">
-          <div className="space-y-1.5">
-            <Skeleton className="h-5 w-24" />
-            <Skeleton className="h-4 w-52" />
-          </div>
-          <Skeleton className="h-7 w-36" />
+        {/* The selected segment rises to a card; the track it sits in is sunk. */}
+        <div className="flex gap-0.5 rounded-lg bg-sunk p-0.5">
+          {PERIODS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setPeriod(p.id)}
+              className={cn(
+                'rounded-md px-3 py-1 text-sm transition-colors',
+                period === p.id
+                  ? 'bg-card font-medium text-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
-        <div className="flex items-stretch divide-x divide-border">
-          {KPI_LABELS.map((label, i) => (
-            <div key={label} className={cn('flex flex-1 flex-col gap-1.5', i === 0 ? 'pr-6' : 'px-6')}>
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-8 w-14" />
+      </div>
+
+      {/* No dividers. Four figures on a stage are already four figures; a rule
+          between each one is a line doing work that spacing does. */}
+      {isLoading ? (
+        <div className="flex gap-14">
+          {['Calls', 'Bookings', 'Waiting on you', 'Abandoned'].map((l) => (
+            <div key={l}>
+              <Skeleton className="h-5 w-24" />
+              <Skeleton className="mt-1.5 h-8 w-10" />
             </div>
           ))}
         </div>
-      </section>
-    )
-  }
-
-  const kpis = [
-    { label: 'Total Calls',  value: metrics?.totalCalls },
-    { label: 'Bookings',     value: metrics?.confirmedBookings },
-    { label: 'Escalations',  value: metrics?.pendingEscalations },
-    { label: 'Abandoned',    value: metrics?.abandonedCalls },
-  ]
-
-  return (
-    <section>
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">Call Stats</h2>
-          <p className="text-sm text-muted-foreground">All calls handled by our AI receptionist</p>
+      ) : (
+        <div className="flex gap-14">
+          <Figure label="Calls" value={metrics?.totalCalls} />
+          <Figure label="Bookings" value={metrics?.confirmedBookings} />
+          <Figure label="Waiting on you" value={metrics?.pendingEscalations} waiting />
+          <Figure label="Abandoned" value={metrics?.abandonedCalls} />
         </div>
-        <div className="flex gap-1">
-          {PERIODS.map((p) => {
-            const active = period === p.id
-            return (
-              <button
-                key={p.id}
-                onClick={() => setPeriod(p.id)}
-                className={cn(
-                  'rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                  active
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                )}
-              >
-                {p.label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      <div className="flex items-stretch divide-x divide-border">
-        {kpis.map((k, i) => (
-          <div
-            key={k.label}
-            className={cn('flex flex-1 flex-col gap-1', i === 0 ? 'pr-6' : 'px-6')}
-          >
-            <p className="text-sm text-muted-foreground">{k.label}</p>
-            <p className="text-3xl font-bold tabular-nums text-foreground">
-              {k.value ?? 0}
-            </p>
-          </div>
-        ))}
-      </div>
+      )}
     </section>
   )
 }

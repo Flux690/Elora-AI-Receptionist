@@ -1,45 +1,28 @@
 import { useEffect, useRef } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import type { CallListItem } from '@receptionist/shared'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useCallsQuery } from '@/hooks/useCallsQuery'
-import { formatPhone, formatDate, formatDuration } from '@/lib/formatters'
+import { formatPhone, formatTime, formatDuration } from '@/lib/formatters'
 import { callOutcomeConfig } from '@/lib/status-config'
 
-interface CallsTableProps {
-  onSelectCall: (id: string) => void
-}
+/** Time · what happened · caller · length · outcome. */
+const COLS = 'grid grid-cols-[72px_1fr_150px_84px_96px] items-center gap-5'
 
-export function CallsTable({ onSelectCall }: CallsTableProps) {
+export function CallsTable() {
+  const navigate = useNavigate()
   const sentinelRef = useRef<HTMLDivElement>(null)
 
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading,
-  } = useCallsQuery()
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
+    useCallsQuery()
 
-  // Auto-load next page when sentinel scrolls into view.
   useEffect(() => {
     const node = sentinelRef.current
     if (!node || !hasNextPage) return
     const obs = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && !isFetchingNextPage) {
-          fetchNextPage()
-        }
+        if (entry.isIntersecting && !isFetchingNextPage) fetchNextPage()
       },
       { rootMargin: '200px' },
     )
@@ -51,71 +34,59 @@ export function CallsTable({ onSelectCall }: CallsTableProps) {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-2 p-4">
+      <div className="flex flex-col gap-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-10 w-full" />
+          <Skeleton key={i} className="h-8 w-full" />
         ))}
       </div>
     )
   }
 
   if (calls.length === 0) {
-    return (
-      <p className="py-2 text-sm text-muted-foreground">No calls yet.</p>
-    )
+    return <p className="py-2 text-sm text-muted-foreground">No calls yet.</p>
   }
 
   return (
-    <Card className="overflow-hidden p-0">
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead>Caller</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead>Duration</TableHead>
-            <TableHead>Outcome</TableHead>
-            <TableHead>Summary</TableHead>
-            <TableHead className="w-10" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {calls.map((call: CallListItem) => {
-            const duration = formatDuration(call.startedAt, call.endedAt)
-            return (
-              <TableRow
-                key={call.id}
-                onClick={() => onSelectCall(call.id)}
-                className="cursor-pointer"
-              >
-                <TableCell className="text-sm font-medium text-foreground">
-                  {formatPhone(call.callerPhone)}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {formatDate(call.startedAt)}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground tabular-nums">
-                  {duration ?? <Skeleton className="h-3 w-10" />}
-                </TableCell>
-                <TableCell>
-                  <StatusBadge value={call.outcome} config={callOutcomeConfig} />
-                </TableCell>
-                <TableCell className="max-w-[280px] truncate text-sm text-muted-foreground">
-                  {call.summary || <span className="text-muted-foreground/60">—</span>}
-                </TableCell>
-                <TableCell>
-                  <ChevronRight className="size-4 text-muted-foreground" />
-                </TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
+    <div>
+      {/* Column headings are labels, not a heading — so no rule beneath them.
+          The rules in here separate rows, which is the one job they have. */}
+      <div className={`${COLS} px-2.5 pb-2 text-sm text-muted-foreground`}>
+        <div>Time</div>
+        <div>What happened</div>
+        <div>Caller</div>
+        <div>Length</div>
+        <div className="justify-self-end">Outcome</div>
+      </div>
+
+      {calls.map((call: CallListItem) => (
+        <button
+          key={call.id}
+          onClick={() => navigate(`/calls/${call.id}`)}
+          className={`${COLS} h-12 w-full cursor-pointer rounded-lg border-t border-border px-2.5 text-left transition-colors hover:bg-hover active:bg-active`}
+        >
+          <span className="text-sm text-muted-foreground tabular-nums">
+            {formatTime(call.startedAt)}
+          </span>
+          <span className="truncate text-sm text-secondary-foreground">
+            {call.summary || <span className="text-muted-foreground">—</span>}
+          </span>
+          <span className="text-sm text-muted-foreground tabular-nums">
+            {call.callerPhone ? formatPhone(call.callerPhone) : 'Withheld'}
+          </span>
+          <span className="text-sm text-muted-foreground tabular-nums">
+            {formatDuration(call.startedAt, call.endedAt) ?? '—'}
+          </span>
+          <span className="justify-self-end">
+            <StatusBadge value={call.outcome} config={callOutcomeConfig} />
+          </span>
+        </button>
+      ))}
 
       {hasNextPage && (
-        <div ref={sentinelRef} className="flex items-center justify-center border-t border-border/40 py-3">
+        <div ref={sentinelRef} className="flex items-center justify-center py-3">
           {isFetchingNextPage && <Skeleton className="h-4 w-24" />}
         </div>
       )}
-    </Card>
+    </div>
   )
 }

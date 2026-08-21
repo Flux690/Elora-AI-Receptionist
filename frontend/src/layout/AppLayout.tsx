@@ -25,7 +25,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarSeparator,
   SidebarTrigger,
 } from '@/components/ui/sidebar'
 import { RouteSkeleton } from './RouteSkeleton'
@@ -70,10 +69,7 @@ export default function AppLayout() {
               Collapsed: only the logo, centered on the icon-rail centerline. */}
           <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
             <div className="flex items-center gap-2 overflow-hidden">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">
-                D
-              </div>
-              <span className="truncate text-base font-semibold text-foreground group-data-[collapsible=icon]:hidden">
+              <span className="truncate text-base font-semibold tracking-tight text-foreground group-data-[collapsible=icon]:hidden">
                 DeskRoute
               </span>
             </div>
@@ -84,8 +80,6 @@ export default function AppLayout() {
             <SidebarTrigger />
           </div>
         </SidebarHeader>
-
-        <SidebarSeparator />
 
         <SidebarContent>
           <SidebarGroup>
@@ -106,7 +100,7 @@ export default function AppLayout() {
                         <span>{item.label}</span>
                       </SidebarMenuButton>
                       {item.to === '/escalations' && pendingCount > 0 && (
-                        <SidebarMenuBadge className="bg-status-pending text-white text-[10px] font-bold">
+                        <SidebarMenuBadge className="text-xs font-semibold">
                           {pendingCount}
                         </SidebarMenuBadge>
                       )}

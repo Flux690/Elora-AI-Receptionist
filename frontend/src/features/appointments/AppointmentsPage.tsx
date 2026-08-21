@@ -45,7 +45,7 @@ export default function AppointmentsPage() {
   }
 
   return (
-    <PageContainer size="md" className="flex flex-col flex-1">
+    <PageContainer size="page" className="flex flex-col flex-1">
       <h1 className="mb-6 text-lg font-semibold text-foreground">Appointments</h1>
 
       {!isLoading && appointments.length === 0 && (

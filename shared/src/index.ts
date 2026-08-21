@@ -20,11 +20,18 @@ export type AgentProfile = {
   holdPhrase: string;
 };
 
+/**
+ * A line of the conversation, as plain text.
+ *
+ * `startTime` / `endTime` were dropped with click-to-seek (PLAN.md 2.8.1).
+ * They held `item.createdAt` — when the chat message object was made, which is
+ * after speech-to-text finalised for a caller turn and before the audio played
+ * for an agent turn — so they never described the recording and nothing should
+ * be tempted to use them for that again.
+ */
 export type TranscriptEntry = {
   role: "user" | "assistant";
   text: string;
-  startTime?: number;
-  endTime?: number;
 };
 
 // API response shapes

@@ -11,6 +11,7 @@ import { ErrorFallback } from '@/layout/ErrorFallback'
 const SignIn      = lazy(() => import('@/features/public/SignInPage'))
 const SSOCallback = lazy(() => import('@/features/public/SSOCallbackPage'))
 const Home        = lazy(() => import('@/features/home/HomePage'))
+const CallDetail  = lazy(() => import('@/features/calls/CallDetailPage'))
 const Escalations = lazy(() => import('@/features/escalations/EscalationsPage'))
 const Appointments = lazy(() => import('@/features/appointments/AppointmentsPage'))
 const Knowledge   = lazy(() => import('@/features/knowledge/KnowledgePage'))
@@ -51,6 +52,7 @@ export default function App() {
 
           <Route element={<AppLayout />}>
             <Route path="/" element={<Home />} />
+            <Route path="/calls/:id" element={<CallDetail />} />
             <Route path="/escalations" element={<Escalations />} />
             <Route path="/appointments" element={<Appointments />} />
             <Route path="/knowledge" element={<Knowledge />} />

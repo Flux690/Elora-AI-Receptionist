@@ -31,7 +31,7 @@ export default function SettingsPage() {
   })
 
   return (
-    <PageContainer size="md">
+    <PageContainer size="form">
       <h1 className="mb-6 text-lg font-semibold text-foreground">Settings</h1>
 
       <Tabs

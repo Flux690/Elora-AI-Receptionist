@@ -32,7 +32,7 @@ export default function KnowledgePage() {
   const items = data ?? []
 
   return (
-    <PageContainer size="md" className="flex flex-col flex-1">
+    <PageContainer size="page" className="flex flex-col flex-1">
       <h1 className="mb-6 text-lg font-semibold text-foreground">Knowledge</h1>
 
       {!isLoading && items.length === 0 && (

@@ -14,7 +14,6 @@ export function extractTranscript(history: llm.ChatContext): TranscriptEntry[] {
     entries.push({
       role: item.role,
       text,
-      startTime: item.createdAt,
     });
   }
 
