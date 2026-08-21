@@ -67,7 +67,8 @@ Built as a multi-tenant B2B SaaS.
 | Calendar | Google Calendar API |
 | Recordings | Cloudflare R2 |
 | Frontend | React 19 + Vite + TypeScript |
-| UI | Tailwind v4 + shadcn/ui |
+| UI | Tailwind v4 + shadcn/ui on Base UI primitives |
+| Design tokens | OKLCH ladder, contrast floors enforced by test |
 | Data fetching | TanStack Query v5 |
 
 
@@ -145,8 +146,14 @@ any empty Postgres - no manual console step.
 docker compose up -d          # throwaway Postgres on host port 5433
 pnpm -F backend test          # unit + agent tests (no DB, no network)
 pnpm -F backend test:int      # service tests against the Docker Postgres
+pnpm -F frontend test         # the design-token contract
 pnpm typecheck                # tsc --noEmit across all workspaces
 ```
+
+The frontend suite is the colour contract, not component tests: it resolves
+`src/index.css` and fails the build if a semantic token holds a raw value, if a
+line stops sitting below every surface, if a hover names a rung instead of being
+a mix, or if any pair drops below its contrast floor.
 
 ### Run
 

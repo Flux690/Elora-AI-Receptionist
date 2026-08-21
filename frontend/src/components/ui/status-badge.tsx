@@ -10,7 +10,10 @@ interface StatusBadgeProps<T extends string> {
 /**
  * Generic status badge driven by a single StatusEntry config.
  * Replaces the duplicated OutcomeBadge / appointment StatusBadge components.
- * Falls back to a muted "Unknown" if the value is missing or unmapped.
+ * Falls back to a quiet em-dash if the value is missing or unmapped.
+ *
+ * A tone is type and weight, not a fill, so there is no chip to pad — status
+ * reads inline with the row it belongs to.
  */
 export function StatusBadge<T extends string>({
   value,
@@ -19,12 +22,12 @@ export function StatusBadge<T extends string>({
 }: StatusBadgeProps<T>) {
   const entry = value ? config[value] : undefined
   const label = entry?.label ?? '—'
-  const tone = entry?.tone ?? 'muted'
+  const tone = entry?.tone ?? 'quiet'
 
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium',
+        'inline-flex items-center text-xs',
         toneToClasses(tone),
         className,
       )}

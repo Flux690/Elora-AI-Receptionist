@@ -77,7 +77,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-[600px] min-h-[560px] rounded-xl border border-border bg-card shadow-md flex flex-col">
+      <div className="w-full max-w-[600px] min-h-[560px] rounded-xl border border-border bg-card flex flex-col">
         <div className="flex-1 p-8">
           <StepIndicator current={step} />
 

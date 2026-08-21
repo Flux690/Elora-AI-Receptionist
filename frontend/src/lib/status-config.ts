@@ -5,17 +5,28 @@ import type {
 } from '@receptionist/shared'
 
 /**
- * Tailwind class strings keyed by visual tone.
- * The "neutral" tone is the fallback used by StatusBadge for unknown values.
+ * Status has three roles, and colour only appears for one of them.
+ *
+ *   fact      a booking happened. Ink, carried in weight — a completed booking
+ *             is not a celebration, and a green chip for every one of them
+ *             spends the loudest thing on screen on the least urgent news.
+ *   waiting   something needs a person. The accent, and the only place it
+ *             appears in a list, so it is findable by colour alone.
+ *   quiet     answered, abandoned, resolved, cancelled. Muted ink; these are
+ *             outcomes you read, not ones you act on.
+ *   failed    an error. Red, and red is used for nothing else in the product,
+ *             so it still means what people expect it to.
+ *
+ * Green and amber are gone on purpose. An escalation is not a failure, and
+ * amber said it was.
  */
-export type StatusTone = 'success' | 'warning' | 'neutral' | 'muted' | 'danger'
+export type StatusTone = 'fact' | 'waiting' | 'quiet' | 'failed'
 
 const toneClasses: Record<StatusTone, string> = {
-  success: 'bg-status-booked/10 text-status-booked',
-  warning: 'bg-status-pending/10 text-status-pending',
-  danger: 'bg-status-error/10 text-status-error',
-  neutral: 'bg-status-answered/10 text-status-answered',
-  muted: 'bg-muted text-muted-foreground',
+  fact: 'text-foreground font-medium',
+  waiting: 'text-accent-ink font-medium',
+  quiet: 'text-muted-foreground',
+  failed: 'text-destructive font-medium',
 }
 
 export function toneToClasses(tone: StatusTone): string {
@@ -25,20 +36,20 @@ export function toneToClasses(tone: StatusTone): string {
 export type StatusEntry = { label: string; tone: StatusTone }
 
 export const callOutcomeConfig: Record<CallOutcome, StatusEntry> = {
-  booked:    { label: 'Booked',    tone: 'success' },
-  escalated: { label: 'Escalated', tone: 'warning' },
-  answered:  { label: 'Answered',  tone: 'neutral' },
-  abandoned: { label: 'Abandoned', tone: 'muted' },
-  error:     { label: 'Error',     tone: 'danger' },
+  booked:    { label: 'Booked',    tone: 'fact' },
+  escalated: { label: 'Escalated', tone: 'waiting' },
+  answered:  { label: 'Answered',  tone: 'quiet' },
+  abandoned: { label: 'Abandoned', tone: 'quiet' },
+  error:     { label: 'Error',     tone: 'failed' },
 }
 
 export const appointmentStatusConfig: Record<AppointmentStatus, StatusEntry> = {
-  confirmed: { label: 'Confirmed', tone: 'success' },
-  requested: { label: 'Requested', tone: 'warning' },
-  cancelled: { label: 'Cancelled', tone: 'danger' },
+  confirmed: { label: 'Confirmed', tone: 'fact' },
+  requested: { label: 'Requested', tone: 'waiting' },
+  cancelled: { label: 'Cancelled', tone: 'quiet' },
 }
 
 export const escalationStatusConfig: Record<EscalationStatus, StatusEntry> = {
-  pending:  { label: 'Pending',  tone: 'warning' },
-  resolved: { label: 'Resolved', tone: 'success' },
+  pending:  { label: 'Pending',  tone: 'waiting' },
+  resolved: { label: 'Resolved', tone: 'quiet' },
 }

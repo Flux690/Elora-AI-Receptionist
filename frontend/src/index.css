@@ -1,94 +1,316 @@
-@import "@fontsource-variable/dm-sans/index.css";
+@import "@fontsource-variable/schibsted-grotesk/index.css";
 @import "tailwindcss";
 
-@theme {
-  --font-sans: "DM Sans Variable", system-ui, sans-serif;
+/* ── Primitives ───────────────────────────────────────────────────────────────
+   The only absolute colours in the system. Every semantic token below points at
+   one of these, at a mix of them, or at another semantic token — never at a
+   value of its own. `design-tokens.test.ts` fails the build if that slips.
 
-  --font-weight-normal:   400;
-  --font-weight-medium:   500;
-  --font-weight-semibold: 600;
-  --font-weight-bold:     700;
+   Read off linear.app/apexclaw in light mode with the console, and
+   cross-checked against nightwatch-docs/linear-and-our-tokens.md:
 
-  /* Palette */
-  --color-background:             #FAFAFA;
-  --color-foreground:             #0F172A;
-  --color-card:                   #FFFFFF;
-  --color-card-foreground:        #0F172A;
-  --color-popover:                #FFFFFF;
-  --color-popover-foreground:     #0F172A;
-  --color-primary:                #059669;
-  --color-primary-foreground:     #FFFFFF;
-  --color-secondary:              #F5F5F5;
-  --color-secondary-foreground:   #0F172A;
-  --color-muted:                  #F5F5F5;
-  --color-muted-foreground:       #64748B;
-  --color-accent:                 #F5F5F5;
-  --color-accent-foreground:      #0F172A;
-  --color-destructive:            #EF4444;
-  --color-destructive-foreground: #FFFFFF;
-  --color-border:                 #E5E7EB;
-  --color-input:                  #D1D5DB;
-  --color-ring:                   #059669;
+     html / ground   lch(94.44)  #eeeef0   the sidebar is this showing through
+     stage           lch(97.94)  #f9f9fa   floats on it, 12px radius, 1 hairline
+     card / input    lch(100)    #ffffff   the lightest thing on screen
+     selected        #e1e1e2               BELOW the ground, never above it
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  color-scheme: light;
 
-  /* Custom */
-  --color-primary-subtle:  #05966912;
-  --color-primary-hover:   #047857;
-  --color-sidebar:         #FFFFFF;
-  --color-sidebar-border:  #E5E7EB;
-  --color-sidebar-foreground: #0F172A;
-  --color-sidebar-muted:   #64748B;
-  --color-sidebar-accent:  #05966912;
+  /* Surfaces. Lifted means lighter, so a card sits ABOVE the page rather than
+     being a grey block on a white one.
 
-  /* Status */
-  --color-status-booked:    #059669;
-  --color-status-confirmed: #059669;
-  --color-status-resolved:  #059669;
-  --color-status-escalated: #F59E0B;
-  --color-status-pending:   #F59E0B;
-  --color-status-requested: #F59E0B;
-  --color-status-answered:  #64748B;
-  --color-status-abandoned: #94A3B8;
-  --color-status-error:     #EF4444;
-  --color-status-cancelled: #EF4444;
+     Deliberately not evenly spaced — these are measured, and Linear's own
+     ladder is not even. Near black, the range Nightwatch tunes, the eye reads a
+     ratio and that ladder states the multipliers it was measured at; near white
+     it reads a difference, and the honest thing is to keep the measured values
+     rather than round them into a pattern they never had. */
+  --n-1: oklch(0.945 0.002 282);
+  --n-2: oklch(0.978 0.001 282);
+  --n-3: oklch(1 0 0);
 
-  /* Radii */
-  --radius-sm:   6px;
-  --radius-md:   8px;
-  --radius-lg:   12px;
-  --radius-xl:   16px;
-  --radius-pill:  9999px;
+  /* Rungs BELOW the ground. Light darkens to signal state where dark lightens,
+     and Linear takes it in two small steps rather than one leap — measured on
+     the issues page as lch 94.44 (page) -> 92.44 (hover) -> 90.94 (active).
+     There is no shadow anywhere in it — their button-overlay-shadow variable
+     is set to none and the issues page carries zero shadowed elements. The
+     raised effect is entirely a control resting on a surface lighter than the
+     page, and sinking below it when pressed. */
+  --n-2a: oklch(0.960 0.002 282);
+  --n-2b: oklch(0.938 0.003 282);
+  --sunk-1: oklch(0.926 0.003 282);
+  --sunk: oklch(0.910 0.003 282);
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px #0000000D;
-  --shadow-md: 0 4px 12px #00000012;
-  --shadow-lg: 0 12px 40px #0000001A;
+  /* Lines sit below every surface, so an edge can never be lighter than what it
+     lands on. --line-2 is the darker of the two on purpose: a card and an input
+     share one fill, so the input's border is all that keeps it defined. */
+  --line-1: oklch(0.888 0.003 282);
+  --line-2: oklch(0.876 0.003 282);
+
+  /* Ink, evenly spaced by 0.1575. */
+  --ink-1: oklch(0.520 0.010 282);
+  --ink-2: oklch(0.3625 0.014 282);
+  --ink-3: oklch(0.205 0.018 282);
+
+  /* Two hues, one job each. Ink carries every action, so neither of these is a
+     "primary" — colour is never decorative here, which is what lets it mean
+     something the moment it appears. */
+  --accent-fill: oklch(0.470 0.170 258); /* something is waiting on you */
+  --red-fill: oklch(0.545 0.195 25);     /* destructive, and nothing else */
+  --white: oklch(1 0 0);
+
+  /* ── Semantics ─────────────────────────────────────────────────────────────
+     Each names a job and points at a step above. The names are unchanged from
+     the previous system — 35 of them are in use across the app — so retuning
+     the palette costs no call sites. */
+
+  --background: var(--n-1);
+  --foreground: var(--ink-3);
+  --stage: var(--n-2);
+  --card: var(--n-3);
+  --card-foreground: var(--ink-3);
+  --popover: var(--n-3);
+  --popover-foreground: var(--ink-3);
+  --secondary: var(--n-2);
+  --secondary-foreground: var(--ink-3);
+  --muted: var(--n-2);
+  --muted-foreground: var(--ink-1);
+
+  /* The accent carries action. One hue with one meaning — "this is something
+     you act on" — so a primary button, a focus ring and a row still waiting on
+     you are all the same invitation rather than three unrelated signals.
+
+     Ink held this briefly, which made every button correct and none of them
+     findable: on a page of black text, a black button is just more black. */
+  --primary: var(--accent-fill);
+  --primary-foreground: var(--white);
+  --primary-subtle: color-mix(in srgb, var(--accent-fill) 8%, transparent);
+
+  /* shadcn spends `accent` on hover and selected fills. */
+  --accent: var(--sunk);
+  --accent-foreground: var(--ink-3);
+  --accent-ink: var(--accent-fill);
+
+  --destructive: var(--red-fill);
+  --destructive-foreground: var(--white);
+
+  --border: var(--line-1);
+  --input: var(--line-2);
+  --ring: var(--accent-fill);
+
+  /* The sidebar has no fill of its own: it is the ground showing through, and
+     the stage floats against it. Colour is a fifth of that effect — the gutter,
+     the radius and the hairline carry the rest. */
+  --sidebar: var(--n-1);
+  --sidebar-foreground: var(--ink-1);
+  --sidebar-muted: var(--ink-1);
+  --sidebar-hover: var(--sunk-1);
+  --sidebar-accent: var(--sunk);
+  --sidebar-accent-foreground: var(--ink-3);
+  --sidebar-border: transparent;
+
+  /* States are mixes against whatever they land on, never a rung of their own.
+     A fixed rung is right at one depth and wrong at every other, which is how a
+     row ends up darker than the panel it opened on. */
+  --hover: color-mix(in srgb, var(--ink-3) 4%, transparent);
+  --active: color-mix(in srgb, var(--ink-3) 8%, transparent);
+
+  /* A control rests ABOVE what it sits on, and sinks in two steps. The steps
+     are small and even — one leap reads as pressed-into-the-page rather than
+     picked. Sized against the stage, as Linear's are against its ground. */
+  --control: var(--n-3);
+  --control-hover: var(--n-2a);
+  --control-active: var(--n-2b);
+  --primary-hover: color-mix(in oklab, var(--primary), var(--white) 12%);
+  --destructive-hover: color-mix(in oklab, var(--destructive), var(--white) 12%);
+
+  /* Status. Three roles, and colour only appears for one of them: ink states a
+     fact, the accent flags something waiting on you, red is destructive. Green
+     and amber are gone — a booking is not a celebration and an escalation is
+     not a failure. */
+  --status-booked: var(--ink-3);
+  --status-confirmed: var(--ink-3);
+  --status-escalated: var(--accent-fill);
+  --status-pending: var(--accent-fill);
+  --status-requested: var(--accent-fill);
+  --status-answered: var(--ink-1);
+  --status-abandoned: var(--ink-1);
+  --status-resolved: var(--ink-1);
+  --status-cancelled: var(--ink-1);
+  --status-error: var(--red-fill);
 }
 
-:root {
-  --radius: 8px;
+/* Tailwind's colour utilities, resolving through the semantic layer above. */
+@theme inline {
+  /* The default scale is cleared so `shadow-md` stops generating a rule, then
+     two are declared — and only two.
+
+     Measured off Linear's pills, which draw their hairline as a 0.5px SPREAD
+     rather than a CSS border: `borderWidth` reports 0px and the edge is on an
+     ::after. A ring darkens the surface exactly at the edge, so a control can
+     look lifted without being lightened, and it never shrinks the content the
+     way a real border does.
+
+     `edge` is that ring alone — an unselected control. `raised` adds two very
+     soft lifts on top, which is what a selected one carries. */
+  --shadow-*: initial;
+  --shadow-edge: 0 0 0 0.5px oklch(0 0 0 / 0.09);
+  --shadow-raised:
+    0 0 0 0.5px oklch(0 0 0 / 0.09),
+    0 3px 6px -2px oklch(0 0 0 / 0.02),
+    0 1px 1px 0 oklch(0 0 0 / 0.04);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-stage: var(--stage);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-subtle: var(--primary-subtle);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-ink: var(--accent-ink);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-hover: var(--destructive-hover);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sunk: var(--sunk);
+  --color-sunk-1: var(--sunk-1);
+  --color-control: var(--control);
+  --color-control-hover: var(--control-hover);
+  --color-control-active: var(--control-active);
+
+  --color-hover: var(--hover);
+  --color-active: var(--active);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+
+  --color-status-booked: var(--status-booked);
+  --color-status-confirmed: var(--status-confirmed);
+  --color-status-escalated: var(--status-escalated);
+  --color-status-pending: var(--status-pending);
+  --color-status-requested: var(--status-requested);
+  --color-status-answered: var(--status-answered);
+  --color-status-abandoned: var(--status-abandoned);
+  --color-status-resolved: var(--status-resolved);
+  --color-status-cancelled: var(--status-cancelled);
+  --color-status-error: var(--status-error);
+}
+
+/* Tokens with no palette dimension. */
+@theme {
+  --font-sans: "Schibsted Grotesk Variable", system-ui, sans-serif;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Two radii, not five. 8px is everything on the stage, 12px is what floats
+     above it. The five names are Tailwind's namespace, not five rungs — which
+     means the 23 `rounded-lg` and 4 `rounded-xl` call sites need no edit. */
+  --radius-sm: 8px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 12px;
+
+  /* 14px floor. `--text-xs` is 14 rather than 12 so existing `text-xs` uses
+     comply without being touched; there is deliberately nothing below it. */
+  --text-xs: 14px;
+  --text-xs--line-height: calc(20 / 14);
+  --text-sm: 14px;
+  --text-sm--line-height: calc(20 / 14);
+  --text-base: 16px;
+  --text-base--line-height: calc(24 / 16);
+  --text-lg: 20px;
+  --text-lg--line-height: calc(28 / 20);
+  --text-xl: 24px;
+  --text-xl--line-height: calc(30 / 24);
+  --text-2xl: 32px;
+  --text-2xl--line-height: calc(36 / 32);
+
+  /* Measures. A page names one of these; nothing else does. */
+  --container-page: 900px;
+  --container-form: 880px;
+  --container-sidebar: 244px;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --default-transition-duration: var(--duration-base);
+  --default-transition-timing-function: var(--ease-out);
+}
+
+/* One lit edge on focus, laid over the control's own border rather than beside
+   it — so focus never recolours a border and never grows a ring. Excluded:
+   containers focused only to reach their contents. */
+:focus-visible:not([tabindex="-1"]):not([role="tabpanel"]):not([role="option"]) {
+  outline: 1px solid var(--ring);
+  outline-offset: -1px;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--n-2), var(--accent-fill) 22%);
+  color: var(--foreground);
 }
 
 @layer base {
   * {
     box-sizing: border-box;
+    border-color: var(--border);
   }
+
+  /* A scrollbar is a hint about position, not a control worth a background. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-2) transparent;
+  }
+
   body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+    background-color: var(--background);
+    color: var(--foreground);
     font-family: var(--font-sans);
+    font-size: 14px;
     font-feature-settings: "ss01", "cv11";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    margin: 0;
   }
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-muted-foreground); }
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
-/* Test Agent live visualizer — bars inherit button text color, no background */
+/* Test Agent live visualiser — bars inherit button text colour, no background */
 .test-agent-viz {
   display: flex;
   align-items: center;
