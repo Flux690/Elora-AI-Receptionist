@@ -11,6 +11,8 @@ type CreateCallInput = {
   clientId?: string | null;
   callerPhone: string | null;
   livekitRoomName: string;
+  /** Which disclosure wording the caller heard. The compliance audit trail. */
+  disclosureVersion?: string;
 };
 
 export async function createCall(input: CreateCallInput): Promise<CallRow> {
@@ -22,6 +24,7 @@ export async function createCall(input: CreateCallInput): Promise<CallRow> {
       clientId: input.clientId ?? null,
       callerPhone: input.callerPhone,
       livekitRoomName: input.livekitRoomName,
+      disclosureVersion: input.disclosureVersion ?? null,
     })
     .returning();
 

@@ -1,10 +1,14 @@
 import type { AppContext } from "../types.js";
 import { getTenantById, updateTenant } from "../services/tenants.js";
+import { listServices } from "../services/services.js";
 import { updateSettingsSchema } from "../schemas.js";
 
 export async function getSettings(c: AppContext) {
   const tenantId = c.get("tenantId");
-  const tenant = await getTenantById(tenantId);
+  const [tenant, services] = await Promise.all([
+    getTenantById(tenantId),
+    listServices(tenantId),
+  ]);
   if (!tenant) return c.json({ error: "Tenant not found" }, 404);
 
   return c.json({
@@ -13,9 +17,13 @@ export async function getSettings(c: AppContext) {
       industry: tenant.industry,
       timezone: tenant.timezone,
       description: tenant.description,
-      services: tenant.services,
+      services,
+      businessHours: tenant.businessHours,
+      bookingPolicy: tenant.bookingPolicy,
       phoneNumber: tenant.phoneNumber ?? null,
-      googleCalendarId: tenant.googleCalendarId ?? null,
+      calendarProvider: tenant.calendarProvider ?? null,
+      calendarExternalId: tenant.calendarExternalId ?? null,
+      calendarPayload: tenant.calendarPayload ?? null,
     },
     agent: tenant.agentProfile,
   });
@@ -34,8 +42,8 @@ export async function updateSettings(c: AppContext) {
     if (body.business.industry !== undefined) patch.industry = body.business.industry;
     if (body.business.timezone !== undefined) patch.timezone = body.business.timezone;
     if (body.business.description !== undefined) patch.description = body.business.description;
-    if (body.business.services !== undefined) patch.services = body.business.services;
-    if (body.business.googleCalendarId !== undefined) patch.googleCalendarId = body.business.googleCalendarId;
+    if (body.business.businessHours !== undefined) patch.businessHours = body.business.businessHours;
+    if (body.business.bookingPolicy !== undefined) patch.bookingPolicy = body.business.bookingPolicy;
   }
 
   if (body.agent) {

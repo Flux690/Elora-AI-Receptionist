@@ -1,3 +1,4 @@
+import { WEEKDAYS, type BusinessHours, type TimeInterval, type Weekday } from "@receptionist/shared";
 import type { AgentDeps } from "./types.js";
 
 /** A question/answer pair from the tenant's knowledge base. */
@@ -56,15 +57,78 @@ function buildDateAnchors(now: Date, timeZone: string): string {
   return lines.join("\n");
 }
 
+const WEEKDAY_LABELS: Record<Weekday, string> = {
+  mon: "Monday",
+  tue: "Tuesday",
+  wed: "Wednesday",
+  thu: "Thursday",
+  fri: "Friday",
+  sat: "Saturday",
+  sun: "Sunday",
+};
+
+/** "9:00 AM" from "09:00". Spoken aloud, so 24-hour time would be wrong. */
+function speakTime(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  const suffix = h! < 12 ? "AM" : "PM";
+  const hour = h! % 12 === 0 ? 12 : h! % 12;
+  return `${hour}:${String(m).padStart(2, "0")} ${suffix}`;
+}
+
+function speakIntervals(intervals: TimeInterval[]): string {
+  if (intervals.length === 0) return "Closed";
+  return intervals.map((i) => `${speakTime(i.start)} to ${speakTime(i.end)}`).join(", and ");
+}
+
+/**
+ * The weekly pattern, plus any exception falling inside the window the date
+ * anchors already cover.
+ *
+ * "Are you open Saturday?" is plausibly the most common question an appointment
+ * business receives, and until hours existed it was an escalation every time —
+ * the agent had nothing to answer from.
+ */
+function buildHoursBlock(hours: BusinessHours, now: Date, timeZone: string): string {
+  const weekly = WEEKDAYS.map(
+    (day) => `- ${WEEKDAY_LABELS[day]}: ${speakIntervals(hours.weekly[day] ?? [])}`
+  ).join("\n");
+
+  // Only exceptions the caller could plausibly be asking about. A closure eight
+  // months out is noise in a prompt read on every call.
+  const horizon = new Set<string>();
+  for (let offset = 0; offset <= DAYS_AHEAD; offset++) {
+    horizon.add(partsIn(new Date(now.getTime() + offset * 86_400_000), timeZone).iso);
+  }
+
+  const upcoming = hours.exceptions
+    .filter((e) => horizon.has(e.date))
+    .map((e) => {
+      const label = e.label ? ` (${e.label})` : "";
+      return `- ${e.date}${label}: ${speakIntervals(e.intervals)}`;
+    });
+
+  const exceptionBlock = upcoming.length
+    ? `\nThese specific dates override the pattern above:\n${upcoming.join("\n")}`
+    : "";
+
+  return `${weekly}${exceptionBlock}`;
+}
+
 export function buildSystemPrompt(deps: AgentDeps): string {
-  const { tenant, client, knowledge } = deps;
+  const { tenant, client, knowledge, services } = deps;
   const agent = tenant.agentProfile;
   const timeZone = tenant.timezone;
 
-  const serviceLines = tenant.services
+  // Duration is stated so the agent can answer "how long does that take?"
+  // without a tool call. It does NOT do the slot arithmetic — that is the
+  // backend's job, and the model is never asked to add minutes to a time.
+  const now = new Date();
+  const today = partsIn(now, timeZone);
+
+  const serviceLines = services
     .map((s) => {
       const desc = s.description ? ` – ${s.description}` : "";
-      return `- ${s.name}: ${s.price}${desc}`;
+      return `- ${s.name}: ${s.price} (${s.durationMinutes} minutes)${desc}`;
     })
     .join("\n");
 
@@ -77,12 +141,10 @@ export function buildSystemPrompt(deps: AgentDeps): string {
         .join("\n\n")}\n`
     : "";
 
-  const calendarBlock = deps.googleCalendarId
+  const calendarBlock = deps.calendarExternalId
     ? "Calendar: connected — use checkAvailability before offering times, use bookAppointment to confirm."
     : "Calendar: not connected — if caller wants to book, create an escalation so the team follows up.";
 
-  const now = new Date();
-  const today = partsIn(now, timeZone);
 
   const callerBlock = client?.name
     ? `${client.name} (returning client, phone: ${deps.callerPhone})`
@@ -105,6 +167,9 @@ Description: ${tenant.description}
 
 ## Services
 ${serviceLines || "No services listed."}
+
+## Hours
+${buildHoursBlock(tenant.businessHours, now, timeZone)}
 
 ## Booking
 ${calendarBlock}

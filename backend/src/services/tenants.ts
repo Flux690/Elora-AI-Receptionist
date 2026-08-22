@@ -10,11 +10,14 @@ const tenantFields = {
   industry: tenants.industry,
   timezone: tenants.timezone,
   description: tenants.description,
-  services: tenants.services,
+  businessHours: tenants.businessHours,
+  bookingPolicy: tenants.bookingPolicy,
   agentProfile: tenants.agentProfile,
   phoneNumber: tenants.phoneNumber,
   clerkUserId: tenants.clerkUserId,
-  googleCalendarId: tenants.googleCalendarId,
+  calendarProvider: tenants.calendarProvider,
+  calendarExternalId: tenants.calendarExternalId,
+  calendarPayload: tenants.calendarPayload,
 } as const;
 
 export type WorkerTenant = {
@@ -60,14 +63,14 @@ export async function createTenant(input: {
   clerkUserId: string;
   phoneNumber: string;
   description?: string;
-  services?: import("@receptionist/shared").ServiceItem[];
+  businessHours?: import("@receptionist/shared").BusinessHours;
+  bookingPolicy?: import("@receptionist/shared").BookingPolicy;
   agentProfile?: import("@receptionist/shared").AgentProfile;
 }): Promise<WorkerTenant> {
   const rows = await db
     .insert(tenants)
     .values({
       description: "",
-      services: [],
       agentProfile: { name: "", greeting: "", farewell: "", fallback: "", holdPhrase: "" },
       ...input,
     })
@@ -82,8 +85,10 @@ export async function deleteTenant(id: string): Promise<void> {
 export async function updateTenant(
   id: string,
   patch: Partial<Pick<TenantRow,
-    | "name" | "industry" | "description" | "services" | "agentProfile"
-    | "timezone" | "googleCalendarId" | "phoneNumber"
+    | "name" | "industry" | "description" | "agentProfile"
+    | "businessHours" | "bookingPolicy"
+    | "timezone" | "phoneNumber"
+    | "calendarProvider" | "calendarExternalId" | "calendarPayload"
   >>
 ): Promise<void> {
   await db

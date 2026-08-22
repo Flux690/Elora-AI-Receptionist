@@ -1,6 +1,6 @@
 import { db } from "../db/client.js";
-import { tenants, clients, calls, escalations, appointments } from "../db/schema.js";
-import type { AgentProfile, ServiceItem } from "@receptionist/shared";
+import { tenants, clients, calls, escalations, appointments, services } from "../db/schema.js";
+import type { AgentProfile, Service } from "@receptionist/shared";
 
 /**
  * Fixture builders for integration tests. Every one takes overrides so a test
@@ -18,9 +18,31 @@ export const AGENT_PROFILE: AgentProfile = {
   holdPhrase: "One moment while I check that.",
 };
 
-export const SERVICES: ServiceItem[] = [
-  { name: "Haircut", price: "$45", description: "Wash, cut and style" },
-  { name: "Colour", price: "$120" },
+/**
+ * Two services with deliberately different shapes: a short one with no padding,
+ * and a long one with cleanup either side. Slot generation behaves differently
+ * for each, so a fixture where both were 60 minutes would hide most bugs.
+ */
+export const SERVICES: Service[] = [
+  {
+    id: "33333333-3333-3333-3333-333333333331",
+    name: "Haircut",
+    price: "$45",
+    description: "Wash, cut and style",
+    durationMinutes: 30,
+    bufferBeforeMinutes: 0,
+    bufferAfterMinutes: 0,
+    requiredResources: [],
+  },
+  {
+    id: "33333333-3333-3333-3333-333333333332",
+    name: "Colour",
+    price: "$120",
+    durationMinutes: 120,
+    bufferBeforeMinutes: 10,
+    bufferAfterMinutes: 15,
+    requiredResources: [],
+  },
 ];
 
 export async function makeTenant(overrides: Partial<typeof tenants.$inferInsert> = {}) {
@@ -31,7 +53,6 @@ export async function makeTenant(overrides: Partial<typeof tenants.$inferInsert>
       industry: "salon",
       timezone: "America/New_York",
       description: "A test salon.",
-      services: SERVICES,
       agentProfile: AGENT_PROFILE,
       phoneNumber: `+1555${uniq().slice(-7)}`,
       clerkUserId: `user_${uniq()}`,
@@ -104,6 +125,23 @@ export async function makeAppointment(
       startTime,
       endTime: new Date(startTime.getTime() + 60 * 60 * 1000),
       status: "confirmed",
+      ...overrides,
+    })
+    .returning();
+  return rows[0]!;
+}
+
+export async function makeService(
+  tenantId: string,
+  overrides: Partial<typeof services.$inferInsert> = {}
+) {
+  const rows = await db
+    .insert(services)
+    .values({
+      tenantId,
+      name: `Haircut ${uniq()}`,
+      price: "$45",
+      durationMinutes: 30,
       ...overrides,
     })
     .returning();

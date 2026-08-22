@@ -8,11 +8,13 @@ type CreateAppointmentInput = {
   tenantId: string;
   clientId: string | null;
   callerPhone: string | null;
+  /** The service record this was booked against; null if it is since deleted. */
+  serviceId?: string | null;
   service: string;
   startTime: Date;
   endTime: Date;
   status: "requested" | "confirmed" | "cancelled";
-  googleEventId?: string;
+  externalEventId?: string;
 };
 
 export async function createAppointment(input: CreateAppointmentInput): Promise<AppointmentRow> {
@@ -22,11 +24,12 @@ export async function createAppointment(input: CreateAppointmentInput): Promise<
       tenantId: input.tenantId,
       clientId: input.clientId,
       callerPhone: input.callerPhone,
+      serviceId: input.serviceId ?? null,
       service: input.service,
       startTime: input.startTime,
       endTime: input.endTime,
       status: input.status,
-      googleEventId: input.googleEventId ?? null,
+      externalEventId: input.externalEventId ?? null,
     })
     .returning();
   return rows[0];
@@ -41,7 +44,7 @@ export async function listAppointments(tenantId: string) {
       startTime: appointments.startTime,
       endTime: appointments.endTime,
       status: appointments.status,
-      googleEventId: appointments.googleEventId,
+      externalEventId: appointments.externalEventId,
       createdAt: appointments.createdAt,
     })
     .from(appointments)
@@ -91,7 +94,7 @@ export async function getUpcomingByPhone(tenantId: string, callerPhone: string) 
       startTime: appointments.startTime,
       endTime: appointments.endTime,
       status: appointments.status,
-      googleEventId: appointments.googleEventId,
+      externalEventId: appointments.externalEventId,
     })
     .from(appointments)
     .where(

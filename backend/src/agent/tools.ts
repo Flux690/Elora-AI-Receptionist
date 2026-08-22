@@ -3,12 +3,27 @@ import { z } from "zod";
 import type { AgentDeps } from "./types.js";
 import { createEscalation } from "../services/escalations.js";
 import { setClientName } from "../services/clients.js";
-import { checkAvailability, createCalendarEvent, deleteCalendarEvent } from "../services/calendar.js";
+import { fetchBusyRanges, createCalendarEvent, deleteCalendarEvent } from "../services/calendar.js";
+import {
+  describeDate,
+  describeSlot,
+  filterByBusy,
+  findService,
+  generateCandidateSlots,
+  isOpenOn,
+} from "./scheduling.js";
 import { createAppointment, getUpcomingByPhone, cancelAppointmentById } from "../services/appointments.js";
+
+/** How many times the agent reads out at once. More than three is unfollowable. */
+const MAX_SLOTS_OFFERED = 3;
+
+/** How far ahead to search when the caller did not name a day. */
+const DEFAULT_SEARCH_DAYS = 14;
 
 export function createAgentTools(deps: AgentDeps) {
   const holdPhrase = deps.tenant.agentProfile.holdPhrase;
   const tenantId = deps.tenant.id;
+  const timeZone = deps.tenant.timezone;
 
   function sayHold(ctx: voice.RunContext) {
     if (!holdPhrase) return;
@@ -70,96 +85,196 @@ export function createAgentTools(deps: AgentDeps) {
 
     checkAvailability: llm.tool({
       description:
-        "Check available appointment slots on the business calendar. Always call this before offering specific times to a caller who wants to book.",
+        "Find real appointment times for a service. Always call this before offering any time to a caller. It returns slots with ids; read the times out and remember the ids.",
       parameters: z.object({
-        service: z.string().describe("The service the caller wants to book."),
-        startIso: z
+        service: z.string().describe("The service the caller wants, as they said it."),
+        preferredDate: z
           .string()
-          .describe("Start of the search window in ISO 8601 format, adjusted to the business timezone."),
-        endIso: z
-          .string()
-          .describe("End of the search window in ISO 8601 format."),
+          .nullable()
+          .describe("The date the caller asked for, as YYYY-MM-DD. Null if they did not name one."),
+        partOfDay: z
+          .enum(["morning", "afternoon", "evening"])
+          .nullable()
+          .describe("Only if the caller asked for one. Null otherwise."),
       }),
-      execute: async ({ startIso, endIso }, { ctx }) => {
-        // sayHold fires FIRST — before any await — so the caller hears it immediately
-        if (!deps.googleCalendarId) {
+      execute: async ({ service, preferredDate, partOfDay }, { ctx }) => {
+        if (!deps.calendarExternalId) {
           return {
-            error: "Calendar not connected. Create an escalation so the team can follow up with the caller.",
+            error:
+              "No calendar is connected, so times cannot be checked. Create an escalation so the team can follow up.",
           };
         }
+
+        const matched = findService(deps.services, service);
+        if (!matched) {
+          // Never guess a service: the wrong one means the wrong length, and
+          // therefore a slot the business cannot honour.
+          return {
+            error: `"${service}" is not on the service list. Ask the caller which service they mean, from: ${deps.services
+              .map((s) => s.name)
+              .join(", ")}.`,
+          };
+        }
+
+        // sayHold fires FIRST — before any await — so the caller hears it immediately
         sayHold(ctx);
         const token = await deps.getGoogleToken();
         if (!token) {
           return { error: "Calendar authentication unavailable. Create an escalation." };
         }
-        try {
-          const slots = await checkAvailability(token, deps.googleCalendarId, startIso, endIso);
-          return { available: slots.slice(0, 5) };
-        } catch (err) {
-          console.error("[agent] checkAvailability failed:", err);
-          return { error: "Could not check availability. Create an escalation." };
+
+        const now = new Date();
+        const hours = deps.tenant.businessHours;
+        const policy = deps.tenant.bookingPolicy;
+
+        // A closed day is not a dead end. Say so, then keep looking forward —
+        // the caller still wants an appointment.
+        const closedNote =
+          preferredDate && !isOpenOn(hours, preferredDate)
+            ? `The business is closed on ${describeDate(preferredDate, timeZone)}. Say so, then offer these instead.`
+            : undefined;
+
+        const candidates = generateCandidateSlots({
+          hours,
+          policy,
+          service: matched,
+          timeZone,
+          now,
+          fromDate: preferredDate ?? undefined,
+          days: preferredDate && !closedNote ? 0 : DEFAULT_SEARCH_DAYS,
+          partOfDay,
+        });
+
+        if (candidates.length === 0) {
+          return {
+            slots: [],
+            note: `No times are available${
+              preferredDate ? ` around ${describeDate(preferredDate, timeZone)}` : ""
+            }. Offer to have the team call back, or create an escalation.`,
+          };
         }
+
+        let free = candidates;
+        try {
+          const busy = await fetchBusyRanges(
+            token,
+            deps.calendarExternalId,
+            candidates[0]!.blockStart.toISOString(),
+            candidates.at(-1)!.blockEnd.toISOString()
+          );
+          free = filterByBusy(candidates, busy);
+        } catch (err) {
+          console.error("[agent] freeBusy lookup failed:", err);
+          return { error: "Could not check the calendar. Create an escalation." };
+        }
+
+        if (free.length === 0) {
+          return {
+            slots: [],
+            note: "Everything in that window is booked. Offer a different day.",
+          };
+        }
+
+        const offered = free.slice(0, MAX_SLOTS_OFFERED).map((slot) => {
+          const slotId = `slot_${deps.slots.nextId++}`;
+          deps.slots.held.set(slotId, { slot, service: matched });
+          return { slotId, time: describeSlot(slot, timeZone) };
+        });
+
+        return {
+          service: matched.name,
+          slots: offered,
+          ...(closedNote ? { note: closedNote } : {}),
+        };
       },
     }),
 
     bookAppointment: llm.tool({
       description:
-        "Book a confirmed appointment after the caller has chosen a specific slot. Do not call this until the caller has explicitly confirmed the time.",
+        "Book one of the slots returned by checkAvailability, using its slotId. Only call this once the caller has confirmed a specific time. Never invent a slotId.",
       parameters: z.object({
-        service: z.string().describe("The service being booked."),
-        startIso: z.string().describe("Confirmed slot start in ISO 8601."),
-        endIso: z.string().describe("Confirmed slot end in ISO 8601."),
+        slotId: z.string().describe("The slotId of the time the caller chose."),
       }),
-      execute: async ({ service, startIso, endIso }, { ctx }) => {
+      execute: async ({ slotId }, { ctx }) => {
+        const held = deps.slots.held.get(slotId);
+        if (!held) {
+          // The model made one up, or referred to an offer from before a
+          // re-check. Either way, do not book something never offered.
+          return {
+            error:
+              "That time is no longer held. Call checkAvailability again and offer the caller a fresh set of times.",
+          };
+        }
+
         // sayHold fires FIRST — before any await — so the caller hears it immediately
         sayHold(ctx);
+        const { slot, service } = held;
         const token = await deps.getGoogleToken();
-        if (!token || !deps.googleCalendarId) {
-          await createAppointment({
-            tenantId,
-            clientId: deps.client?.id ?? null,
-            callerPhone: deps.callerPhone,
-            service,
-            startTime: new Date(startIso),
-            endTime: new Date(endIso),
-            status: "requested",
-          });
+
+        const appointmentBase = {
+          tenantId,
+          clientId: deps.client?.id ?? null,
+          callerPhone: deps.callerPhone,
+          serviceId: service.id,
+          service: service.name,
+          startTime: slot.start,
+          endTime: slot.end,
+        };
+
+        if (!token || !deps.calendarExternalId) {
+          await createAppointment({ ...appointmentBase, status: "requested" });
           deps.callState.wasBooked = true;
           return {
             booked: false,
             reason: "Calendar not connected — appointment request saved, team will confirm.",
           };
         }
+
         try {
-          const eventId = await createCalendarEvent(token, deps.googleCalendarId, {
-            summary: `${service} — ${deps.client?.name ?? deps.callerPhone ?? "caller ID withheld"}`,
-            startIso,
-            endIso,
-            timezone: deps.tenant.timezone,
+          // Re-check immediately before writing. The slot was computed when the
+          // caller was still deciding, and somebody may have taken it since —
+          // a walk-in, or the owner booking it by hand.
+          const busy = await fetchBusyRanges(
+            token,
+            deps.calendarExternalId,
+            slot.blockStart.toISOString(),
+            slot.blockEnd.toISOString()
+          );
+          if (filterByBusy([slot], busy).length === 0) {
+            deps.slots.held.delete(slotId);
+            return {
+              error:
+                "That time was taken while you were talking. Call checkAvailability again and offer what is left.",
+            };
+          }
+
+          const padded =
+            service.bufferBeforeMinutes > 0 || service.bufferAfterMinutes > 0
+              ? ` (appointment ${describeSlot(slot, timeZone)}; includes setup and cleanup)`
+              : "";
+
+          const eventId = await createCalendarEvent(token, deps.calendarExternalId, {
+            summary: `${service.name} — ${deps.client?.name ?? deps.callerPhone ?? "caller ID withheld"}`,
+            // The block, not the appointment: the event must reserve setup and
+            // cleanup or the next booking lands on top of them.
+            startIso: slot.blockStart.toISOString(),
+            endIso: slot.blockEnd.toISOString(),
+            timezone: timeZone,
+            description: `Booked by the AI receptionist${padded}`,
           });
+
           await createAppointment({
-            tenantId,
-            clientId: deps.client?.id ?? null,
-            callerPhone: deps.callerPhone,
-            service,
-            startTime: new Date(startIso),
-            endTime: new Date(endIso),
+            ...appointmentBase,
             status: "confirmed",
-            googleEventId: eventId,
+            externalEventId: eventId,
           });
           deps.callState.wasBooked = true;
-          return { booked: true, eventId };
+          deps.slots.held.delete(slotId);
+
+          return { booked: true, time: describeSlot(slot, timeZone) };
         } catch (err) {
           console.error("[agent] bookAppointment failed:", err);
-          await createAppointment({
-            tenantId,
-            clientId: deps.client?.id ?? null,
-            callerPhone: deps.callerPhone,
-            service,
-            startTime: new Date(startIso),
-            endTime: new Date(endIso),
-            status: "requested",
-          });
+          await createAppointment({ ...appointmentBase, status: "requested" });
           deps.callState.wasBooked = true;
           return {
             booked: false,
@@ -211,11 +326,11 @@ export function createAgentTools(deps: AgentDeps) {
         const cancelled = await cancelAppointmentById(appointmentId, tenantId);
         if (!cancelled) return { error: "Appointment not found." };
 
-        if (cancelled.googleEventId && deps.googleCalendarId) {
+        if (cancelled.externalEventId && deps.calendarExternalId) {
           const token = await deps.getGoogleToken();
           if (token) {
             try {
-              await deleteCalendarEvent(token, deps.googleCalendarId, cancelled.googleEventId);
+              await deleteCalendarEvent(token, deps.calendarExternalId, cancelled.externalEventId);
             } catch (err) {
               console.error("[agent] deleteCalendarEvent failed:", err);
             }

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { buildSystemPrompt } from "./prompt.js";
+import { DEFAULT_BUSINESS_HOURS } from "@receptionist/shared";
 import { makeAgentDeps, makeWorkerTenant } from "../test/agent-fixtures.js";
 
 /**
@@ -127,6 +128,78 @@ describe("buildSystemPrompt", () => {
       const prompt = buildSystemPrompt(makeAgentDeps({ callerPhone: null }));
       expect(prompt).not.toContain("null");
       expect(prompt.toLowerCase()).toContain("withheld");
+    });
+  });
+
+  describe("opening hours", () => {
+    it("states the weekly pattern in words a caller would hear", () => {
+      const prompt = buildSystemPrompt(makeAgentDeps());
+
+      // 24-hour time is for storage, not for saying out loud.
+      expect(prompt).toContain("Monday: 9:00 AM to 5:00 PM");
+      expect(prompt).not.toContain("Monday: 09:00");
+    });
+
+    it("says Closed for a day with no opening periods", () => {
+      // "Are you open Saturday?" was an escalation every time before hours
+      // existed — the agent had nothing to answer from.
+      expect(buildSystemPrompt(makeAgentDeps())).toContain("Sunday: Closed");
+    });
+
+    it("renders a lunch closure as two periods, not one long day", () => {
+      const tenant = makeWorkerTenant({
+        businessHours: {
+          weekly: {
+            ...DEFAULT_BUSINESS_HOURS.weekly,
+            mon: [
+              { start: "09:00", end: "13:00" },
+              { start: "14:00", end: "18:00" },
+            ],
+          },
+          exceptions: [],
+        },
+      });
+
+      expect(buildSystemPrompt(makeAgentDeps({ tenant }))).toContain(
+        "Monday: 9:00 AM to 1:00 PM, and 2:00 PM to 6:00 PM"
+      );
+    });
+
+    it("surfaces an exception falling inside the next seven days", () => {
+      // Frozen clock is Tuesday 18 Aug in New York; the 20th is inside the window.
+      const tenant = makeWorkerTenant({
+        businessHours: {
+          ...DEFAULT_BUSINESS_HOURS,
+          exceptions: [{ date: "2026-08-20", intervals: [], label: "Staff training" }],
+        },
+      });
+
+      const prompt = buildSystemPrompt(makeAgentDeps({ tenant }));
+      expect(prompt).toContain("2026-08-20 (Staff training): Closed");
+    });
+
+    it("omits an exception far outside the window — it is noise on every call", () => {
+      const tenant = makeWorkerTenant({
+        businessHours: {
+          ...DEFAULT_BUSINESS_HOURS,
+          exceptions: [{ date: "2026-12-25", intervals: [], label: "Christmas Day" }],
+        },
+      });
+
+      expect(buildSystemPrompt(makeAgentDeps({ tenant }))).not.toContain("Christmas Day");
+    });
+
+    it("keeps hours in the cacheable prefix, above the per-call caller block", () => {
+      const prompt = buildSystemPrompt(makeAgentDeps());
+      expect(prompt.indexOf("## Hours")).toBeLessThan(prompt.indexOf("## Caller"));
+    });
+  });
+
+  describe("services", () => {
+    it("states each service's length so the agent can answer without a tool call", () => {
+      const prompt = buildSystemPrompt(makeAgentDeps());
+      expect(prompt).toContain("Haircut: $45 (30 minutes)");
+      expect(prompt).toContain("Colour: $120 (120 minutes)");
     });
   });
 

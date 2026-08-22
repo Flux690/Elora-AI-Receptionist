@@ -7,28 +7,27 @@ import {
   voice,
 } from "@livekit/agents";
 import * as silero from "@livekit/agents-plugin-silero";
-import { createClerkClient } from "@clerk/backend";
 import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import type { CallOutcome } from "@receptionist/shared";
-import { env } from "../env.js";
 import { db, startDbKeepWarm } from "../db/client.js";
 import { calls as callsTable } from "../db/schema.js";
 import { upsertClient } from "../services/clients.js";
 import { createCall, finishCall } from "../services/calls.js";
 import { getTenantById, getTenantByPhoneNumber } from "../services/tenants.js";
 import { listKnowledgeForPrompt } from "../services/knowledge.js";
+import { listServices } from "../services/services.js";
 import { startCallRecording, stopCallRecording } from "../services/storage.js";
-import type { AgentDeps, CallState } from "./types.js";
+import { getGoogleOAuthToken } from "../services/googleAuth.js";
+import type { AgentDeps, CallState, SlotStore } from "./types.js";
 import type { KnowledgeEntry } from "./prompt.js";
 import { buildSessionConfig, buildKeyterms } from "./session-config.js";
 import { resolveCallerPhone } from "./caller.js";
+import { buildGreeting, DISCLOSURE_VERSION } from "./disclosure.js";
 import { ReceptionistAgent } from "./receptionist.js";
 import { CallMetrics } from "./metrics.js";
 import { extractTranscript } from "./transcript.js";
 import { generateCallSummary } from "./summary.js";
-
-const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
 
 // ── LRU cache ─────────────────────────────────────────────────────────────────
 // Map preserves insertion order, so the first key is always the least-recently-used.
@@ -58,12 +57,14 @@ const TENANT_CACHE_TTL_MS = 5 * 60 * 1000;
 
 type ResolvedTenant = {
   tenant: import("../services/tenants.js").WorkerTenant;
+  services: import("@receptionist/shared").Service[];
   knowledge: KnowledgeEntry[];
 };
 
-// Tenant and knowledge are cached together: both are read on every call, both
-// go into the system prompt, and both should expire at the same moment so a
-// config change and a new knowledge item propagate on the same 5-minute cycle.
+// Tenant, services and knowledge are cached together: all three are read on
+// every call, all three go into the system prompt, and all three should expire
+// at the same moment so a config change, a new service and a new knowledge item
+// propagate on the same 5-minute cycle.
 const tenantCache = new LRUCache<string, ResolvedTenant & { expiresAt: number }>(500);
 
 async function resolveTenant(idOrPhone: {
@@ -75,7 +76,11 @@ async function resolveTenant(idOrPhone: {
 
   const cached = tenantCache.get(cacheKey);
   if (cached && Date.now() < cached.expiresAt) {
-    return { tenant: cached.tenant, knowledge: cached.knowledge };
+    return {
+      tenant: cached.tenant,
+      services: cached.services,
+      knowledge: cached.knowledge,
+    };
   }
 
   const tenant = idOrPhone.tenantId
@@ -85,38 +90,21 @@ async function resolveTenant(idOrPhone: {
   if (!tenant) return null;
 
   // Second round trip on a cache miss only. The tenant id is not known until
-  // the first query resolves, so these cannot be parallelised on the
-  // phone-number path.
-  const knowledge = await listKnowledgeForPrompt(tenant.id);
+  // the first query resolves, so these cannot be parallelised with it on the
+  // phone-number path — but they can be parallelised with each other, so the
+  // services read costs no extra wall-clock time on the path to first audio.
+  const [services, knowledge] = await Promise.all([
+    listServices(tenant.id),
+    listKnowledgeForPrompt(tenant.id),
+  ]);
 
   tenantCache.set(cacheKey, {
     tenant,
+    services,
     knowledge,
     expiresAt: Date.now() + TENANT_CACHE_TTL_MS,
   });
-  return { tenant, knowledge };
-}
-
-// ── Google OAuth token cache ──────────────────────────────────────────────────
-// Google access tokens are valid for 60 minutes; cache for 50 to avoid expiry
-// races. Clerk refreshes under the hood when we call getUserOauthAccessToken —
-// caching skips that network round-trip on every inbound call.
-const OAUTH_TOKEN_CACHE_TTL_MS = 50 * 60 * 1000;
-const oauthTokenCache = new LRUCache<string, { token: string; expiresAt: number }>(200);
-
-async function getGoogleOAuthToken(clerkUserId: string): Promise<string | null> {
-  const cached = oauthTokenCache.get(clerkUserId);
-  if (cached && Date.now() < cached.expiresAt) return cached.token;
-
-  try {
-    const r = await clerkClient.users.getUserOauthAccessToken(clerkUserId, "google");
-    const token = r.data[0]?.token ?? null;
-    if (token) oauthTokenCache.set(clerkUserId, { token, expiresAt: Date.now() + OAUTH_TOKEN_CACHE_TTL_MS });
-    return token;
-  } catch (err) {
-    console.error("[worker] Failed to fetch Google OAuth token:", err);
-    return null;
-  }
+  return { tenant, services, knowledge };
 }
 
 // ── Egress stop with retry ────────────────────────────────────────────────────
@@ -186,13 +174,13 @@ export default defineAgent({
       console.error(`[worker] tenant not found — dropping`);
       return;
     }
-    const { tenant, knowledge } = resolved;
+    const { tenant, services, knowledge } = resolved;
     console.log(`[worker] resolved tenant: ${tenant.id}${isTestSession ? " (test session)" : ""}`);
 
     // 3. Fire Google OAuth token fetch in background (no await — resolves while greeting plays).
     //    Token is cached at module level with a 50-minute TTL so repeat calls skip the network.
     const tokenPromise: Promise<string | null> =
-      tenant.googleCalendarId && tenant.clerkUserId
+      tenant.calendarExternalId && tenant.clerkUserId
         ? getGoogleOAuthToken(tenant.clerkUserId)
         : Promise.resolve(null);
 
@@ -204,6 +192,10 @@ export default defineAgent({
     //    Tools fire only after caller speaks + LLM responds, so client will
     //    always be populated by the time any tool execute() runs.
     const callState: CallState = { wasBooked: false, wasEscalated: false };
+    // Slots the agent offers during this call. In memory and per call: an offer
+    // is only good while the conversation lasts, and booking re-checks the
+    // calendar anyway.
+    const slots: SlotStore = { held: new Map(), nextId: 1 };
 
     // Deferred rather than started here: creating it now keeps the DB write off
     // the path to first audio, while still giving tools something to await.
@@ -217,14 +209,16 @@ export default defineAgent({
 
     const deps: AgentDeps = {
       tenant,
+      services,
       client: null,
       callerPhone,
       callId,
       getGoogleToken: () => tokenPromise,
-      googleCalendarId: tenant.googleCalendarId ?? null,
+      calendarExternalId: tenant.calendarExternalId ?? null,
       knowledge,
       callRowReady,
       callState,
+      slots,
     };
 
     // 6. Build the pipeline. See session-config.ts for why turnDetection is
@@ -232,7 +226,7 @@ export default defineAgent({
     const { sessionOptions, inputOptions } = buildSessionConfig({
       isTestSession,
       vad: ctx.proc.userData.vad as silero.VAD,
-      keyterms: buildKeyterms(tenant.name, tenant.services.map((s) => s.name)),
+      keyterms: buildKeyterms(tenant.name, services.map((s) => s.name)),
     });
 
     // 7. Create and start session
@@ -334,10 +328,12 @@ export default defineAgent({
     });
 
     // 9. ── GREETING ──────────────────────────────────────────────────────────
-    const greeting = tenant.agentProfile.greeting;
-    if (greeting) {
-      session.say(greeting, { allowInterruptions: false });
-    }
+    // The platform disclosure always leads, including in browser test sessions:
+    // the owner should hear exactly what their callers hear, and the part they
+    // cannot edit is the part most worth them knowing about.
+    session.say(buildGreeting(tenant.agentProfile.greeting), {
+      allowInterruptions: false,
+    });
 
     // 10. Recording + DB writes — skipped for test sessions
     if (!isTestSession) {
@@ -364,6 +360,7 @@ export default defineAgent({
             clientId: null,
             callerPhone,
             livekitRoomName: roomName,
+            disclosureVersion: DISCLOSURE_VERSION,
           }),
         ]);
         markCallRowReady(true);

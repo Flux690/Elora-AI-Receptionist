@@ -2,6 +2,7 @@ import { getAuth } from "@clerk/hono";
 import { createClerkClient } from "@clerk/backend";
 import type { Context } from "hono";
 import { createTenant } from "../services/tenants.js";
+import { replaceServices } from "../services/services.js";
 import {
   searchPhoneNumbers,
   purchasePhoneNumber,
@@ -26,14 +27,21 @@ export async function create(c: Context) {
   const parsed = onboardingCreateSchema.safeParse(await c.req.json());
   if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400);
 
-  const { phoneNumber, ...tenantData } = parsed.data;
+  const { phoneNumber, services, ...tenantData } = parsed.data;
 
   // 1. Purchase first — if this fails, nothing hits the DB
   const purchased = await purchasePhoneNumber(phoneNumber);
 
-  // 2. Create tenant atomically — if DB fails, release the number
+  // 2. Create tenant atomically — if DB fails, release the number.
+  //    Services live in their own table now, so they are a second write; it is
+  //    inside the same try so a failure still releases the purchased number.
   try {
-    await createTenant({ clerkUserId: auth.userId, phoneNumber: purchased.e164_format, ...tenantData });
+    const tenant = await createTenant({
+      clerkUserId: auth.userId,
+      phoneNumber: purchased.e164_format,
+      ...tenantData,
+    });
+    if (services.length > 0) await replaceServices(tenant.id, services);
   } catch (dbErr) {
     await releasePhoneNumber(purchased.e164_format).catch((e) => console.error("[onboarding] rollback release failed:", e));
     throw dbErr;

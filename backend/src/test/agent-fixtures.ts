@@ -1,6 +1,7 @@
 import type { AgentDeps } from "../agent/types.js";
 import type { WorkerTenant } from "../services/tenants.js";
 import { AGENT_PROFILE, SERVICES } from "./factories.js";
+import { DEFAULT_BUSINESS_HOURS, DEFAULT_BOOKING_POLICY } from "@receptionist/shared";
 
 /**
  * Pure fixtures for agent-level unit tests. Deliberately touches no database —
@@ -15,11 +16,14 @@ export function makeWorkerTenant(overrides: Partial<WorkerTenant> = {}): WorkerT
     industry: "salon",
     timezone: "America/New_York",
     description: "A test salon.",
-    services: SERVICES,
+    businessHours: DEFAULT_BUSINESS_HOURS,
+    bookingPolicy: DEFAULT_BOOKING_POLICY,
     agentProfile: AGENT_PROFILE,
     phoneNumber: "+15550000000",
     clerkUserId: "user_test",
-    googleCalendarId: null,
+    calendarProvider: null,
+    calendarExternalId: null,
+    calendarPayload: null,
     ...overrides,
   };
 }
@@ -27,15 +31,17 @@ export function makeWorkerTenant(overrides: Partial<WorkerTenant> = {}): WorkerT
 export function makeAgentDeps(overrides: Partial<AgentDeps> = {}): AgentDeps {
   return {
     tenant: makeWorkerTenant(),
+    services: SERVICES,
     client: null,
     callerPhone: "+14155550123",
     callId: "22222222-2222-2222-2222-222222222222",
     getGoogleToken: async () => null,
-    googleCalendarId: null,
+    calendarExternalId: null,
     knowledge: [],
     // Fixtures default to the row already existing, which is the normal case.
     callRowReady: Promise.resolve(true),
     callState: { wasBooked: false, wasEscalated: false },
+    slots: { held: new Map(), nextId: 1 },
     ...overrides,
   };
 }
