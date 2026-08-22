@@ -90,7 +90,7 @@ export function BusinessTab({ settings }: { settings: AppSettings }) {
 
   return (
     <div>
-      <Section title="Business details" lede="What your agent tells callers about you.">
+      <Section>
         <Field
           label="Business name"
           help="Said out loud when the agent answers."
@@ -139,7 +139,7 @@ export function BusinessTab({ settings }: { settings: AppSettings }) {
         </Field>
       </Section>
 
-      <Section title="About" lede="Answers to the things callers ask that aren't bookings.">
+      <Section>
         <Field
           label="Description"
           help="Parking, who you are, how long you've been open."
@@ -160,11 +160,11 @@ export function BusinessTab({ settings }: { settings: AppSettings }) {
         </div>
       </Section>
 
-      <Section layout="gutter" title="Services" lede="What you offer, and how long each one takes.">
+      <Section title="Services" lede="What you offer, and how long each one takes.">
         <ServicesSection services={settings.business.services} />
       </Section>
 
-      <Section title="Connections" lede="Where calls arrive, and where bookings go.">
+      <Section>
         {settings.business.phoneNumber ? (
           <div>
             <span className="text-sm font-medium text-foreground">Phone number</span>

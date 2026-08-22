@@ -44,7 +44,7 @@ export function AccountTab() {
 
   return (
     <div>
-      <Section title="You" lede="Your sign-in, not the business.">
+      <Section>
         <div className="flex items-center gap-3.5">
           {user?.imageUrl && (
             <img
@@ -83,7 +83,7 @@ export function AccountTab() {
 
         <Field
           label="Email"
-          help="Used to sign in. Changing it needs re-verification."
+          help="You sign in with Google, so this is managed by your Google account."
           htmlFor="email"
         >
           <Input

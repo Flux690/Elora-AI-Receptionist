@@ -9,7 +9,10 @@ Built as a multi-tenant B2B SaaS.
 - **Real phone calls** - LiveKit Phone Numbers, no SIP trunk setup required
 - **Answers from context** - services, pricing, business details *and the whole knowledge base* baked into the system prompt at call start, so no tool call and no retrieval round trip
 - **Knowledge base** - question/answer pairs built from resolved escalations, inlined into the prompt (pgvector and the HNSW index remain for when a tenant outgrows the prompt)
-- **Appointment booking** - checks Google Calendar availability and creates confirmed events by voice
+- **Real opening hours** - a weekly pattern with lunch closures, days you're shut, and one-off dates for holidays. Your agent answers "are you open Saturday?" without asking you
+- **Services with real durations** - each one has its own length, plus optional setup and cleanup time that blocks your calendar without the caller ever hearing about it
+- **Appointment booking that respects both** - the agent only offers times you're actually open, long enough for the service booked, and free on your calendar. It re-checks the moment before it books, so a slot taken mid-conversation doesn't become a double booking
+- **AI disclosure on every call** - callers are told they're speaking to an AI on a recorded line before anything else is said. Required by law in several US states
 - **Escalation loop** - unanswerable questions flagged for admin review; resolved answers auto-populate the knowledge base
 - **Call recordings** - every call recorded with full transcript and AI-generated summary
 - **In-browser agent test** - talk to your agent live from the dashboard, no phone call (no recording, no call log)
@@ -23,11 +26,15 @@ Built as a multi-tenant B2B SaaS.
 2. LiveKit routes the call to the AI agent worker via SIP
 3. Agent resolves the tenant from the number dialed, builds a system prompt with business context, and greets the caller
 4. STT → LLM → TTS pipeline handles the conversation; the audio turn detector decides when the caller has finished
-5. Pricing, hours and knowledge-base answers come straight from the system prompt - no tool calls needed
+5. Pricing, opening hours and knowledge-base answers come straight from the system prompt - no tool calls needed
 6. Genuinely unknown questions are flagged for admin review
-7. Bookings: availability checked against Google Calendar, confirmed event created by voice
+7. Bookings: the agent asks what service and roughly when, the backend works out which slots actually exist from your hours and that service's length, and reads back two or three. The caller picks one and it's confirmed into your calendar
 8. On hang-up: transcript extracted, summary generated, call record finalized
 
+
+## Versioning
+
+`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.0**.
 
 ## Screenshots
 
@@ -190,8 +197,15 @@ Admin - `Authorization: Bearer <clerk_jwt>` required:
 | GET | `/api/admin/knowledge` | Knowledge base items |
 | DELETE | `/api/admin/knowledge/:id` | Delete knowledge item |
 | GET | `/api/admin/appointments` | Appointment list |
-| GET | `/api/admin/settings` | Tenant settings |
-| PATCH | `/api/admin/settings` | Update settings |
+| GET | `/api/admin/services` | Services, in display order |
+| POST | `/api/admin/services` | Add a service |
+| PATCH | `/api/admin/services/:id` | Update a service |
+| DELETE | `/api/admin/services/:id` | Remove a service |
+| GET | `/api/admin/calendar/list` | Calendars the connected Google account can write to |
+| PATCH | `/api/admin/calendar` | Choose which calendar holds appointments |
+| DELETE | `/api/admin/calendar` | Disconnect the calendar |
+| GET | `/api/admin/settings` | Tenant settings, opening hours and booking window |
+| PATCH | `/api/admin/settings` | Update settings, hours or booking window |
 | GET | `/api/admin/phone/search?areaCode=415` | Search available numbers (`areaCode` optional) |
 | POST | `/api/admin/phone/provision` | Purchase phone number |
 | DELETE | `/api/admin/phone` | Release phone number |

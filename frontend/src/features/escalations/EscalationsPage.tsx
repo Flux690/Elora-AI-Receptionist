@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FilterPills } from '@/components/ui/filter-pills'
 import { PageContainer } from '@/layout/PageContainer'
+import { PageHeader } from '@/layout/PageHeader'
 import { EmptyState } from '@/layout/EmptyState'
 import { apiClient } from '@/lib/apiClient'
 import { keys, fetchers } from '@/lib/queries'
@@ -24,11 +25,7 @@ function isStatus(v: string | null): v is EscalationStatus {
   return v === 'pending' || v === 'resolved'
 }
 
-interface AnswerFormProps {
-  escalation: EscalationItem
-}
-
-function AnswerForm({ escalation }: AnswerFormProps) {
+function AnswerForm({ escalation }: { escalation: EscalationItem }) {
   const [answer, setAnswer] = useState('')
   const qc = useQueryClient()
 
@@ -43,37 +40,41 @@ function AnswerForm({ escalation }: AnswerFormProps) {
       qc.invalidateQueries({ queryKey: ['metrics'] })
       qc.invalidateQueries({ queryKey: keys.knowledge })
       setAnswer('')
-      toast.success('Saved — the next caller who asks will get it')
+      toast.success('Answered — the next caller who asks will get it')
     },
     onError: (err: unknown) => {
       const message =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Failed to resolve escalation. Try again.'
+        'Could not save that answer. Try again.'
       toast.error(message)
     },
   })
 
   return (
     <div className="mt-7">
-      <h2 className="text-base font-semibold tracking-tight text-foreground">Your answer</h2>
-      {/* A border and no fill. The card underneath is already white; a second
-          fill here would be a surface for something that is not an object. */}
+      <label
+        htmlFor="answer"
+        className="text-sm font-medium text-foreground"
+      >
+        Your answer
+      </label>
+      <p className="mt-px text-sm text-muted-foreground">
+        Saved to your knowledge base, so the agent can answer it on the next call.
+      </p>
       <Textarea
+        id="answer"
         value={answer}
         onChange={(e) => setAnswer(e.target.value)}
         placeholder="Type your answer here…"
-        className="mt-2 min-h-24 resize-none bg-transparent"
+        className="mt-2.5 min-h-28 resize-none"
       />
-      <div className="mt-3 flex items-center gap-3">
+      <div className="mt-3">
         <Button
           onClick={() => resolve.mutate(answer)}
           disabled={!answer.trim() || resolve.isPending}
         >
-          {resolve.isPending ? 'Saving…' : 'Save & teach Zen'}
+          {resolve.isPending ? 'Saving…' : 'Save answer'}
         </Button>
-        <p className="text-sm text-muted-foreground">
-          Answering this adds it to your agent&rsquo;s knowledge.
-        </p>
       </div>
     </div>
   )
@@ -88,10 +89,7 @@ export default function EscalationsPage() {
   const { data, isLoading } = useQuery({
     queryKey: keys.escalations(status),
     queryFn: () => fetchers.escalations(status),
-    /* Hold the previous list while the new filter loads. Without this, each
-       toggle is a fresh query key with no cache, so `isLoading` flips true and
-       the whole view — including the panel explaining what the page is for —
-       is torn down and replaced by skeletons for a beat. Switching a filter
+    /* Hold the previous list while the new filter loads. Switching a filter
        should narrow a list, not empty the screen. */
     placeholderData: (prev) => prev,
   })
@@ -100,25 +98,26 @@ export default function EscalationsPage() {
   const selectedId = params.get('escalation')
   const selected = escalations.find((e) => e.id === selectedId) ?? escalations[0]
 
-  function update(next: URLSearchParams) {
-    setParams(next, { replace: true })
-  }
-
   function setStatus(s: EscalationStatus) {
     const next = new URLSearchParams(params)
     next.set('status', s)
     next.delete('escalation')
-    update(next)
+    setParams(next, { replace: true })
   }
 
   function select(id: string) {
     const next = new URLSearchParams(params)
     next.set('escalation', id)
-    update(next)
+    setParams(next, { replace: true })
   }
 
   return (
     <PageContainer size="page" className="flex flex-1 flex-col">
+      <PageHeader
+        title="Escalations"
+        description="Questions your agent could not answer. Answer one and it never has to ask you again."
+      />
+
       <FilterPills options={STATUSES} value={status} onChange={setStatus} />
 
       {isLoading ? (
@@ -130,67 +129,68 @@ export default function EscalationsPage() {
       ) : escalations.length === 0 ? (
         <EmptyState
           icon={Inbox}
-          title="Escalations"
-          description="When a caller asks something your agent has no answer for, it lands here. Answer it once and your agent has it for every caller after that." 
+          title={status === 'pending' ? 'Nothing waiting on you' : 'Nothing answered yet'}
+          description={
+            status === 'pending'
+              ? 'When a caller asks something your agent has no answer for, it lands here.'
+              : 'Answers you give show up here, and in your knowledge base.'
+          }
         />
       ) : (
-        /* List and detail. Selection is carried by a fill, not a border or a
-           chevron — the list stays a list and the answer gets room to be read. */
-        <div className="mt-6 flex flex-1 gap-8">
-          <div className="flex w-[330px] shrink-0 flex-col gap-0.5">
+        /* A list and the one you are reading. Selection is a fill, so the list
+           stays a list and the answer gets room to be read. */
+        <div className="mt-5 flex flex-1 gap-10">
+          {/* The same 2px the sidebar rows use. Without it two hovered rows
+               touch and you read the edge of the fill as a border. */}
+          <div className="flex w-[320px] shrink-0 flex-col gap-0.5">
             {escalations.map((e: EscalationItem) => (
               <button
                 key={e.id}
                 onClick={() => select(e.id)}
+                aria-current={selected?.id === e.id}
                 className={cn(
-                  'rounded-lg p-3 text-left transition-colors',
-                  selected?.id === e.id ? 'bg-sunk' : 'hover:bg-hover',
+                  // Everything else on the page uses the 8px radius; a square
+                  // fill here was the one thing that did not.
+                  'group rounded-lg px-3 py-2.5 text-left transition-colors',
+                  selected?.id === e.id ? 'bg-sunk-1' : 'hover:bg-hover',
                 )}
               >
-                <div className="flex items-center gap-2">
+                <p className="text-sm font-medium leading-snug text-foreground">
+                  {e.question}
+                </p>
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
                   {e.status === 'pending' && (
                     <span className="size-1.5 shrink-0 rounded-full bg-accent-ink" />
                   )}
-                  <span className="text-sm text-muted-foreground">
-                    {formatDateTime(e.createdAt)}
-                  </span>
-                </div>
-                <p className="mt-1.5 text-sm font-medium leading-snug text-foreground">
-                  {e.question}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {e.callerPhone ? formatPhone(e.callerPhone) : 'Caller ID withheld'}
+                  <span className="tabular-nums">{formatDateTime(e.createdAt)}</span>
                 </p>
               </button>
             ))}
           </div>
 
           {selected && (
-            /* The one card on this screen. An escalation genuinely is an
-               object: it arrives, it waits, and you act on it. */
             <div className="min-w-0 flex-1">
-              <div className="max-w-[660px] rounded-lg border border-input bg-card p-6">
-                <div className="flex items-center gap-2">
+              <div className="max-w-[620px]">
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
                   {selected.status === 'pending' && (
                     <span className="size-1.5 shrink-0 rounded-full bg-accent-ink" />
                   )}
-                  <span className="text-sm text-muted-foreground">
-                    {formatDateTime(selected.createdAt)} ·{' '}
+                  <span className="tabular-nums">{formatDateTime(selected.createdAt)}</span>
+                  <span aria-hidden>·</span>
+                  <span className="tabular-nums">
                     {selected.callerPhone
                       ? formatPhone(selected.callerPhone)
-                      : 'caller ID withheld'}
+                      : 'Caller ID withheld'}
                   </span>
-                </div>
+                </p>
 
-                <h2 className="mt-3 text-lg font-semibold leading-snug tracking-tight text-foreground">
+                <h2 className="mt-2 text-lg font-semibold leading-snug tracking-tight text-foreground">
                   {selected.question}
                 </h2>
 
                 {selected.status === 'resolved' && selected.answer ? (
-                  <div className="mt-6">
-                    <h3 className="text-base font-semibold tracking-tight text-foreground">
-                      Your answer
-                    </h3>
+                  <div className="mt-7">
+                    <h3 className="text-sm font-medium text-foreground">Your answer</h3>
                     <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-secondary-foreground">
                       {selected.answer}
                     </p>

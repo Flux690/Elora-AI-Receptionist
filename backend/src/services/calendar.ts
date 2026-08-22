@@ -4,6 +4,14 @@ const GOOGLE_CALENDAR_BASE = "https://www.googleapis.com/calendar/v3";
 
 export type BusyRange = { start: Date; end: Date };
 
+/** Raised when the token is valid but was minted without the calendar scope. */
+export class CalendarScopeMissingError extends Error {
+  constructor() {
+    super("[calendar] the Google token carries no calendar scope");
+    this.name = "CalendarScopeMissingError";
+  }
+}
+
 /**
  * The calendars the connected Google account can write to.
  *
@@ -21,6 +29,15 @@ export async function listCalendars(accessToken: string): Promise<CalendarOption
     `${GOOGLE_CALENDAR_BASE}/users/me/calendarList?minAccessRole=writer`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
+
+  // Signing in with Google mints a token with `email profile openid` and nothing
+  // else, so every tenant who has not yet pressed Connect has a perfectly valid
+  // token that Google refuses for calendar reads. That is the normal state of a
+  // disconnected account, and it was surfacing as an unhandled 500 on every
+  // Settings load — noise in the log and a broken picker in the dashboard.
+  if (res.status === 401 || res.status === 403) {
+    throw new CalendarScopeMissingError();
+  }
 
   if (!res.ok) {
     const body = await res.text();

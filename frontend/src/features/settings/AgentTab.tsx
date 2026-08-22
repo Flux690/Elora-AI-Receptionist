@@ -69,7 +69,7 @@ export function AgentTab({ settings }: { settings: AppSettings }) {
         </p>
       </Section>
 
-      <Section title="Voice" lede="How your agent introduces itself on a call.">
+      <Section>
         <Field label="Agent name" help="How it introduces itself." htmlFor="agent-name">
           <Input
             id="agent-name"

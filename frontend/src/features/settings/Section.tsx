@@ -4,7 +4,12 @@ import { cn } from '@/lib/utils'
 type Layout = 'stacked' | 'gutter'
 
 interface SectionProps {
-  title: string
+  /**
+   * Omit it when the fields already say what they are. A heading reading
+   * "Business details" above a field labelled "Business name" is the same
+   * sentence twice, and the rule between sections already groups them.
+   */
+  title?: string
   lede?: string
   /**
    * `stacked` — the heading sits above its fields. The default, and right for a
@@ -28,17 +33,22 @@ export function Section({
   children,
   className,
 }: SectionProps) {
-  const heading = (
+  const heading = title ? (
     <div className={layout === 'gutter' ? undefined : 'mb-5'}>
       <h2 className="text-sm font-semibold tracking-tight text-foreground">{title}</h2>
       {lede && <p className="mt-1 text-sm text-muted-foreground">{lede}</p>}
     </div>
+  ) : (
+    // The gutter still needs its left column to exist, or the fields slide into it.
+    layout === 'gutter' ? <div /> : null
   )
 
   return (
     <section
       className={cn(
-        'border-t border-border py-8 first:border-t-0 first:pt-0',
+        // No rule between sections. Space groups them; a line only adds
+        // furniture to a page that is already a short list of fields.
+        'pb-10 first:pt-0',
         layout === 'gutter' && 'grid grid-cols-[196px_1fr] items-start gap-x-11',
         className,
       )}

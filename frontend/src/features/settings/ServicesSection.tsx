@@ -6,7 +6,7 @@ import type { Service, ServiceDraft } from '@receptionist/shared'
 import { Button } from '@/components/ui/button'
 import { apiClient } from '@/lib/apiClient'
 import { keys } from '@/lib/queries'
-import { ServiceRow, emptyService } from './ServiceRow'
+import { ServiceRow, ServiceCaptions, emptyService } from './ServiceRow'
 
 /**
  * A row being edited: an existing service still carries its id, a new one does
@@ -83,20 +83,19 @@ export function ServicesSection({ services }: { services: Service[] }) {
   const unnamed = rows.some((r) => !r.name.trim())
 
   return (
-    <div className="flex flex-col gap-3">
-
+    <div>
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No services yet. Your agent needs these to quote prices and work out how
           long a booking takes.
         </p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div>
+          <ServiceCaptions />
           {rows.map((row, i) => (
             <ServiceRow
               key={row.id ?? `new-${i}`}
               service={row}
-              showBuffers
               onChange={(patch) => update(i, patch)}
               onRemove={() => remove(i)}
             />
@@ -104,9 +103,13 @@ export function ServicesSection({ services }: { services: Service[] }) {
         </div>
       )}
 
-      <div className="flex items-center gap-3">
+      <p className="mt-3 text-sm text-muted-foreground">
+        Minutes. Setup and cleanup block your calendar; callers never hear them.
+      </p>
+
+      <div className="mt-4 flex items-center gap-3">
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
           onClick={() => setRows((rs) => [...rs, emptyService()])}
         >
@@ -115,9 +118,7 @@ export function ServicesSection({ services }: { services: Service[] }) {
         </Button>
         <div className="flex-1" />
         {unnamed && (
-          <p className="text-sm text-muted-foreground">
-            Every service needs a name before this can be saved.
-          </p>
+          <p className="text-sm text-muted-foreground">Every service needs a name.</p>
         )}
         <Button onClick={() => save.mutate()} disabled={save.isPending || unnamed}>
           {save.isPending ? 'Saving…' : 'Save services'}

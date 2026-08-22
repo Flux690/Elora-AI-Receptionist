@@ -43,69 +43,64 @@ export default function CallDetailPage() {
           <Skeleton className="h-52 w-full" />
         </div>
       ) : (
-        <div className="mt-6 flex gap-10">
-          <div className="w-[540px] shrink-0">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h1 className="text-xl font-semibold tracking-tight text-foreground">
-                  {call.callerPhone ? formatPhone(call.callerPhone) : 'Caller ID withheld'}
-                </h1>
-                <p className="mt-1.5 text-sm text-muted-foreground">
-                  {formatDateTime(call.startedAt)}
-                  {formatDuration(call.startedAt, call.endedAt) && (
-                    <> · {formatDuration(call.startedAt, call.endedAt)}</>
-                  )}
-                </p>
-              </div>
-              <StatusBadge value={call.outcome} config={callOutcomeConfig} />
+        /* One column. The summary sat in a second column beside the
+           transcript, which put the thing you read first furthest from the
+           thing that identifies the call, and left a tall empty gutter on any
+           call short enough not to have much of a transcript. */
+        <div className="mt-6 max-w-[640px]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight text-foreground">
+                {call.callerPhone ? formatPhone(call.callerPhone) : 'Caller ID withheld'}
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground tabular-nums">
+                {formatDateTime(call.startedAt)}
+                {formatDuration(call.startedAt, call.endedAt) && (
+                  <> · {formatDuration(call.startedAt, call.endedAt)}</>
+                )}
+              </p>
             </div>
-
-            <div className="mt-5">
-              <AudioPlayer callId={id} hasRecording={!!call.recordingUrl} />
-            </div>
-
-            <h2 className="mt-7 text-base font-semibold tracking-tight text-foreground">
-              Transcript
-            </h2>
-            {/* Plain text. These were buttons that seeked the audio; they are
-                not focusable and not announced as interactive any more. */}
-            <div className="mt-2 flex flex-col">
-              {call.transcript?.length ? (
-                call.transcript.map((entry, i) => (
-                  <div key={i} className="grid grid-cols-[58px_1fr] gap-4 py-2">
-                    <span className="text-sm text-muted-foreground">
-                      {entry.role === 'user' ? 'Caller' : 'Agent'}
-                    </span>
-                    <span
-                      className={
-                        entry.role === 'user'
-                          ? 'text-sm leading-relaxed text-foreground'
-                          : 'text-sm leading-relaxed text-secondary-foreground'
-                      }
-                    >
-                      {entry.text}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No transcript was captured for this call.
-                </p>
-              )}
-            </div>
+            <StatusBadge value={call.outcome} config={callOutcomeConfig} />
           </div>
 
-          <div className="min-w-0 flex-1">
-            <h2 className="text-base font-semibold tracking-tight text-foreground">
-              Summary
-            </h2>
-            <p className="mt-2 text-sm leading-relaxed text-secondary-foreground">
-              {call.summary || (
-                <span className="text-muted-foreground">
-                  This call was too short to summarise.
-                </span>
-              )}
-            </p>
+          <p className="mt-4 text-sm leading-relaxed text-secondary-foreground">
+            {call.summary || (
+              <span className="text-muted-foreground">
+                This call was too short to summarise.
+              </span>
+            )}
+          </p>
+
+          <div className="mt-6">
+            <AudioPlayer callId={id} hasRecording={!!call.recordingUrl} />
+          </div>
+
+          <h2 className="mt-8 text-sm font-medium text-foreground">Transcript</h2>
+          {/* Plain text. These were buttons that seeked the audio; they are
+              not focusable and not announced as interactive any more. */}
+          <div className="mt-2 flex flex-col">
+            {call.transcript?.length ? (
+              call.transcript.map((entry, i) => (
+                <div key={i} className="grid grid-cols-[58px_1fr] gap-4 py-2">
+                  <span className="text-sm text-muted-foreground">
+                    {entry.role === 'user' ? 'Caller' : 'Agent'}
+                  </span>
+                  <span
+                    className={
+                      entry.role === 'user'
+                        ? 'text-sm leading-relaxed text-foreground'
+                        : 'text-sm leading-relaxed text-secondary-foreground'
+                    }
+                  >
+                    {entry.text}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No transcript was captured for this call.
+              </p>
+            )}
           </div>
         </div>
       )}

@@ -5,6 +5,7 @@ import type { AppointmentItem } from '@receptionist/shared'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { PageContainer } from '@/layout/PageContainer'
+import { PageHeader } from '@/layout/PageHeader'
 import { EmptyState } from '@/layout/EmptyState'
 import { keys, fetchers } from '@/lib/queries'
 import { formatPhone, formatDateTime } from '@/lib/formatters'
@@ -20,6 +21,11 @@ export default function AppointmentsPage() {
 
   return (
     <PageContainer size="page" className="flex flex-col flex-1">
+      <PageHeader
+        title="Appointments"
+        description="Everything your agent has booked, newest first."
+      />
+
       {!isLoading && appointments.length === 0 && (
         <EmptyState
           icon={Calendar}

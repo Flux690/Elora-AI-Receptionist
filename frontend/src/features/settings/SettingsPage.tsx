@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PageContainer } from '@/layout/PageContainer'
+import { PageHeader } from '@/layout/PageHeader'
 import { keys, fetchers } from '@/lib/queries'
 import { BusinessTab } from './BusinessTab'
 import { HoursTab } from './HoursTab'
@@ -33,22 +34,16 @@ export default function SettingsPage() {
 
   return (
     <PageContainer size="form">
-      <h1 className="mb-6 text-xl font-semibold tracking-tight text-foreground">Settings</h1>
+      <PageHeader title="Settings" />
 
       <Tabs
         value={tab}
         onValueChange={(v) => isTabId(v) && setTab(v)}
         className="gap-6"
       >
-        {/* The list is sized to its labels and sits top-left; the rule belongs
-            to the row beneath it, which is what the active tab's underline sits
-            on. Without that rule the indicator floats 5px under a tab with
-            nothing to meet, which reads as no indicator at all. */}
-        <TabsList
-          variant="line"
-          className="justify-start rounded-none border-b border-border w-full"
-          aria-label="Settings sections"
-        >
+        {/* Sized to its labels, top-left, and carrying no rule of its own. The
+            only mark is the underline under whichever option you are on. */}
+        <TabsList variant="line" className="justify-start rounded-none" aria-label="Settings sections">
           <TabsTrigger value="business" className="flex-none">Business</TabsTrigger>
           <TabsTrigger value="hours" className="flex-none">Hours</TabsTrigger>
           <TabsTrigger value="agent" className="flex-none">Agent</TabsTrigger>

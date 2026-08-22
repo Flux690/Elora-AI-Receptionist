@@ -8,15 +8,25 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
+        /* `[a]:hover:` only fired when the button rendered as an anchor, so an
+           ordinary primary button had no hover state at all. */
+        default:
+          "bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary",
+        /* Rest sits on --control, the lightest rung, so the control is raised
+           above the stage rather than the same colour as it. Hover and active
+           sink it in two steps. It used to rest on --background — the ground,
+           the DARKEST surface — and lighten on hover, which is the movement
+           inverted. */
         outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+          "border-border bg-control hover:bg-control-hover active:bg-control-active hover:text-foreground aria-expanded:bg-control-hover aria-expanded:text-foreground",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+          "bg-control text-secondary-foreground hover:bg-control-hover active:bg-control-active aria-expanded:bg-control-hover aria-expanded:text-secondary-foreground",
+        /* No fill at rest — a ghost is only a control once you point at it —
+           then the same two steps as everything else. */
         ghost:
-          "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
+          "hover:bg-hover active:bg-active hover:text-foreground aria-expanded:bg-hover aria-expanded:text-foreground",
         destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:",
+          "bg-destructive/10 text-destructive hover:bg-destructive/20 active:bg-destructive/30 focus-visible:border-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

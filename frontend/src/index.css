@@ -39,8 +39,12 @@
 
   /* Rungs BELOW the ground. Light darkens to signal state where dark lightens,
      and it takes it in two small steps rather than one leap. */
-  --n-2a: oklch(0.978 0.005 92);
-  --n-2b: oklch(0.966 0.005 92);
+  /* A control rests ABOVE the stage and sinks BELOW it when pressed. The old
+     values sank it to 0.978 and 0.966 against a stage of 0.972 — the first step
+     was still lighter than the page, so hovering a button changed almost
+     nothing and the control read as painted onto the background. */
+  --n-2a: oklch(0.966 0.006 92);
+  --n-2b: oklch(0.940 0.007 92);
   --sunk-1: oklch(0.904 0.008 92);
   --sunk: oklch(0.885 0.009 92);
 

@@ -6,6 +6,7 @@ import type { KnowledgeItem } from '@receptionist/shared'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PageContainer } from '@/layout/PageContainer'
+import { PageHeader } from '@/layout/PageHeader'
 import { EmptyState } from '@/layout/EmptyState'
 import { keys, fetchers } from '@/lib/queries'
 import { apiClient } from '@/lib/apiClient'
@@ -32,7 +33,10 @@ export default function KnowledgePage() {
 
   return (
     <PageContainer size="page" className="flex flex-col flex-1">
-
+      <PageHeader
+        title="Knowledge"
+        description="Answers your agent gives without asking you. Each one came from an escalation you resolved."
+      />
 
       {!isLoading && items.length === 0 && (
         <EmptyState
@@ -43,17 +47,17 @@ export default function KnowledgePage() {
       )}
 
       {!isLoading && items.length > 0 && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col">
             {items.map((item: KnowledgeItem) => (
               <div
                 key={item.id}
-                className="flex items-start gap-3 rounded-lg border border-input bg-card p-4"
+                className="group flex items-start gap-4 border-t border-border py-4 first:border-t-0"
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium leading-snug text-foreground">
                     {item.question}
                   </p>
-                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                     {item.answer}
                   </p>
                 </div>
@@ -63,7 +67,7 @@ export default function KnowledgePage() {
                   onClick={() => setPendingDelete(item)}
                   disabled={del.isPending}
                   aria-label="Delete entry"
-                  className="text-muted-foreground hover:text-destructive"
+                  className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-destructive"
                 >
                   <Trash2 className="size-4" />
                 </Button>

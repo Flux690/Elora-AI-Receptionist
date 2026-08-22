@@ -1,7 +1,7 @@
 import { getAuth } from "@clerk/hono";
 import type { AppContext } from "../types.js";
 import { getTenantById, updateTenant } from "../services/tenants.js";
-import { listCalendars } from "../services/calendar.js";
+import { listCalendars, CalendarScopeMissingError } from "../services/calendar.js";
 import { getGoogleOAuthToken, forgetGoogleOAuthToken } from "../services/googleAuth.js";
 import { calendarSelectSchema } from "../schemas.js";
 
@@ -23,7 +23,16 @@ export async function list(c: AppContext) {
   // yet. The dashboard shows the Connect button rather than a failure.
   if (!token) return c.json({ connected: false, calendars: [] });
 
-  return c.json({ connected: true, calendars: await listCalendars(token) });
+  try {
+    return c.json({ connected: true, calendars: await listCalendars(token) });
+  } catch (err) {
+    // A sign-in token with no calendar scope is the same answer as no token:
+    // not connected. Anything else is a genuine failure and still bubbles.
+    if (err instanceof CalendarScopeMissingError) {
+      return c.json({ connected: false, calendars: [] });
+    }
+    throw err;
+  }
 }
 
 /**

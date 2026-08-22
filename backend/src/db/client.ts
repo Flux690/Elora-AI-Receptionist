@@ -47,6 +47,19 @@ pool.on("error", (err) => {
 export const db = drizzle(pool);
 
 /**
+ * Closes every pooled connection.
+ *
+ * The pool is created at module load and holds live sockets — `keepAlive` is on
+ * and the idle timeout is 30s, both deliberately (see above). Those sockets are
+ * libuv handles, so Node will not exit while they are open. Without this, the
+ * API ignored SIGINT, sat there until tsx gave up after five seconds and
+ * force-killed it, and `pnpm dev` took a beating on every Ctrl-C.
+ */
+export async function closeDb(): Promise<void> {
+  await pool.end();
+}
+
+/**
  * Neon suspends the compute after ~5 minutes with no active queries, and calls
  * to a small business are minutes apart — so without this the first call after
  * a quiet spell pays a cold start before the greeting can play.

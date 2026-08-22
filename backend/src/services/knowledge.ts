@@ -40,21 +40,20 @@ export type KnowledgeResult = {
   similarity: number;
 };
 
+/**
+ * Files an answer as a knowledge item, without touching the escalation.
+ *
+ * NOT the production path — resolving an escalation goes through
+ * `resolveEscalationWithKnowledge` below, which does this insert inside the same
+ * transaction that flips the escalation to resolved. This survives as the
+ * seeding helper the integration tests use to put knowledge in the database
+ * without driving a full resolve, and those are its only callers.
+ */
 export async function createKnowledgeFromEscalation(
   escalation: EscalationRow,
   answer: string
 ): Promise<void> {
-  // Embed the question alone. Queries are questions, so storing a
-  // question+answer blob put stored and query vectors in different regions of
-  // the space and systematically depressed recall. The answer rides along as a
-  // payload column, not as part of the embedded text.
   const embedding = await embedText(escalation.question);
-
-  if (!embedding) {
-    throw new Error(
-      `[knowledge] Failed to generate embedding for escalation ${escalation.id} — item not saved`
-    );
-  }
 
   await db.insert(knowledgeItems).values({
     tenantId: escalation.tenantId,
@@ -82,10 +81,22 @@ export async function resolveEscalationWithKnowledge(
   tenantId: string,
   answer: string
 ): Promise<void> {
+  // Best-effort, deliberately. Nothing reads this column: the knowledge base is
+  // inlined into the system prompt at call start and `searchKnowledge` is the
+  // unused Tier 2 path (CLAUDE.md). Throwing here made the embedding a hard
+  // dependency of the product's core loop — answering an escalation so the
+  // agent stops asking — and an expired card or an empty OpenRouter balance
+  // took that loop offline entirely, with a 500 and no way for the owner to
+  // save the answer they had already written.
+  //
+  // A null embedding costs the HNSW index one row. Losing the answer costs the
+  // caller. Re-embedding a backlog is a batch job whenever Tier 2 is switched
+  // on; an answer the owner typed and lost is gone.
   const embedding = await embedText(escalation.question);
   if (!embedding) {
-    throw new Error(
-      `[knowledge] Failed to generate embedding for escalation ${escalation.id} — nothing saved`
+    console.warn(
+      `[knowledge] no embedding for escalation ${escalation.id}; ` +
+        `saving the answer without one. Vector search will not match it until re-embedded.`
     );
   }
 

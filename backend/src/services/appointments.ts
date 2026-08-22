@@ -53,32 +53,6 @@ export async function listAppointments(tenantId: string) {
     .limit(100);
 }
 
-export async function getNextAppointment(
-  tenantId: string,
-  clientId: string
-): Promise<AppointmentRow | null> {
-  const rows = await db
-    .select({
-      id: appointments.id,
-      service: appointments.service,
-      startTime: appointments.startTime,
-      endTime: appointments.endTime,
-      status: appointments.status,
-    })
-    .from(appointments)
-    .where(
-      and(
-        eq(appointments.tenantId, tenantId),
-        eq(appointments.clientId, clientId),
-        gt(appointments.startTime, new Date()),
-        ne(appointments.status, "cancelled")
-      )
-    )
-    .orderBy(asc(appointments.startTime))
-    .limit(1);
-  return (rows[0] as AppointmentRow | undefined) ?? null;
-}
-
 /**
  * Upcoming appointments for a caller, by their phone number.
  *

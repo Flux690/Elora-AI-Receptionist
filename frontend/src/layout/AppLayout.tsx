@@ -65,19 +65,17 @@ export default function AppLayout() {
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader>
-          {/* Expanded row: logo + name on left, trigger on right.
-              Collapsed: only the logo, centered on the icon-rail centerline. */}
-          <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
-            <div className="flex items-center gap-2 overflow-hidden">
-              <span className="truncate text-base font-semibold tracking-tight text-foreground group-data-[collapsible=icon]:hidden">
-                DeskRoute
-              </span>
-            </div>
-            <SidebarTrigger className="group-data-[collapsible=icon]:hidden" />
-          </div>
-          {/* Collapsed-only: trigger on its own row, centered. */}
-          <div className="hidden group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
-            <SidebarTrigger />
+          {/* One row, always. It used to be two — a brand row with a trigger and
+              a second collapsed-only row with another trigger — so collapsing
+              swapped which trigger was visible and moved it down the y axis,
+              taking every icon below it along. The label hides; nothing moves.
+              h-8 matches a nav row, so the trigger sits on the same rhythm and,
+              when collapsed, on the same centreline as the icons. */}
+          <div className="flex h-8 items-center gap-2">
+            <span className="truncate text-base font-semibold tracking-tight text-foreground group-data-[collapsible=icon]:hidden">
+              DeskRoute
+            </span>
+            <SidebarTrigger className="ml-auto shrink-0 group-data-[collapsible=icon]:ml-0" />
           </div>
         </SidebarHeader>
 
@@ -134,17 +132,17 @@ export default function AppLayout() {
                 so it is the only thing that reacts to a pointer. */}
             <SidebarMenuItem>
               <div
-                className="flex h-8 items-center gap-2 rounded-lg px-2 text-sm text-sidebar-foreground group-data-[collapsible=icon]:justify-center"
+                className="flex h-8 items-center gap-2 rounded-lg p-2 text-sm text-sidebar-foreground"
                 title={firstName}
               >
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
                     alt=""
-                    className="size-4 shrink-0 rounded-full object-cover"
+                    className="size-[18px] shrink-0 rounded-full object-cover"
                   />
                 ) : (
-                  <span className="size-4 shrink-0 rounded-full bg-muted" />
+                  <span className="size-[18px] shrink-0 rounded-full bg-muted" />
                 )}
                 <span className="truncate group-data-[collapsible=icon]:hidden">
                   {firstName}
