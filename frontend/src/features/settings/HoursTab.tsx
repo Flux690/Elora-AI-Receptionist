@@ -118,6 +118,7 @@ export function HoursTab({ settings }: { settings: AppSettings }) {
   return (
     <div>
       <Section
+        layout="gutter"
         title="Opening hours"
         lede="Your agent answers &ldquo;are you open Saturday?&rdquo; from this, and only offers times inside it."
       >
@@ -191,6 +192,7 @@ export function HoursTab({ settings }: { settings: AppSettings }) {
       </Section>
 
       <Section
+        layout="gutter"
         title="Holidays"
         lede="A date that ignores the weekly pattern. Leave it with no periods to close for the day."
       >
@@ -206,7 +208,7 @@ export function HoursTab({ settings }: { settings: AppSettings }) {
                 )
 
               return (
-                <div key={i} className="rounded-lg border border-border bg-card p-4 space-y-3">
+                <div key={i} className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Input
                       type="date"

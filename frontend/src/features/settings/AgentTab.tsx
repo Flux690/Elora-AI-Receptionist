@@ -81,6 +81,7 @@ export function AgentTab({ settings }: { settings: AppSettings }) {
       </Section>
 
       <Section
+        layout="gutter"
         title="Phrases"
         lede="What it says at the four moments that repeat on every call."
       >

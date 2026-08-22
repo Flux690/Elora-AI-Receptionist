@@ -160,7 +160,7 @@ export function BusinessTab({ settings }: { settings: AppSettings }) {
         </div>
       </Section>
 
-      <Section title="Services" lede="What you offer, and how long each one takes.">
+      <Section layout="gutter" title="Services" lede="What you offer, and how long each one takes.">
         <ServicesSection services={settings.business.services} />
       </Section>
 

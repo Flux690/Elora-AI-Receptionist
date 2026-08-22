@@ -33,21 +33,26 @@ export default function SettingsPage() {
 
   return (
     <PageContainer size="form">
-
+      <h1 className="mb-6 text-xl font-semibold tracking-tight text-foreground">Settings</h1>
 
       <Tabs
         value={tab}
         onValueChange={(v) => isTabId(v) && setTab(v)}
         className="gap-6"
       >
-        {/* Sized to its labels and sitting top-left. It was a full-width bar
-            with a rule under it, which drew a line across the page to hold four
-            words. The active tab's own underline is the only marker needed. */}
-        <TabsList variant="line" className="justify-start rounded-none">
-          <TabsTrigger value="business">Business</TabsTrigger>
-          <TabsTrigger value="hours">Hours</TabsTrigger>
-          <TabsTrigger value="agent">Agent</TabsTrigger>
-          <TabsTrigger value="account">Account</TabsTrigger>
+        {/* The list is sized to its labels and sits top-left; the rule belongs
+            to the row beneath it, which is what the active tab's underline sits
+            on. Without that rule the indicator floats 5px under a tab with
+            nothing to meet, which reads as no indicator at all. */}
+        <TabsList
+          variant="line"
+          className="justify-start rounded-none border-b border-border w-full"
+          aria-label="Settings sections"
+        >
+          <TabsTrigger value="business" className="flex-none">Business</TabsTrigger>
+          <TabsTrigger value="hours" className="flex-none">Hours</TabsTrigger>
+          <TabsTrigger value="agent" className="flex-none">Agent</TabsTrigger>
+          <TabsTrigger value="account" className="flex-none">Account</TabsTrigger>
         </TabsList>
 
         <TabsContent value="business">

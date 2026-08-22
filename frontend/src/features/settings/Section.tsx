@@ -1,38 +1,49 @@
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
+type Layout = 'stacked' | 'gutter'
+
 interface SectionProps {
   title: string
-  lede: string
+  lede?: string
+  /**
+   * `stacked` — the heading sits above its fields. The default, and right for a
+   * short set of unrelated settings: a name, a description, two numbers.
+   *
+   * `gutter` — the heading moves into a narrow left column beside the fields.
+   * Earns its keep only where the right-hand side is a repeating structure tall
+   * enough that a heading above it would scroll out of sight: opening hours,
+   * holidays, services, the call phrases. Using it everywhere gave a two-field
+   * section the same architecture as a seven-row one.
+   */
+  layout?: Layout
   children: React.ReactNode
   className?: string
 }
 
-/**
- * A settings section, laid out as a gutter.
- *
- * The section states itself in a narrow left column and the fields it governs
- * stack on the right. Chosen over a panel of label-left/control-right rows
- * because this product has to explain itself — someone setting up a phone agent
- * for their salon is not a power user — and a left column gives that text a home
- * instead of cramming it under every label.
- *
- * The rule between sections is the only line on the page. Rows do not get one,
- * and neither do the collections inside them.
- */
-export function Section({ title, lede, children, className }: SectionProps) {
+export function Section({
+  title,
+  lede,
+  layout = 'stacked',
+  children,
+  className,
+}: SectionProps) {
+  const heading = (
+    <div className={layout === 'gutter' ? undefined : 'mb-5'}>
+      <h2 className="text-sm font-semibold tracking-tight text-foreground">{title}</h2>
+      {lede && <p className="mt-1 text-sm text-muted-foreground">{lede}</p>}
+    </div>
+  )
+
   return (
     <section
       className={cn(
-        'grid grid-cols-[196px_1fr] items-start gap-x-11 border-t border-border py-8',
-        'first:border-t-0 first:pt-0',
+        'border-t border-border py-8 first:border-t-0 first:pt-0',
+        layout === 'gutter' && 'grid grid-cols-[196px_1fr] items-start gap-x-11',
         className,
       )}
     >
-      <div>
-        <h2 className="text-sm font-semibold tracking-tight text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{lede}</p>
-      </div>
+      {heading}
       <div className="flex min-w-0 flex-col gap-[18px]">{children}</div>
     </section>
   )
@@ -56,8 +67,11 @@ export function Field({ label, help, htmlFor, children }: FieldProps) {
       <Label htmlFor={htmlFor} className="block">
         {label}
       </Label>
-      {help && <p className="mt-px mb-[7px] text-sm text-muted-foreground">{help}</p>}
-      {!help && <div className="h-[7px]" />}
+      {help ? (
+        <p className="mt-px mb-[7px] text-sm text-muted-foreground">{help}</p>
+      ) : (
+        <div className="h-[7px]" />
+      )}
       {children}
     </div>
   )
