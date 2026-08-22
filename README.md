@@ -24,7 +24,7 @@ Built as a multi-tenant B2B SaaS.
 
 1. Customer calls the business's US phone number
 2. LiveKit routes the call to the AI agent worker via SIP
-3. Agent resolves the tenant from the number dialed, builds a system prompt with business context, and greets the caller
+3. Agent resolves the tenant from the number dialed, builds a system prompt with business context, and answers - the AI-and-recording disclosure first, then the business's own greeting
 4. STT → LLM → TTS pipeline handles the conversation; the audio turn detector decides when the caller has finished
 5. Pricing, opening hours and knowledge-base answers come straight from the system prompt - no tool calls needed
 6. Genuinely unknown questions are flagged for admin review
@@ -38,20 +38,23 @@ Built as a multi-tenant B2B SaaS.
 
 ## Screenshots
 
-**Home - call stats and recent call history**
+**Home** - how the phone did this month, and every call it took
 <img src="screenshots/dashboard.png" alt="Home - call stats and recent call history" width="780">
 
-**Call detail - AI-generated summary and transcript**
-<img src="screenshots/call-details.png" alt="Call detail - AI-generated summary and transcript" width="780">
+**A call** - what it was about, in one line, then the whole transcript
+<img src="screenshots/call-details.png" alt="A call - summary and full transcript" width="780">
 
-**Escalations - unanswered caller questions queued for admin review**
-<img src="screenshots/escalation.png" alt="Escalations - unanswered caller questions queued for admin review" width="780">
+**Escalations** - what your agent could not answer. Answer once, and it never asks again
+<img src="screenshots/escalation.png" alt="Escalations - questions the agent could not answer" width="780">
 
-**Settings - business info, phone number, and Google Calendar**
-<img src="screenshots/settings.png" alt="Settings - business info, phone number, and Google Calendar" width="780">
+**Services** - what you offer, how long each takes, and the setup and cleanup that block your calendar without the caller hearing about it
+<img src="screenshots/settings.png" alt="Settings - services, phone number and Google Calendar" width="780">
 
-**Settings - agent name, greeting, farewell, and hold phrase**
-<img src="screenshots/settings-agent.png" alt="Settings - agent name, greeting, farewell, and hold phrase" width="780">
+**Opening hours** - a weekly pattern with lunch closures and days you're shut, plus one-off dates for holidays
+<img src="screenshots/settings-hours.png" alt="Settings - opening hours, holidays and the booking window" width="780">
+
+**Your agent's voice** - the disclosure it must say, then the four phrases that repeat on every call
+<img src="screenshots/settings-agent.png" alt="Settings - the AI disclosure and the agent's phrases" width="780">
 
 
 ## Tech Stack
@@ -75,7 +78,7 @@ Built as a multi-tenant B2B SaaS.
 | Recordings | Cloudflare R2 |
 | Frontend | React 19 + Vite + TypeScript |
 | UI | Tailwind v4 + shadcn/ui on Base UI primitives |
-| Design tokens | OKLCH ladder, contrast floors enforced by test |
+| Design tokens | Warm OKLCH ladder generated from one base plus a contrast value; contrast floors enforced by test |
 | Data fetching | TanStack Query v5 |
 
 
@@ -94,8 +97,8 @@ Built as a multi-tenant B2B SaaS.
 ### Install
 
 ```bash
-git clone https://github.com/Flux690/desktroute
-cd desktroute
+git clone https://github.com/PrabhatMattoo/DeskRoute.git
+cd DeskRoute
 pnpm install
 ```
 
