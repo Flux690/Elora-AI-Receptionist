@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useUser } from '@clerk/react'
+import { Link } from 'react-router-dom'
 import { Calendar } from 'lucide-react'
 import type { AppointmentItem } from '@receptionist/shared'
 import { Button } from '@/components/ui/button'
@@ -11,29 +11,12 @@ import { formatPhone, formatDateTime } from '@/lib/formatters'
 import { appointmentStatusConfig } from '@/lib/status-config'
 
 export default function AppointmentsPage() {
-  const { user } = useUser()
   const { data, isLoading } = useQuery({
     queryKey: keys.appointments,
     queryFn: fetchers.appointments,
   })
 
   const appointments = data ?? []
-
-  async function connectGoogleCalendar() {
-    const googleAccount = user?.externalAccounts.find((a) => a.provider === 'google')
-    if (googleAccount) {
-      await googleAccount.reauthorize({
-        additionalScopes: ['https://www.googleapis.com/auth/calendar'],
-        redirectUrl: `${window.location.origin}/sso-callback?returnTo=/appointments`,
-      })
-    } else {
-      await user?.createExternalAccount({
-        strategy: 'oauth_google',
-        redirectUrl: `${window.location.origin}/sso-callback?returnTo=/appointments`,
-        additionalScopes: ['https://www.googleapis.com/auth/calendar'],
-      })
-    }
-  }
 
   return (
     <PageContainer size="page" className="flex flex-col flex-1">
@@ -42,8 +25,11 @@ export default function AppointmentsPage() {
           icon={Calendar}
           title="No appointments yet"
           description="When your agent books appointments through Google Calendar, they'll appear here."
+          /* One copy of the connect flow, and it lives where the calendar
+             setting lives. This page used to hold a second implementation of
+             it that could drift from the real one. */
           action={
-            <Button onClick={connectGoogleCalendar}>
+            <Button render={<Link to="/settings?tab=business" />} nativeButton={false}>
               <Calendar className="size-3.5" />
               Connect Google Calendar
             </Button>

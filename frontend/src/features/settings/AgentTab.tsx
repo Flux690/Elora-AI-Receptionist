@@ -1,28 +1,45 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Info } from 'lucide-react'
 import { toast } from 'sonner'
 import type { AgentProfile } from '@receptionist/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { apiClient } from '@/lib/apiClient'
 import { keys } from '@/lib/queries'
 import type { AppSettings } from '@/lib/settings-types'
+import { Section, Field } from './Section'
 
-interface AgentField {
+
+/**
+ * Kept in step with `backend/src/agent/disclosure.ts` by hand.
+ *
+ * Deliberately not served from the API: this is shown so the owner knows what
+ * plays, not so anything can change it. If it drifts, the dashboard is wrong —
+ * the call is still compliant, which is the failure direction to prefer.
+ */
+const AI_DISCLOSURE =
+  "Just so you know, you're speaking with an AI assistant, and this call is recorded."
+
+interface PhraseField {
   field: keyof AgentProfile
   label: string
-  hint: string
+  help: string
 }
 
-const FIELDS: AgentField[] = [
-  { field: 'name',       label: 'Agent Name',  hint: 'How your agent introduces itself on calls' },
-  { field: 'greeting',   label: 'Greeting',    hint: 'First thing the agent says when picking up a call' },
-  { field: 'farewell',   label: 'Farewell',    hint: 'Closing message before ending a call' },
-  { field: 'fallback',   label: 'Fallback',    hint: 'What the agent says when it cannot answer a question' },
-  { field: 'holdPhrase', label: 'Hold Phrase', hint: 'Said while the agent is searching for information' },
+/** The four moments that repeat on every call. */
+const PHRASES: PhraseField[] = [
+  { field: 'greeting', label: 'Greeting', help: 'Said right after the disclosure above.' },
+  { field: 'farewell', label: 'Farewell', help: 'Said when ending a call normally.' },
+  {
+    field: 'fallback',
+    label: "When it doesn't know",
+    help: 'Said before the question is passed to you. It lands in Escalations.',
+  },
+  {
+    field: 'holdPhrase',
+    label: 'While it looks something up',
+    help: 'Fills the pause while it checks your calendar.',
+  },
 ]
 
 export function AgentTab({ settings }: { settings: AppSettings }) {
@@ -39,30 +56,49 @@ export function AgentTab({ settings }: { settings: AppSettings }) {
   })
 
   return (
-    <div className="flex flex-col gap-5">
-      {FIELDS.map(({ field, label, hint }) => (
-        <div key={field} className="space-y-1.5">
-          <div className="flex items-center gap-1.5">
-            <Label htmlFor={`agent-${field}`}>{label}</Label>
-            <Tooltip>
-              <TooltipTrigger>
-                <Info className="size-3.5 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent>{hint}</TooltipContent>
-            </Tooltip>
-          </div>
+    <div>
+      <Section
+        title="Disclosure"
+        lede="Required by law in several states, so it cannot be edited or removed."
+      >
+        <p className="border-l-2 border-input pl-3 text-sm leading-relaxed text-secondary-foreground">
+          &ldquo;{AI_DISCLOSURE}&rdquo;
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Your greeting is said straight after it.
+        </p>
+      </Section>
+
+      <Section title="Voice" lede="How your agent introduces itself on a call.">
+        <Field label="Agent name" help="How it introduces itself." htmlFor="agent-name">
           <Input
-            id={`agent-${field}`}
-            value={form[field]}
-            onChange={(e) => setForm((f) => ({ ...f, [field]: e.target.value }))}
+            id="agent-name"
+            className="w-52"
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
           />
+        </Field>
+      </Section>
+
+      <Section
+        title="Phrases"
+        lede="What it says at the four moments that repeat on every call."
+      >
+        {PHRASES.map(({ field, label, help }) => (
+          <Field key={field} label={label} help={help} htmlFor={`agent-${field}`}>
+            <Input
+              id={`agent-${field}`}
+              value={form[field]}
+              onChange={(e) => setForm((f) => ({ ...f, [field]: e.target.value }))}
+            />
+          </Field>
+        ))}
+        <div className="flex justify-start pt-1">
+          <Button onClick={() => save.mutate()} disabled={save.isPending}>
+            {save.isPending ? 'Saving…' : 'Save changes'}
+          </Button>
         </div>
-      ))}
-      <div className="flex justify-end pt-2">
-        <Button onClick={() => save.mutate()} disabled={save.isPending}>
-          {save.isPending ? 'Saving…' : 'Save Changes'}
-        </Button>
-      </div>
+      </Section>
     </div>
   )
 }

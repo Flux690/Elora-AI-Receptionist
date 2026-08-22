@@ -1,4 +1,11 @@
-import type { ServiceItem, AgentProfile } from '@receptionist/shared'
+import type {
+  Service,
+  BusinessHours,
+  BookingPolicy,
+  AgentProfile,
+  CalendarProvider,
+  CalendarPayload,
+} from '@receptionist/shared'
 
 /**
  * Frontend-shaped Settings response. The backend returns the business config
@@ -14,9 +21,18 @@ export interface AppSettings {
     industry: string
     timezone: string
     description: string
-    services: ServiceItem[]
+    services: Service[]
+    businessHours: BusinessHours
+    bookingPolicy: BookingPolicy
     phoneNumber: string | null
-    googleCalendarId: string | null
+    /**
+     * Which system holds the calendar, its id there, and its display name.
+     * Three fields rather than one `googleCalendarId`, because the schema no
+     * longer names a vendor in a column (PLAN.md 2.5).
+     */
+    calendarProvider: CalendarProvider | null
+    calendarExternalId: string | null
+    calendarPayload: CalendarPayload | null
   }
   agent: AgentProfile
 }

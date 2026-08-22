@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import type { ServiceItem } from '@receptionist/shared'
+import type { ServiceDraft } from '@receptionist/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,20 +32,61 @@ export function PriceInput({ value, onChange, className }: PriceInputProps) {
   )
 }
 
-interface ServiceRowProps {
-  service: ServiceItem
-  onChange: (patch: Partial<ServiceItem>) => void
-  onRemove: () => void
+interface MinutesInputProps {
+  id?: string
+  value: number
+  onChange: (value: number) => void
 }
 
 /**
- * Single service row used in BOTH Settings BusinessTab and Onboarding BusinessStep.
+ * Whole minutes, with the unit shown rather than left to a placeholder.
  *
- * Layout: name (full-width) → price (narrow with $ prefix) → description (full-width).
- * Three stacked rows. Description gets its own row so users can write
- * proper descriptions without cramming.
+ * Empty parses to 0 instead of NaN — a half-typed field should not put the
+ * form into a state that fails validation with an incomprehensible message.
  */
-export function ServiceRow({ service, onChange, onRemove }: ServiceRowProps) {
+function MinutesInput({ id, value, onChange }: MinutesInputProps) {
+  return (
+    <div className="relative">
+      <Input
+        id={id}
+        value={String(value)}
+        onChange={(e) => onChange(Number(e.target.value.replace(/\D/g, '')) || 0)}
+        inputMode="numeric"
+        className="pr-12"
+      />
+      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+        min
+      </span>
+    </div>
+  )
+}
+
+interface ServiceRowProps {
+  service: ServiceDraft
+  onChange: (patch: Partial<ServiceDraft>) => void
+  onRemove: () => void
+  /**
+   * Onboarding collects name, price and length only. Padding is a refinement
+   * nobody can answer sensibly before they have taken a single booking, and
+   * three extra fields per service is how a setup form starts feeling like tax
+   * paperwork.
+   */
+  showBuffers?: boolean
+}
+
+/**
+ * A single service, used in both Settings and Onboarding.
+ *
+ * Length is the field that makes booking correct: without it every appointment
+ * was assumed to take an hour, so a two-hour colour and a fifteen-minute fringe
+ * trim blocked exactly the same slot.
+ */
+export function ServiceRow({
+  service,
+  onChange,
+  onRemove,
+  showBuffers = false,
+}: ServiceRowProps) {
   return (
     <div className="rounded-lg border border-border bg-card p-4 space-y-3">
       <div className="flex items-center justify-between">
@@ -62,6 +103,7 @@ export function ServiceRow({ service, onChange, onRemove }: ServiceRowProps) {
           <X className="size-4" />
         </Button>
       </div>
+
       <div className="flex gap-2">
         <Input
           value={service.name}
@@ -71,11 +113,58 @@ export function ServiceRow({ service, onChange, onRemove }: ServiceRowProps) {
         />
         <PriceInput value={service.price} onChange={(price) => onChange({ price })} />
       </div>
+
       <Input
         value={service.description ?? ''}
         onChange={(e) => onChange({ description: e.target.value })}
         placeholder="Description (optional)"
       />
+
+      <div className={cn('grid gap-3', showBuffers ? 'grid-cols-3' : 'grid-cols-1')}>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">How long it takes</Label>
+          <MinutesInput
+            value={service.durationMinutes}
+            onChange={(durationMinutes) => onChange({ durationMinutes })}
+          />
+        </div>
+
+        {showBuffers && (
+          <>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Setup before</Label>
+              <MinutesInput
+                value={service.bufferBeforeMinutes}
+                onChange={(bufferBeforeMinutes) => onChange({ bufferBeforeMinutes })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Cleanup after</Label>
+              <MinutesInput
+                value={service.bufferAfterMinutes}
+                onChange={(bufferAfterMinutes) => onChange({ bufferAfterMinutes })}
+              />
+            </div>
+          </>
+        )}
+      </div>
+
+      {showBuffers && (
+        <p className="text-xs text-muted-foreground">
+          Setup and cleanup block your calendar but are never mentioned to the caller.
+        </p>
+      )}
     </div>
   )
 }
+
+/** A new service, with the defaults the backend would apply anyway. */
+export const emptyService = (): ServiceDraft => ({
+  name: '',
+  price: '',
+  description: '',
+  durationMinutes: 60,
+  bufferBeforeMinutes: 0,
+  bufferAfterMinutes: 0,
+  requiredResources: [],
+})

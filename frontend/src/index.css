@@ -1,60 +1,69 @@
 @import "@fontsource-variable/schibsted-grotesk/index.css";
 @import "tailwindcss";
 
+/* This product is light-only: `color-scheme: light`, one palette, and no dark
+   rung anywhere in the ladder. Tailwind's default `dark:` variant keys on the
+   OS `prefers-color-scheme`, so every `dark:` utility the shadcn components ship
+   was silently winning for anyone whose machine is in dark mode — which is how
+   an input came to render as `bg-input/30` over the stage instead of taking the
+   card fill, and why fields looked sunk and grey rather than raised and light.
+
+   Binding the variant to a class that is never applied neutralises all of them
+   at once. If a real dark theme ever lands, it arrives by adding `.dark` and a
+   second set of token values, not by reverting this line. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ── Primitives ───────────────────────────────────────────────────────────────
    The only absolute colours in the system. Every semantic token below points at
    one of these, at a mix of them, or at another semantic token — never at a
    value of its own. `design-tokens.test.ts` fails the build if that slips.
 
-   Read off linear.app/apexclaw in light mode with the console, and
-   cross-checked against nightwatch-docs/linear-and-our-tokens.md:
+   PAPER. Warm hue 92, not the cool 282 this started as, and every rung is ours
+   rather than a value measured off somebody else's product. The page reads as
+   paper rather than glass, which is the right register for a business that
+   answers a phone.
 
-     html / ground   lch(94.44)  #eeeef0   the sidebar is this showing through
-     stage           lch(97.94)  #f9f9fa   floats on it, 12px radius, 1 hairline
-     card / input    lch(100)    #ffffff   the lightest thing on screen
-     selected        #e1e1e2               BELOW the ground, never above it
+   The rungs are wider apart than the ladder they replace. Separation between
+   the rail and the stage is carried by five things at once — fill, the fall,
+   the gutter, the radius and a hairline — and when only the fill was doing the
+   work the two surfaces read as one however far apart their colours were.
    ────────────────────────────────────────────────────────────────────────── */
 :root {
   color-scheme: light;
 
   /* Surfaces. Lifted means lighter, so a card sits ABOVE the page rather than
-     being a grey block on a white one.
-
-     Deliberately not evenly spaced — these are measured, and Linear's own
-     ladder is not even. Near black, the range Nightwatch tunes, the eye reads a
-     ratio and that ladder states the multipliers it was measured at; near white
-     it reads a difference, and the honest thing is to keep the measured values
-     rather than round them into a pattern they never had. */
-  --n-1: oklch(0.945 0.002 282);
-  --n-2: oklch(0.978 0.001 282);
-  --n-3: oklch(1 0 0);
+     being a grey block on a white one. */
+  --n-1: oklch(0.930 0.007 92);
+  --n-2: oklch(0.972 0.006 92);
+  --n-3: oklch(0.992 0.003 92);
 
   /* Rungs BELOW the ground. Light darkens to signal state where dark lightens,
-     and Linear takes it in two small steps rather than one leap — measured on
-     the issues page as lch 94.44 (page) -> 92.44 (hover) -> 90.94 (active).
-     There is no shadow anywhere in it — their button-overlay-shadow variable
-     is set to none and the issues page carries zero shadowed elements. The
-     raised effect is entirely a control resting on a surface lighter than the
-     page, and sinking below it when pressed. */
-  --n-2a: oklch(0.960 0.002 282);
-  --n-2b: oklch(0.938 0.003 282);
-  --sunk-1: oklch(0.926 0.003 282);
-  --sunk: oklch(0.910 0.003 282);
+     and it takes it in two small steps rather than one leap. */
+  --n-2a: oklch(0.978 0.005 92);
+  --n-2b: oklch(0.966 0.005 92);
+  --sunk-1: oklch(0.904 0.008 92);
+  --sunk: oklch(0.885 0.009 92);
 
   /* Lines sit below every surface, so an edge can never be lighter than what it
      lands on. --line-2 is the darker of the two on purpose: a card and an input
      share one fill, so the input's border is all that keeps it defined. */
-  --line-1: oklch(0.888 0.003 282);
-  --line-2: oklch(0.876 0.003 282);
+  --line-1: oklch(0.852 0.009 92);
+  --line-2: oklch(0.842 0.009 92);
 
-  /* Ink, evenly spaced by 0.1575. */
-  --ink-1: oklch(0.520 0.010 282);
-  --ink-2: oklch(0.3625 0.014 282);
-  --ink-3: oklch(0.205 0.018 282);
+  /* Ink, evenly spaced by 0.1425. */
+  --ink-1: oklch(0.475 0.015 92);
+  --ink-2: oklch(0.3325 0.019 92);
+  --ink-3: oklch(0.190 0.023 92);
 
   /* Two hues, one job each. Ink carries every action, so neither of these is a
      "primary" — colour is never decorative here, which is what lets it mean
-     something the moment it appears. */
+     something the moment it appears.
+
+     The accent stays cool on a warm ladder, deliberately. It measures 7.00
+     white-on-accent and 6.90 as text on a card, so nothing forces a change; and
+     because it is now the only cool thing on the page, the one colour that means
+     "act on this" is more findable than it was, not less. Warm paper and cool
+     ink is the oldest pairing in print. */
   --accent-fill: oklch(0.470 0.170 258); /* something is waiting on you */
   --red-fill: oklch(0.545 0.195 25);     /* destructive, and nothing else */
   --white: oklch(1 0 0);
@@ -215,6 +224,22 @@
   --color-status-resolved: var(--status-resolved);
   --color-status-cancelled: var(--status-cancelled);
   --color-status-error: var(--status-error);
+}
+
+/* The stage floats on the ground rather than sitting flush against it.
+
+   Separation between the rail and the page is carried by five things at once —
+   a lighter fill, the fall toward the ground at its foot, a gutter, a radius and
+   a hairline. Fill alone is a fifth of the effect, and on its own the two
+   surfaces read as one however far apart their colours are. */
+.stage-float {
+  border-radius: var(--radius-xl);
+  background-image: linear-gradient(
+    180deg,
+    var(--n-2) 0%,
+    color-mix(in oklab, var(--n-2), var(--n-1) 70%) 100%
+  );
+  box-shadow: 0 0 0 1px var(--line-1);
 }
 
 /* Tokens with no palette dimension. */

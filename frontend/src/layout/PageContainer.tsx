@@ -5,13 +5,15 @@ type Size = 'page' | 'form'
 /**
  * The two measures in the product, and nothing else names a width.
  *
- * `form` is 880px because a settings row has to read as a line of prose —
- * label on the left, control on the right, close enough together that the eye
- * does not have to travel. `page` is a touch wider for lists and tables.
+ * `form` is the settings measure: wide enough for the gutter and the field
+ * column beside it, and no wider. `page` is a touch wider for lists and tables.
  */
 const sizeWidth: Record<Size, string> = {
   page: 'max-w-[900px]',
-  form: 'max-w-[880px]',
+  // 840 = a 196px gutter, 44px of air, and 600px of field. Down from 880, which
+  // predated the gutter and left fields stretching further than any value in
+  // them ever needed.
+  form: 'max-w-[840px]',
 }
 
 interface PageContainerProps {

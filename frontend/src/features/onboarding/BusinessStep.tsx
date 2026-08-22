@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react'
-import type { ServiceItem } from '@receptionist/shared'
+import type { ServiceDraft } from '@receptionist/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ServiceRow } from '@/features/settings/ServiceRow'
+import { ServiceRow, emptyService } from '@/features/settings/ServiceRow'
 
 const INDUSTRIES = [
   'Hair Salon',
@@ -31,7 +31,7 @@ export interface BusinessStepData {
   name: string
   industry: string
   description: string
-  services: ServiceItem[]
+  services: ServiceDraft[]
 }
 
 interface BusinessStepProps {
@@ -43,7 +43,7 @@ interface BusinessStepProps {
 export function BusinessStep({ data, onChange, onNext }: BusinessStepProps) {
   const canAdvance = data.name.trim().length > 0 && data.industry.length > 0
 
-  function updateService(i: number, patch: Partial<ServiceItem>) {
+  function updateService(i: number, patch: Partial<ServiceDraft>) {
     onChange({
       ...data,
       services: data.services.map((s, idx) => (idx === i ? { ...s, ...patch } : s)),
@@ -57,7 +57,7 @@ export function BusinessStep({ data, onChange, onNext }: BusinessStepProps) {
   function addService() {
     onChange({
       ...data,
-      services: [...data.services, { name: '', price: '', description: '' }],
+      services: [...data.services, emptyService()],
     })
   }
 
@@ -118,7 +118,8 @@ export function BusinessStep({ data, onChange, onNext }: BusinessStepProps) {
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          Add your main services so the AI can inform callers about pricing.
+          Add your main services so the agent can quote prices and work out how long
+          a booking takes. You can fine-tune setup and cleanup time later in Settings.
         </p>
         <div className="flex flex-col gap-3">
           {data.services.map((svc, i) => (

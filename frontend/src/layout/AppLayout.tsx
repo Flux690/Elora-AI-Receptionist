@@ -128,25 +128,32 @@ export default function AppLayout() {
 
             {/* Profile: avatar acts as the icon to share the nav centerline.
                 Sign-out lives as a SidebarMenuAction — auto-hides when collapsed. */}
+            {/* Who you are is a label, not a control. It used to be a
+                SidebarMenuButton, so it lit up on hover and read as clickable
+                while doing nothing at all. Signing out is the only action here,
+                so it is the only thing that reacts to a pointer. */}
             <SidebarMenuItem>
-              <SidebarMenuButton
-                tooltip={firstName}
-                className="text-sm"
+              <div
+                className="flex h-8 items-center gap-2 rounded-lg px-2 text-sm text-sidebar-foreground group-data-[collapsible=icon]:justify-center"
+                title={firstName}
               >
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
-                    alt={firstName}
+                    alt=""
                     className="size-4 shrink-0 rounded-full object-cover"
                   />
                 ) : (
                   <span className="size-4 shrink-0 rounded-full bg-muted" />
                 )}
-                <span className="truncate">{firstName}</span>
-              </SidebarMenuButton>
+                <span className="truncate group-data-[collapsible=icon]:hidden">
+                  {firstName}
+                </span>
+              </div>
               <SidebarMenuAction
                 onClick={() => signOut()}
                 aria-label="Sign out"
+                title="Sign out"
               >
                 <LogOut />
               </SidebarMenuAction>
@@ -155,7 +162,7 @@ export default function AppLayout() {
         </SidebarFooter>
       </Sidebar>
 
-      <SidebarInset>
+      <SidebarInset className="stage-float my-2.5 mr-2.5">
         <div className="flex flex-col flex-1 overflow-auto">
           <Suspense fallback={<RouteSkeleton />}>
             <Outlet />

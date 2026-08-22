@@ -7,6 +7,7 @@ import type {
   CallDetail,
   AppointmentItem,
   EscalationStatus,
+  CalendarOption,
 } from '@receptionist/shared'
 import type { Period } from './types'
 import type { AppSettings } from './settings-types'
@@ -20,6 +21,7 @@ export const keys = {
   callRecording: (id: string) => ['calls', id, 'recording'] as const,
   settings: ['settings'] as const,
   appointments: ['appointments'] as const,
+  calendarList: ['calendar', 'list'] as const,
 }
 
 export const fetchers = {
@@ -46,4 +48,9 @@ export const fetchers = {
 
   appointments: () =>
     apiClient.get<AppointmentItem[]>('/admin/appointments').then((r) => r.data),
+
+  calendarList: () =>
+    apiClient
+      .get<{ connected: boolean; calendars: CalendarOption[] }>('/admin/calendar/list')
+      .then((r) => r.data),
 }
