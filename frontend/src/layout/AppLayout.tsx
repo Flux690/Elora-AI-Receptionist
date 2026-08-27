@@ -142,7 +142,7 @@ export default function AppLayout() {
                     className="size-[18px] shrink-0 rounded-full object-cover"
                   />
                 ) : (
-                  <span className="size-[18px] shrink-0 rounded-full bg-muted" />
+                  <span className="size-[18px] shrink-0 rounded-full bg-sunk-1" />
                 )}
                 <span className="truncate group-data-[collapsible=icon]:hidden">
                   {firstName}
