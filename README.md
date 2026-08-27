@@ -34,7 +34,7 @@ Built as a multi-tenant B2B SaaS.
 
 ## Versioning
 
-`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.0**.
+`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.1**.
 
 ## Screenshots
 
@@ -78,7 +78,7 @@ Built as a multi-tenant B2B SaaS.
 | Recordings | Cloudflare R2 |
 | Frontend | React 19 + Vite + TypeScript |
 | UI | Tailwind v4 + shadcn/ui on Base UI primitives |
-| Design tokens | Warm OKLCH ladder generated from one base plus a contrast value; contrast floors enforced by test |
+| Design tokens | Warm LCH ladder generated from one anchor plus a contrast dial, re-anchored per depth; laws and contrast floors enforced by test |
 | Data fetching | TanStack Query v5 |
 
 
@@ -160,10 +160,18 @@ pnpm -F frontend test         # the design-token contract
 pnpm typecheck                # tsc --noEmit across all workspaces
 ```
 
-The frontend suite is the colour contract, not component tests: it resolves
-`src/index.css` and fails the build if a semantic token holds a raw value, if a
-line stops sitting below every surface, if a hover names a rung instead of being
-a mix, or if any pair drops below its contrast floor.
+The frontend suite is the colour contract, not component tests. One surface is
+given — the stage — and every other colour is a departure from it, so the suite
+asserts the *relationships* rather than any value: that the anchor holds still
+as contrast moves, that surfaces and controls travel in opposite directions,
+that ink mixes toward the pole instead of stepping a fixed distance, that chroma
+re-anchors with depth rather than being pinned flat, that no line is ever
+lighter than what it edges, that every overlay carries an edge, and that every
+pair clears its floor **on the ground it actually lands on**.
+
+Each of those was verified by mutation: break the law in `index.css` and the
+suite must go red. A green contract that cannot see a defect is how the previous
+one passed 26 of 26 while a dropdown over a card was invisible.
 
 ### Run
 
