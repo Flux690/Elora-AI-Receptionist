@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Service, ServiceDraft } from '@receptionist/shared'
 import { Button } from '@/components/ui/button'
+import { Table, TableBody } from '@/components/ui/table'
 import { apiClient } from '@/lib/apiClient'
 import { keys } from '@/lib/queries'
 import { ServiceRow, ServiceCaptions, emptyService } from './ServiceRow'
@@ -90,17 +91,19 @@ export function ServicesSection({ services }: { services: Service[] }) {
           long a booking takes.
         </p>
       ) : (
-        <div>
+        <Table>
           <ServiceCaptions />
-          {rows.map((row, i) => (
-            <ServiceRow
-              key={row.id ?? `new-${i}`}
-              service={row}
-              onChange={(patch) => update(i, patch)}
-              onRemove={() => remove(i)}
-            />
-          ))}
-        </div>
+          <TableBody>
+            {rows.map((row, i) => (
+              <ServiceRow
+                key={row.id ?? `new-${i}`}
+                service={row}
+                onChange={(patch) => update(i, patch)}
+                onRemove={() => remove(i)}
+              />
+            ))}
+          </TableBody>
+        </Table>
       )}
 
       <p className="mt-3 text-sm text-muted-foreground">

@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 interface PageHeaderProps {
   title: string
   /** One line, in the reader's terms. Omit it rather than restating the title. */
-  description?: string
+  description?: React.ReactNode
   /** A control that belongs to the page as a whole, e.g. Test Agent. */
   actions?: React.ReactNode
   className?: string

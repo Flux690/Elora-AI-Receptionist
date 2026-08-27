@@ -47,9 +47,12 @@ export default function KnowledgePage() {
       )}
 
       {!isLoading && items.length > 0 && (
-        <div className="flex flex-col">
+        /* A list, not a table: these rows have no columns of comparable values,
+           just an item and the one thing you can do to it. `<ul>` is the right
+           element and no component is needed to get it. */
+        <ul className="flex flex-col">
             {items.map((item: KnowledgeItem) => (
-              <div
+              <li
                 key={item.id}
                 className="group flex items-start gap-4 border-t border-border py-4 first:border-t-0"
               >
@@ -71,9 +74,9 @@ export default function KnowledgePage() {
                 >
                   <Trash2 className="size-4" />
                 </Button>
-              </div>
+              </li>
             ))}
-        </div>
+        </ul>
       )}
 
       <ConfirmDialog

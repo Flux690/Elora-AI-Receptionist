@@ -4,6 +4,14 @@ import { Calendar } from 'lucide-react'
 import type { AppointmentItem } from '@receptionist/shared'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { PageContainer } from '@/layout/PageContainer'
 import { PageHeader } from '@/layout/PageHeader'
 import { EmptyState } from '@/layout/EmptyState'
@@ -44,31 +52,39 @@ export default function AppointmentsPage() {
       )}
 
       {!isLoading && appointments.length > 0 && (
-        <div>
-          <div className="grid grid-cols-[1fr_150px_200px_110px] gap-5 px-2.5 pb-2 text-sm text-muted-foreground">
-            <div>Service</div>
-            <div>Caller</div>
-            <div>Date &amp; time</div>
-            <div className="justify-self-end">Status</div>
-          </div>
-          {appointments.map((a: AppointmentItem) => (
-            <div
-              key={a.id}
-              className="grid h-12 grid-cols-[1fr_150px_200px_110px] items-center gap-5 border-t border-border px-2.5"
-            >
-              <span className="truncate text-sm font-medium text-foreground">{a.service}</span>
-              <span className="text-sm text-muted-foreground tabular-nums">
-                {a.callerPhone ? formatPhone(a.callerPhone) : 'Withheld'}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {a.startTime ? formatDateTime(a.startTime) : 'Time to be confirmed'}
-              </span>
-              <span className="justify-self-end">
-                <StatusBadge value={a.status} config={appointmentStatusConfig} />
-              </span>
-            </div>
-          ))}
-        </div>
+        <Table>
+          {/* Headings are labels, not a heading — no rule beneath them. The
+              rules in here separate rows, which is the one job they have. */}
+          <TableHeader className="[&_tr]:border-b-0">
+            <TableRow className="border-b-0 hover:bg-transparent">
+              <TableHead className="h-auto px-2.5 pb-2">Service</TableHead>
+              <TableHead className="h-auto w-[150px] px-2.5 pb-2">Caller</TableHead>
+              <TableHead className="h-auto w-[200px] px-2.5 pb-2">Date &amp; time</TableHead>
+              <TableHead className="h-auto w-[110px] px-2.5 pb-2 text-right">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {appointments.map((a: AppointmentItem) => (
+              <TableRow
+                key={a.id}
+                className="h-12 border-t border-b-0 border-border hover:bg-transparent"
+              >
+                <TableCell className="max-w-0 truncate px-2.5 py-0 font-medium text-foreground">
+                  {a.service}
+                </TableCell>
+                <TableCell className="px-2.5 py-0 text-muted-foreground tabular-nums">
+                  {a.callerPhone ? formatPhone(a.callerPhone) : 'Withheld'}
+                </TableCell>
+                <TableCell className="px-2.5 py-0 text-muted-foreground">
+                  {a.startTime ? formatDateTime(a.startTime) : 'Time to be confirmed'}
+                </TableCell>
+                <TableCell className="px-2.5 py-0 text-right">
+                  <StatusBadge value={a.status} config={appointmentStatusConfig} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
 
     </PageContainer>

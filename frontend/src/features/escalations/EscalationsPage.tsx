@@ -8,13 +8,14 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FilterPills } from '@/components/ui/filter-pills'
+import { Label } from '@/components/ui/label'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { PageContainer } from '@/layout/PageContainer'
 import { PageHeader } from '@/layout/PageHeader'
 import { EmptyState } from '@/layout/EmptyState'
 import { apiClient } from '@/lib/apiClient'
 import { keys, fetchers } from '@/lib/queries'
 import { formatPhone, formatDateTime } from '@/lib/formatters'
-import { cn } from '@/lib/utils'
 
 const STATUSES = [
   { id: 'pending', label: 'Waiting' },
@@ -52,12 +53,9 @@ function AnswerForm({ escalation }: { escalation: EscalationItem }) {
 
   return (
     <div className="mt-7">
-      <label
-        htmlFor="answer"
-        className="text-sm font-medium text-foreground"
-      >
+      <Label htmlFor="answer" className="text-foreground">
         Your answer
-      </label>
+      </Label>
       <p className="mt-px text-sm text-muted-foreground">
         Saved to your knowledge base, so the agent can answer it on the next call.
       </p>
@@ -118,7 +116,7 @@ export default function EscalationsPage() {
         description="Questions your agent could not answer. Answer one and it never has to ask you again."
       />
 
-      <FilterPills options={STATUSES} value={status} onChange={setStatus} />
+      <FilterPills options={STATUSES} value={status} onChange={setStatus} label="Escalation status" />
 
       {isLoading ? (
         <div className="mt-6 flex flex-col gap-3">
@@ -140,21 +138,17 @@ export default function EscalationsPage() {
         /* A list and the one you are reading. Selection is a fill, so the list
            stays a list and the answer gets room to be read. */
         <div className="mt-5 flex flex-1 gap-10">
-          {/* The same 2px the sidebar rows use. Without it two hovered rows
-               touch and you read the edge of the fill as a border. */}
-          <div className="flex w-[320px] shrink-0 flex-col gap-0.5">
+          {/* One control with a chosen value, not a row of unrelated buttons —
+              so a screen reader announces it as a list you are choosing from,
+              and the arrow keys walk it. */}
+          <ToggleGroup
+            className="w-[320px] shrink-0 flex-col gap-0.5"
+            aria-label="Escalations"
+            value={selected ? [selected.id] : []}
+            onValueChange={([id]) => id && select(id)}
+          >
             {escalations.map((e: EscalationItem) => (
-              <button
-                key={e.id}
-                onClick={() => select(e.id)}
-                aria-current={selected?.id === e.id}
-                className={cn(
-                  // Everything else on the page uses the 8px radius; a square
-                  // fill here was the one thing that did not.
-                  'group rounded-lg px-3 py-2.5 text-left transition-colors',
-                  selected?.id === e.id ? 'bg-sunk-1' : 'hover:bg-hover',
-                )}
-              >
+              <ToggleGroupItem key={e.id} value={e.id} variant="row" size="row" className="group">
                 <p className="text-sm font-medium leading-snug text-foreground">
                   {e.question}
                 </p>
@@ -164,9 +158,9 @@ export default function EscalationsPage() {
                   )}
                   <span className="tabular-nums">{formatDateTime(e.createdAt)}</span>
                 </p>
-              </button>
+              </ToggleGroupItem>
             ))}
-          </div>
+          </ToggleGroup>
 
           {selected && (
             <div className="min-w-0 flex-1">

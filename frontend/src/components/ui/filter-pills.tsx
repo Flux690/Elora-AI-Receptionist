@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 export interface FilterOption<T extends string> {
   id: T
@@ -10,6 +10,8 @@ interface FilterPillsProps<T extends string> {
   value: T
   onChange: (value: T) => void
   className?: string
+  /** Read out to a screen reader as the name of the whole control. */
+  label?: string
 }
 
 /**
@@ -20,40 +22,37 @@ interface FilterPillsProps<T extends string> {
  * Deliberately not a segmented control in a sunk track: that reads as a mode
  * switch for the whole screen, and these only ever narrow a list.
  *
- * Every pill carries a surface — a control with no fill at rest does not look
- * like something you can press. The three states are one step apart each, so
- * hover and selected are distinguishable without either shouting.
+ * The look is unchanged; what changed is underneath. This was a row of
+ * `<button aria-pressed>`, which a screen reader announces as several unrelated
+ * toggles rather than one control with a chosen value, and which a keyboard
+ * user walks with Tab instead of arrow keys. `ToggleGroup` is the primitive for
+ * exactly this and it ships with the library.
  */
 export function FilterPills<T extends string>({
   options,
   value,
   onChange,
   className,
+  label,
 }: FilterPillsProps<T>) {
   return (
-    <div className={cn('flex gap-1.5', className)}>
+    <ToggleGroup
+      className={className}
+      aria-label={label}
+      value={[value]}
+      /* One at a time. An empty array means the pressed pill was pressed
+         again — a filter always has a value, so that is a no-op rather than
+         "no filter". */
+      onValueChange={(next) => {
+        const [chosen] = next as T[]
+        if (chosen) onChange(chosen)
+      }}
+    >
       {options.map((o) => (
-        <button
-          key={o.id}
-          onClick={() => onChange(o.id)}
-          aria-pressed={value === o.id}
-          className={cn(
-            'h-7 rounded-full px-3 text-sm transition-[background-color,box-shadow,color]',
-            /* Measured off Linear's My Issues pills, and the opposite way round
-               to intuition: the UNSELECTED pill is the raised one — white, with
-               a hairline and two soft lifts — and the selected pill is pressed
-               IN. It takes a darker fill (lch 93.5 against a white rest) and
-               LOSES its lift, keeping only the ring. A pressed thing sinks and
-               its shadow goes; carrying the lift into the selected state made
-               it read as raised and dark at once, which is nothing physical. */
-            value === o.id
-              ? 'bg-control-active font-medium text-foreground shadow-edge'
-              : 'bg-control text-muted-foreground shadow-raised hover:bg-control-hover hover:text-foreground',
-          )}
-        >
+        <ToggleGroupItem key={o.id} value={o.id} variant="pill">
           {o.label}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   )
 }

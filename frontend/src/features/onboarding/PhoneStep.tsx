@@ -4,8 +4,8 @@ import type { AvailableNumber } from '@receptionist/shared'
 import { apiClient } from '@/lib/apiClient'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn } from '@/lib/utils'
 import { formatPhone } from '@/lib/formatters'
 
 interface PhoneStepProps {
@@ -95,13 +95,14 @@ export function PhoneStep({ selectedNumber, onSelect, onBack, onFinish, submitti
       </div>
 
       {!showMore && !loading && (
-        <button
+        <Button
+          variant="link"
           type="button"
           onClick={() => setShowMore(true)}
-          className="w-full text-center text-sm font-medium text-primary hover:text-primary-hover transition-colors"
+          className="w-full"
         >
           Choose a different number
-        </button>
+        </Button>
       )}
 
       {showMore && (
@@ -136,27 +137,30 @@ export function PhoneStep({ selectedNumber, onSelect, onBack, onFinish, submitti
 
           {searchError && <p className="text-xs text-destructive">{searchError}</p>}
 
+          {/* Picking one of several is a single-choice control, not a stack of
+              buttons that happen to track their own state. */}
           {moreNumbers.length > 0 && (
-            <div className="flex max-h-48 flex-col gap-1.5 overflow-y-auto">
+            <ToggleGroup
+              className="max-h-48 flex-col gap-1.5 overflow-y-auto"
+              aria-label="Available numbers"
+              value={selectedNumber ? [selectedNumber] : []}
+              onValueChange={([number]) => number && onSelect(number)}
+            >
               {moreNumbers.map((n) => (
-                <button
+                <ToggleGroupItem
                   key={n.id}
-                  onClick={() => onSelect(n.e164_format)}
-                  type="button"
-                  className={cn(
-                    'flex items-center justify-between rounded-md border px-4 py-2.5 text-sm transition-colors',
-                    selectedNumber === n.e164_format
-                      ? 'border-primary bg-primary-subtle text-foreground'
-                      : 'border-border bg-card text-foreground hover:bg-muted',
-                  )}
+                  value={n.e164_format}
+                  variant="row"
+                  size="row"
+                  className="flex items-center justify-between px-4 py-2.5 text-sm text-foreground"
                 >
                   <span className="font-medium">{formatPhone(n.e164_format)}</span>
                   <span className="text-xs text-muted-foreground">
                     {n.locality}, {n.region}
                   </span>
-                </button>
+                </ToggleGroupItem>
               ))}
-            </div>
+            </ToggleGroup>
           )}
         </div>
       )}

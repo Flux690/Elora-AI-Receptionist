@@ -214,11 +214,12 @@ export function BusinessTab({ settings }: { settings: AppSettings }) {
             {numbers.length > 0 && (
               <div className="mt-3 flex flex-col gap-1.5">
                 {numbers.map((n) => (
-                  <button
+                  <Button
                     key={n.id}
+                    variant="outline"
                     onClick={() => provisionPhone.mutate(n.e164_format)}
                     disabled={provisionPhone.isPending}
-                    className="flex w-[380px] items-center justify-between rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-hover disabled:opacity-40"
+                    className="h-auto w-[380px] justify-between px-3 py-2 text-left font-normal"
                   >
                     <span className="font-medium text-foreground">
                       {formatPhone(n.e164_format)}
@@ -226,7 +227,7 @@ export function BusinessTab({ settings }: { settings: AppSettings }) {
                     <span className="text-sm text-muted-foreground">
                       {n.locality}, {n.region}
                     </span>
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}

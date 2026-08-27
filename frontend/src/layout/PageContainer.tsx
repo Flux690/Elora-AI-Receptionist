@@ -8,12 +8,17 @@ type Size = 'page' | 'form'
  * `form` is the settings measure: wide enough for the gutter and the field
  * column beside it, and no wider. `page` is a touch wider for lists and tables.
  */
+/**
+ * Named in `index.css`, not here. Both measures used to be hardcoded at this
+ * call site while `--container-page` and `--container-form` sat in the theme
+ * unused — and disagreeing, 880 against 840, with neither obviously wrong.
+ *
+ * `form` is a 196px gutter, 44px of air and 600px of field. `page` is a touch
+ * wider for lists and tables.
+ */
 const sizeWidth: Record<Size, string> = {
-  page: 'max-w-[900px]',
-  // 840 = a 196px gutter, 44px of air, and 600px of field. Down from 880, which
-  // predated the gutter and left fields stretching further than any value in
-  // them ever needed.
-  form: 'max-w-[840px]',
+  page: 'max-w-page',
+  form: 'max-w-form',
 }
 
 interface PageContainerProps {

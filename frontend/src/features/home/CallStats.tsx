@@ -60,7 +60,7 @@ export function CallStats() {
     <section>
       {/* No heading. The selected pill already says which period this is —
           a title repeating it would be the same word twice. */}
-      <FilterPills options={PERIODS} value={period} onChange={setPeriod} className="mb-5" />
+      <FilterPills options={PERIODS} value={period} onChange={setPeriod} className="mb-5" label="Time period" />
 
       {/* No dividers. Four figures on a stage are already four figures; a rule
           between each one is a line doing work that spacing does. */}

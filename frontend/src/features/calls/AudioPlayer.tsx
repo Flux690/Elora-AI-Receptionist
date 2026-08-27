@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { Play, Pause } from 'lucide-react'
 import { keys, fetchers } from '@/lib/queries'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
+import { Slider } from '@/components/ui/slider'
 
 interface AudioPlayerProps {
   callId: string
@@ -48,15 +50,14 @@ export default function AudioPlayer({ callId, hasRecording }: AudioPlayerProps) 
     }
   }
 
-  function handleSeekBar(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleSeek(value: number | readonly number[]) {
     const a = audioRef.current
     if (!a) return
-    const t = Number(e.target.value)
+    const t = Array.isArray(value) ? value[0]! : (value as number)
     a.currentTime = t
     setCurrentTime(t)
   }
 
-  const pct = duration > 0 ? (currentTime / duration) * 100 : 0
   const fmtTime = (s: number) =>
     `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
@@ -83,34 +84,28 @@ export default function AudioPlayer({ callId, hasRecording }: AudioPlayerProps) 
         />
       )}
       <div className="flex items-center gap-3">
-        <button
+        <Button
           onClick={togglePlay}
-          className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary-hover"
+          size="icon"
+          className="shrink-0 rounded-full"
           aria-label={playing ? 'Pause' : 'Play'}
         >
           {playing ? <Pause className="size-3.5" /> : <Play className="ml-0.5 size-3.5" />}
-        </button>
+        </Button>
 
         <span className="w-9 text-sm text-muted-foreground tabular-nums">
           {fmtTime(currentTime)}
         </span>
 
-        <div className="relative h-1 flex-1 overflow-hidden rounded-full bg-sunk">
-          <div
-            className="absolute inset-y-0 left-0 rounded-full bg-primary"
-            style={{ width: `${pct}%` }}
-          />
-          <input
-            type="range"
-            min={0}
-            max={duration || 0}
-            step={0.1}
-            value={currentTime}
-            onChange={handleSeekBar}
-            className="absolute inset-0 w-full cursor-pointer opacity-0"
-            aria-label="Seek"
-          />
-        </div>
+        <Slider
+          className="flex-1"
+          min={0}
+          max={duration || 0}
+          step={0.1}
+          value={currentTime}
+          onValueChange={handleSeek}
+          aria-label="Seek"
+        />
 
         <span className="w-9 text-sm text-muted-foreground tabular-nums">
           {fmtTime(duration)}

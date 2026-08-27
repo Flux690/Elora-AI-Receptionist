@@ -1,4 +1,5 @@
 import { Skeleton } from '@/components/ui/skeleton'
+import { PageHeader } from '@/layout/PageHeader'
 import { formatPhone } from '@/lib/formatters'
 import { TestAgentControl } from './TestAgentControl'
 import type { AppSettings } from '@/lib/settings-types'
@@ -8,11 +9,16 @@ interface OverviewHeaderProps {
 }
 
 /**
- * Who you are and who is answering, as page content rather than a card.
+ * Who you are and who is answering.
  *
- * This used to sit on a Card. A card is for an object — a call, an escalation,
+ * This used to hand-roll its own `<h1>` and description, which is the second
+ * implementation of a page heading in a product that already had `PageHeader` —
+ * two places for the measure, the weight and the gap below to drift apart. It
+ * is the same header as every other page now; only the words are its own.
+ *
+ * (It was a Card before that. A card is for an object — a call, an escalation,
  * a settings group you can act on as a unit. A page heading is none of those,
- * and boxing it just draws a line round the top of the screen.
+ * and boxing it just draws a line round the top of the screen.)
  */
 export function OverviewHeader({ settings }: OverviewHeaderProps) {
   if (!settings) {
@@ -27,12 +33,12 @@ export function OverviewHeader({ settings }: OverviewHeaderProps) {
   const { business, agent } = settings
 
   return (
-    <div className="flex items-start justify-between gap-4">
-      <div className="min-w-0">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          {business.name}
-        </h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
+    <PageHeader
+      className="mb-0"
+      title={business.name}
+      actions={<TestAgentControl />}
+      description={
+        <>
           {business.industry}
           {business.phoneNumber && (
             <>
@@ -43,9 +49,8 @@ export function OverviewHeader({ settings }: OverviewHeaderProps) {
               </span>
             </>
           )}
-        </p>
-      </div>
-      <TestAgentControl />
-    </div>
+        </>
+      }
+    />
   )
 }

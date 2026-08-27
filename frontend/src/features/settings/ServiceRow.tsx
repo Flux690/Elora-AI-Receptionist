@@ -2,10 +2,28 @@ import { X } from 'lucide-react'
 import type { ServiceDraft } from '@receptionist/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
-/** The one place the column widths are stated. Captions and rows share it. */
-export const SERVICE_GRID = 'grid grid-cols-[1fr_92px_76px_76px_76px_28px] items-center gap-2'
+/**
+ * The one place the columns are stated.
+ *
+ * The unit lives in the heading rather than in every cell: five rows of "30 min"
+ * repeats the word four times more than it needs saying.
+ */
+export const SERVICE_COLUMNS = [
+  { label: 'Service', className: '' },
+  { label: 'Price', className: 'w-[92px]' },
+  { label: 'Takes', className: 'w-[76px] text-right' },
+  { label: 'Setup', className: 'w-[76px] text-right' },
+  { label: 'Cleanup', className: 'w-[76px] text-right' },
+  { label: '', className: 'w-[28px]' },
+]
 
 interface MinutesInputProps {
   value: number
@@ -29,22 +47,21 @@ function MinutesInput({ value, onChange, label }: MinutesInputProps) {
   )
 }
 
-/**
- * Column captions, said once above the rows.
- *
- * The unit lives here rather than in every cell: five rows of "30 min" repeats
- * the word four times more than it needs saying.
- */
+/** Column captions, said once above the rows. */
 export function ServiceCaptions() {
   return (
-    <div className={cn(SERVICE_GRID, 'pb-2 text-sm text-muted-foreground')}>
-      <span>Service</span>
-      <span>Price</span>
-      <span className="text-right">Takes</span>
-      <span className="text-right">Setup</span>
-      <span className="text-right">Cleanup</span>
-      <span />
-    </div>
+    <TableHeader className="[&_tr]:border-b-0">
+      <TableRow className="border-b-0 hover:bg-transparent">
+        {SERVICE_COLUMNS.map((c, i) => (
+          <TableHead
+            key={c.label || `spacer-${i}`}
+            className={cn('h-auto px-0 pb-2 font-normal', c.className)}
+          >
+            {c.label}
+          </TableHead>
+        ))}
+      </TableRow>
+    </TableHeader>
   )
 }
 
@@ -65,46 +82,58 @@ interface ServiceRowProps {
  */
 export function ServiceRow({ service, onChange, onRemove }: ServiceRowProps) {
   return (
-    <div className={cn(SERVICE_GRID, 'py-1')}>
-      <Input
-        value={service.name}
-        onChange={(e) => onChange({ name: e.target.value })}
-        placeholder="Service name"
-        aria-label="Service name"
-      />
-      <Input
-        value={service.price}
-        onChange={(e) => onChange({ price: e.target.value })}
-        placeholder="$0"
-        aria-label="Price"
-        className="tabular-nums"
-      />
-      <MinutesInput
-        label="Minutes it takes"
-        value={service.durationMinutes}
-        onChange={(durationMinutes) => onChange({ durationMinutes })}
-      />
-      <MinutesInput
-        label="Setup minutes before"
-        value={service.bufferBeforeMinutes}
-        onChange={(bufferBeforeMinutes) => onChange({ bufferBeforeMinutes })}
-      />
-      <MinutesInput
-        label="Cleanup minutes after"
-        value={service.bufferAfterMinutes}
-        onChange={(bufferAfterMinutes) => onChange({ bufferAfterMinutes })}
-      />
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        onClick={onRemove}
-        aria-label={`Remove ${service.name || 'service'}`}
-        type="button"
-        className="text-muted-foreground hover:text-destructive"
-      >
-        <X className="size-4" />
-      </Button>
-    </div>
+    <TableRow className="border-b-0 hover:bg-transparent">
+      <TableCell className="px-0 py-1 pr-2">
+        <Input
+          value={service.name}
+          onChange={(e) => onChange({ name: e.target.value })}
+          placeholder="Service name"
+          aria-label="Service name"
+        />
+      </TableCell>
+      <TableCell className="px-0 py-1 pr-2">
+        <Input
+          value={service.price}
+          onChange={(e) => onChange({ price: e.target.value })}
+          placeholder="$0"
+          aria-label="Price"
+          className="tabular-nums"
+        />
+      </TableCell>
+      <TableCell className="px-0 py-1 pr-2">
+        <MinutesInput
+          label="Minutes it takes"
+          value={service.durationMinutes}
+          onChange={(durationMinutes) => onChange({ durationMinutes })}
+        />
+      </TableCell>
+      <TableCell className="px-0 py-1 pr-2">
+        <MinutesInput
+          label="Setup minutes before"
+          value={service.bufferBeforeMinutes}
+          onChange={(bufferBeforeMinutes) => onChange({ bufferBeforeMinutes })}
+        />
+      </TableCell>
+      <TableCell className="px-0 py-1 pr-2">
+        <MinutesInput
+          label="Cleanup minutes after"
+          value={service.bufferAfterMinutes}
+          onChange={(bufferAfterMinutes) => onChange({ bufferAfterMinutes })}
+        />
+      </TableCell>
+      <TableCell className="px-0 py-1">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onRemove}
+          aria-label={`Remove ${service.name || 'service'}`}
+          type="button"
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <X className="size-4" />
+        </Button>
+      </TableCell>
+    </TableRow>
   )
 }
 
