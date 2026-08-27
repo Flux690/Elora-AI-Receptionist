@@ -41,7 +41,15 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "flex w-fit items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap transition-colors outline-none select-none focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive data-placeholder:text-muted-foreground data-[size=default]:h-8 data-[size=sm]:h-7 data-[size=sm]:rounded-[min(var(--radius-md),10px)] *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark: [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        /* A typed-in box and a pick-from box are drawn as opposites: an input is
+           its EDGE, a trigger is its FILL plus a lit ring. This one used to be
+           `bg-transparent` with a border — an input you cannot type in.
+
+           `bg-clip-padding` is what makes the transparent border do anything.
+           Clipped to the padding box the fill stops short of it, so the half
+           pixel of border shows the ground through, and the edge reads as two
+           lines: ring, ground, fill. Without it the same ring reads soft. */
+        "flex w-fit items-center justify-between gap-1.5 rounded-lg border border-transparent bg-control bg-clip-padding py-2 pr-2 pl-2.5 text-sm whitespace-nowrap shadow-control transition-colors outline-none select-none hover:bg-control-hover focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive data-placeholder:text-muted-foreground data-[size=default]:h-8 data-[size=sm]:h-7 data-[size=sm]:rounded-[min(var(--radius-md),10px)] *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5     [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}
@@ -63,7 +71,25 @@ function SelectContent({
   sideOffset = 4,
   align = "center",
   alignOffset = 0,
-  alignItemWithTrigger = true,
+  /**
+   * Off, against the library default.
+   *
+   * On, the popup OVERLAPS the trigger so the chosen row sits exactly over the
+   * trigger's own text — the macOS native select. It is pleasant for a five-item
+   * picker and unusable for a long one: the timezone list is 418 entries and
+   * `America/New_York` is number 154, so the menu tries to stack 154 rows above
+   * the field and ends up covering the viewport with the trigger buried in it.
+   *
+   * Base UI does back off "if there is not enough space", but a list capped at
+   * `--available-height` always has enough space by that measure, so the escape
+   * hatch never fires for exactly the lists that need it.
+   *
+   * Off, a select opens below its trigger like every other menu in the product.
+   * That also agrees with how these are now drawn: a hairline and a floating
+   * shadow say the panel sits ABOVE the page, and a panel that swallows its own
+   * trigger contradicts that.
+   */
+  alignItemWithTrigger = false,
   ...props
 }: SelectPrimitive.Popup.Props &
   Pick<
@@ -83,7 +109,8 @@ function SelectContent({
         <SelectPrimitive.Popup
           data-slot="select-content"
           data-align-trigger={alignItemWithTrigger}
-          className={cn("relative isolate z-50 max-h-(--available-height) w-(--anchor-width) min-w-36 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover text-popover-foreground duration-100 data-[align-trigger=true]:animate-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95", className )}
+          data-ground="menu"
+          className={cn("relative isolate z-50 max-h-(--available-height) w-(--anchor-width) min-w-36 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-xl border border-border bg-popover text-popover-foreground shadow-medium duration-100 data-[align-trigger=true]:animate-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95", className )}
           {...props}
         >
           <SelectScrollUpButton />

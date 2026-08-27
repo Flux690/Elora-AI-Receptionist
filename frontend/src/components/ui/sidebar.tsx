@@ -26,7 +26,9 @@ import { PanelLeftIcon } from "lucide-react"
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 // 244px: the rail Linear runs, and what the DeskRoute mocks are drawn to.
-const SIDEBAR_WIDTH = "244px"
+/* The rail's width is a measure like any other and lives with the rest of them
+   in `index.css`, rather than being stated once here and once there. */
+const SIDEBAR_WIDTH = "var(--container-sidebar)"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
@@ -212,6 +214,10 @@ function Sidebar({
       data-variant={variant}
       data-side={side}
       data-slot="sidebar"
+      /* The rail sits BELOW the stage, so everything in it re-derives against a
+         darker ground: its rows sink further, its ink is a shade deeper, and a
+         hairline in here is not the hairline out there. */
+      data-ground="sub"
     >
       {/* This is what handles the sidebar gap on desktop */}
       <div
@@ -241,7 +247,7 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]: group-data-[variant=floating]: group-data-[variant=floating]:"
+          className="flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg"
         >
           {children}
         </div>
