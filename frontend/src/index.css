@@ -13,70 +13,223 @@
    second set of token values, not by reverting this line. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ── Primitives ───────────────────────────────────────────────────────────────
-   The only absolute colours in the system. Every semantic token below points at
-   one of these, at a mix of them, or at another semantic token — never at a
-   value of its own. `design-tokens.test.ts` fails the build if that slips.
+/* ═══ THE ANCHOR ═══════════════════════════════════════════════════════════════
 
-   PAPER. Warm hue 92, not the cool 282 this started as, and every rung is ours
-   rather than a value measured off somebody else's product. The page reads as
-   paper rather than glass, which is the right register for a business that
-   answers a phone.
+   One surface is given; every other colour in the product is a departure from
+   it. That is the whole architecture, and it is what the previous system did
+   not have: thirteen absolute values, none derived from any other, so
+   `--contrast` could not exist and depth could not re-anchor.
 
-   The rungs are wider apart than the ladder they replace. Separation between
-   the rail and the stage is carried by five things at once — fill, the fall,
-   the gutter, the radius and a hairline — and when only the fill was doing the
-   work the two surfaces read as one however far apart their colours were.
+   PAPER, in LCH. The stage is the anchor — content sits on it, the sidebar is
+   the ground below it, a card floats above. Warm hue 97 with real chroma in the
+   surfaces: the page reads as paper rather than glass, which is the right
+   register for a business that answers a phone.
+
+   Authored in `lch()` rather than `oklch()` deliberately. The departure
+   constants below are LCH units, and letting the browser do the conversion is
+   what keeps them meaning what they say. See ~/Projects/nightwatch-docs.
    ────────────────────────────────────────────────────────────────────────── */
 :root {
   color-scheme: light;
 
-  /* Surfaces. Lifted means lighter, so a card sits ABOVE the page rather than
-     being a grey block on a white one. */
-  --n-1: oklch(0.930 0.007 92);
-  --n-2: oklch(0.972 0.006 92);
-  --n-3: oklch(0.992 0.003 92);
+  --base-l: 96.76;
+  --base-c: 2.288;
+  --base-h: 97.4;
 
-  /* Rungs BELOW the ground. Light darkens to signal state where dark lightens,
-     and it takes it in two small steps rather than one leap. */
-  /* A control rests ABOVE the stage and sinks BELOW it when pressed. The old
-     values sank it to 0.978 and 0.966 against a stage of 0.972 — the first step
-     was still lighter than the page, so hovering a button changed almost
-     nothing and the control read as painted onto the background. */
-  --n-2a: oklch(0.966 0.006 92);
-  --n-2b: oklch(0.940 0.007 92);
-  --sunk-1: oklch(0.904 0.008 92);
-  --sunk: oklch(0.885 0.009 92);
+  /* How far every departure travels. The anchor does not move when this
+     changes — that is the property that makes it a contrast control rather
+     than a brightness one. 30 is the reference the constants are quoted at. */
+  --contrast: 30;
+
+  /* ── Departures ────────────────────────────────────────────────────────────
+     Per unit of contrast, so a value here times `--contrast` is the distance in
+     LCH lightness. Quoted at 30 in the comments because that is the scale they
+     were measured on.
+
+     Surfaces and lines move TOWARD THE INK — darker, in a light theme. Controls
+     move TOWARD WHITE, and their hover reverses back toward the ink. In a dark
+     theme those two directions coincide, which is what hides the distinction
+     until somebody ports the system and every control comes out inverted.
+     ─────────────────────────────────────────────────────────────────────── */
+  --d-sub: -0.16233;            /* -4.87  the rail, below the stage */
+  --d-card: 0.077;              /* +2.31  a card, above it */
+  --d-control: 0.077;           /* +2.31  a control rests above its ground */
+  --d-control-hover: -0.02333;  /* -0.70  and sinks when pointed at */
+  --d-control-active: -0.12367; /* -3.71  and further when pressed */
+  --d-row-hover: -0.10033;      /* -3.01  a row in a list or a rail */
+  --d-row-active: -0.174;       /* -5.22  and the one you have selected */
+  --d-border: -0.464;           /* -13.92 a hairline */
+  --d-input: -0.50267;          /* -15.08 an input's edge, the more defined one */
+
+  /* Chroma is a departure too, and it re-anchors exactly as lightness does.
+     Holding it flat is what makes a ported card look duller than its page: the
+     lightness lifts and the colour does not follow. */
+  --dc-sub: 0.382;
+  --dc-card: -1.146;
+  --dc-control: -1.146;
+  --dc-control-hover: 0;
+  --dc-control-active: 0.382;
+  --dc-row-hover: 0.766;
+  --dc-row-active: 1.149;
+  --dc-border: 1.15;
+  --dc-input: 1.15;
+
+  /* Ink is PROPORTIONAL, not additive — a mix toward the dark pole rather than
+     a fixed distance. It is why text barely moves when the surface does, and an
+     additive ladder cannot reproduce it at any other contrast.
+
+     Light stops short of the pole on purpose: `--t-ink-3` at 0.94 lands on
+     L 5.8, never pure black. Black on near-white is harsh in a way white on
+     near-black is not. */
+  --t-ink-1: 0.60;
+  --t-ink-2: 0.77;
+  --t-ink-3: 0.94;
+
+  /* One chroma for every ink rung on a given ground, at half the ground's own
+     shift. The old ladder climbed — 5.79, 7.44, 6.19 — which no law permits and
+     nothing in the contract caught. 5.7 is where the warmth already was: it is
+     both the measured value of the lightest rung and what Linear's own
+     ink-to-ground ratio predicts against paper this warm. */
+  --c-ink: 5.7;
+
+  /* Two hues, one job each, and neither re-anchors — an accent that shifted
+     with depth would stop being findable, which is the only thing it is for.
+     Ink carries every other action.
+
+     The accent stays cool on a warm ladder deliberately. It measures 7.00
+     white-on-accent and 6.90 as text on a card, and because it is the only cool
+     thing on the page the one colour that means "act on this" is more findable
+     for being alone. Warm paper and cool ink is the oldest pairing in print. */
+  --accent-fill: lch(37.85 60.35 258); /* something is waiting on you */
+  --red-fill: lch(44.47 71.57 25);     /* destructive, and nothing else */
+  --white: lch(100 0 0);
+
+  /* The ground every departure is measured from. `:root` is the stage; the
+     blocks below move it, and everything inside re-derives. */
+  --ground-l: var(--base-l);
+  --ground-c: var(--base-c);
+}
+
+/* ═══ THE GROUNDS ══════════════════════════════════════════════════════════════
+
+   A container states its own ground and nothing inside it has to know. This is
+   the mechanism that retires a whole class of wrong-at-depth bugs: a control in
+   a menu derives against the menu, not against the page, so it cannot come out
+   the same colour as the surface it sits on.
+
+   Light compresses at the top and there is no way around it. The card ground
+   sits at L 99.07 against a ceiling of 100, so a control on a card clamps to
+   white — measured, not assumed. Depth above the card rung is therefore carried
+   by the ring and the shadow, never by fill. `--shadow-*` below is not
+   decoration; it is the other half of the ladder.
+   ────────────────────────────────────────────────────────────────────────── */
+[data-ground="sub"] {
+  --ground-l: calc(var(--base-l) + var(--d-sub) * var(--contrast));
+  --ground-c: calc(var(--base-c) + var(--dc-sub));
+}
+
+[data-ground="card"],
+[data-ground="menu"] {
+  --ground-l: calc(var(--base-l) + var(--d-card) * var(--contrast));
+  --ground-c: calc(var(--base-c) + var(--dc-card));
+}
+
+/* A menu highlights about twice as hard as a list, and the difference is not a
+   flourish. A list is scanned and its hover only has to follow the pointer; a
+   menu is READ by pointing at it, so the row under the cursor has to be
+   unmistakable. Reusing the general row value here is the specific thing that
+   makes a ported menu feel dead. */
+[data-ground="menu"] {
+  --d-row-hover: -0.21;  /* -6.3 at contrast 30 */
+  --d-row-active: -0.267; /* -8.0 */
+}
+
+/* ── The derived layer ────────────────────────────────────────────────────────
+   Declared on every element that carries a ground, not just on `:root`.
+
+   That repetition is load-bearing rather than sloppy. A custom property
+   substitutes its `var()`s where it is DECLARED, so a token declared once on
+   `:root` bakes in `:root`'s ground and re-anchoring silently does nothing —
+   the failure looks exactly like success until you measure two depths and get
+   one answer. Re-declaring here is the CSS equivalent of what Linear's theme
+   generator does when it emits a whole new set of properties per sub-theme.
+   ────────────────────────────────────────────────────────────────────────── */
+:root,
+[data-ground] {
+  /* Surfaces. `--n-1` and `--n-2` name PARTICULAR surfaces — the rail and the
+     stage — so they are absolute and do not follow the ground; the sidebar is
+     the sidebar wherever you read it from. `--n-3` is not a third rung but THE
+     LIFT: one step above whatever you are already on. That is what lets `--card`
+     and `--popover` both point at it and still land in the right place at two
+     different depths. */
+  --n-1: lch(
+    calc(var(--base-l) + var(--d-sub) * var(--contrast))
+    calc(var(--base-c) + var(--dc-sub)) var(--base-h)
+  );
+  --n-2: lch(var(--base-l) var(--base-c) var(--base-h));
+  --n-3: lch(
+    calc(var(--ground-l) + var(--d-card) * var(--contrast))
+    calc(var(--ground-c) + var(--dc-card)) var(--base-h)
+  );
+
+  /* Controls, against whatever they actually sit on. */
+  --control: lch(
+    calc(var(--ground-l) + var(--d-control) * var(--contrast))
+    calc(var(--ground-c) + var(--dc-control)) var(--base-h)
+  );
+  --control-hover: lch(
+    calc(var(--ground-l) + var(--d-control-hover) * var(--contrast))
+    calc(var(--ground-c) + var(--dc-control-hover)) var(--base-h)
+  );
+  --control-active: lch(
+    calc(var(--ground-l) + var(--d-control-active) * var(--contrast))
+    calc(var(--ground-c) + var(--dc-control-active)) var(--base-h)
+  );
+
+  /* Rows. A row is not a control: it has no rest fill, so its hover has to
+     travel further than a control's to say the same amount. */
+  --sunk-1: lch(
+    calc(var(--ground-l) + var(--d-row-hover) * var(--contrast))
+    calc(var(--ground-c) + var(--dc-row-hover)) var(--base-h)
+  );
+  --sunk: lch(
+    calc(var(--ground-l) + var(--d-row-active) * var(--contrast))
+    calc(var(--ground-c) + var(--dc-row-active)) var(--base-h)
+  );
 
   /* Lines sit below every surface, so an edge can never be lighter than what it
-     lands on. --line-2 is the darker of the two on purpose: a card and an input
-     share one fill, so the input's border is all that keeps it defined. */
-  --line-1: oklch(0.852 0.009 92);
-  --line-2: oklch(0.842 0.009 92);
+     lands on. `--line-2` is the darker of the two on purpose: a card and an
+     input share one fill, so the input's border is all that defines it. */
+  --line-1: lch(
+    calc(var(--ground-l) + var(--d-border) * var(--contrast))
+    calc(var(--ground-c) + var(--dc-border)) var(--base-h)
+  );
+  --line-2: lch(
+    calc(var(--ground-l) + var(--d-input) * var(--contrast))
+    calc(var(--ground-c) + var(--dc-input)) var(--base-h)
+  );
 
-  /* Ink, evenly spaced by 0.1425. */
-  --ink-1: oklch(0.475 0.015 92);
-  --ink-2: oklch(0.3325 0.019 92);
-  --ink-3: oklch(0.190 0.023 92);
+  /* Ink, proportional toward the pole, at half the ground's chroma shift. */
+  --ink-1: lch(
+    calc(var(--ground-l) + var(--t-ink-1) * (0 - var(--ground-l)))
+    calc(var(--c-ink) + (var(--ground-c) - var(--base-c)) / 2) var(--base-h)
+  );
+  --ink-2: lch(
+    calc(var(--ground-l) + var(--t-ink-2) * (0 - var(--ground-l)))
+    calc(var(--c-ink) + (var(--ground-c) - var(--base-c)) / 2) var(--base-h)
+  );
+  --ink-3: lch(
+    calc(var(--ground-l) + var(--t-ink-3) * (0 - var(--ground-l)))
+    calc(var(--c-ink) + (var(--ground-c) - var(--base-c)) / 2) var(--base-h)
+  );
 
-  /* Two hues, one job each. Ink carries every action, so neither of these is a
-     "primary" — colour is never decorative here, which is what lets it mean
-     something the moment it appears.
-
-     The accent stays cool on a warm ladder, deliberately. It measures 7.00
-     white-on-accent and 6.90 as text on a card, so nothing forces a change; and
-     because it is now the only cool thing on the page, the one colour that means
-     "act on this" is more findable than it was, not less. Warm paper and cool
-     ink is the oldest pairing in print. */
-  --accent-fill: oklch(0.470 0.170 258); /* something is waiting on you */
-  --red-fill: oklch(0.545 0.195 25);     /* destructive, and nothing else */
-  --white: oklch(1 0 0);
-
-  /* ── Semantics ─────────────────────────────────────────────────────────────
-     Each names a job and points at a step above. The names are unchanged from
-     the previous system — 35 of them are in use across the app — so retuning
-     the palette costs no call sites. */
-
+  /* ── Semantics ────────────────────────────────────────────────────────────
+     Each names a job and points at a rung above. Every name here predates the
+     rebuild and has call sites across the app — retuning the architecture cost
+     no call site, which is the point of having named the jobs in the first
+     place. They live in this block rather than on `:root` for the same
+     substitution reason the primitives do.
+     ────────────────────────────────────────────────────────────────────── */
   --background: var(--n-1);
   --foreground: var(--ink-3);
   --stage: var(--n-2);
@@ -84,20 +237,18 @@
   --card-foreground: var(--ink-3);
   --popover: var(--n-3);
   --popover-foreground: var(--ink-3);
-  --secondary: var(--n-2);
+  --secondary: var(--control);
   --secondary-foreground: var(--ink-3);
   --muted: var(--n-2);
   --muted-foreground: var(--ink-1);
 
   /* The accent carries action. One hue with one meaning — "this is something
      you act on" — so a primary button, a focus ring and a row still waiting on
-     you are all the same invitation rather than three unrelated signals.
-
-     Ink held this briefly, which made every button correct and none of them
-     findable: on a page of black text, a black button is just more black. */
+     you are all the same invitation rather than three unrelated signals. */
   --primary: var(--accent-fill);
   --primary-foreground: var(--white);
   --primary-subtle: color-mix(in srgb, var(--accent-fill) 8%, transparent);
+  --primary-hover: color-mix(in oklab, var(--accent-fill), var(--white) 12%);
 
   /* shadcn spends `accent` on hover and selected fills. */
   --accent: var(--sunk);
@@ -106,10 +257,22 @@
 
   --destructive: var(--red-fill);
   --destructive-foreground: var(--white);
+  --destructive-hover: color-mix(in oklab, var(--red-fill), var(--white) 12%);
 
   --border: var(--line-1);
   --input: var(--line-2);
   --ring: var(--accent-fill);
+
+  /* The scrim behind a modal. Absolute, because it is not on the ladder — it
+     covers the ladder. Linear's light theme measures 25%; this is lighter
+     because a blur sits under it here and the two compound. */
+  --scrim: lch(0 0 0 / 0.1);
+
+  /* States derive from the ground rather than washing over it. A flat ink wash
+     is a different ratio at every depth — 8% measures 1.97:1 on the stage and
+     1.47:1 in a menu — which is the specific thing re-anchoring fixes. */
+  --hover: var(--sunk-1);
+  --active: var(--sunk);
 
   /* The sidebar has no fill of its own: it is the ground showing through, and
      the stage floats against it. Colour is a fifth of that effect — the gutter,
@@ -122,25 +285,14 @@
   --sidebar-accent-foreground: var(--ink-3);
   --sidebar-border: transparent;
 
-  /* States are mixes against whatever they land on, never a rung of their own.
-     A fixed rung is right at one depth and wrong at every other, which is how a
-     row ends up darker than the panel it opened on. */
-  --hover: color-mix(in srgb, var(--ink-3) 4%, transparent);
-  --active: color-mix(in srgb, var(--ink-3) 8%, transparent);
-
-  /* A control rests ABOVE what it sits on, and sinks in two steps. The steps
-     are small and even — one leap reads as pressed-into-the-page rather than
-     picked. Sized against the stage, as Linear's are against its ground. */
-  --control: var(--n-3);
-  --control-hover: var(--n-2a);
-  --control-active: var(--n-2b);
-  --primary-hover: color-mix(in oklab, var(--primary), var(--white) 12%);
-  --destructive-hover: color-mix(in oklab, var(--destructive), var(--white) 12%);
-
   /* Status. Three roles, and colour only appears for one of them: ink states a
      fact, the accent flags something waiting on you, red is destructive. Green
      and amber are gone — a booking is not a celebration and an escalation is
-     not a failure. */
+     not a failure.
+
+     `-dot` is split from the text rung on purpose. A dot is a graphical object
+     and needs 3:1; text needs 4.5:1. One token serving both forces a value too
+     pale for the dot or too dark for the words. */
   --status-booked: var(--ink-3);
   --status-confirmed: var(--ink-3);
   --status-escalated: var(--accent-fill);
@@ -156,22 +308,41 @@
 /* Tailwind's colour utilities, resolving through the semantic layer above. */
 @theme inline {
   /* The default scale is cleared so `shadow-md` stops generating a rule, then
-     two are declared — and only two.
+     the ladder is declared — and only the ladder.
 
-     Measured off Linear's pills, which draw their hairline as a 0.5px SPREAD
-     rather than a CSS border: `borderWidth` reports 0px and the edge is on an
-     ::after. A ring darkens the surface exactly at the edge, so a control can
-     look lifted without being lightened, and it never shrinks the content the
-     way a real border does.
+     Four levels, and each is a pairing of radius, edge and shadow rather than a
+     colour. That matters most in light, where the fills run out of room above
+     the card rung and depth has nowhere else to live:
 
-     `edge` is that ring alone — an unselected control. `raised` adds two very
-     soft lifts on top, which is what a selected one carries. */
+       control  8px   ring + low      a button, a trigger
+       card    12px   hairline + low  a panel, the stage
+       menu    12px   hairline + med  a dropdown, a select
+       modal   12px   hairline + high a dialog, a sheet
+
+     `ring` is white at 14.3% rather than a border colour, so one value works at
+     every depth where a bordered ring would have to re-derive. It is what makes
+     a control read as lit from above rather than cut out of the page.
+
+     The stacks are three shadows at low opacity rather than one large blur.
+     That is what makes an edge read soft without the panel looking hazy. */
   --shadow-*: initial;
-  --shadow-edge: 0 0 0 0.5px oklch(0 0 0 / 0.09);
-  --shadow-raised:
-    0 0 0 0.5px oklch(0 0 0 / 0.09),
-    0 3px 6px -2px oklch(0 0 0 / 0.02),
-    0 1px 1px 0 oklch(0 0 0 / 0.04);
+  --shadow-ring: 0 0 0 0.5px lch(100 0 0 / 0.143);
+  --shadow-low:
+    0 3px 6px -2px lch(0 0 0 / 0.02),
+    0 1px 1px lch(0 0 0 / 0.04);
+  --shadow-medium:
+    0 6px 18px lch(0 0 0 / 0.02),
+    0 3px 9px lch(0 0 0 / 0.04),
+    0 1px 1px lch(0 0 0 / 0.04);
+  --shadow-high:
+    0 9px 48px lch(0 0 0 / 0.08),
+    0 6px 24px lch(0 0 0 / 0.1),
+    0 1px 1px lch(0 0 0 / 0.04);
+  /* A control at rest: the ring, and the faintest lift under it. */
+  --shadow-control:
+    0 0 0 0.5px lch(100 0 0 / 0.143),
+    0 3px 6px -2px lch(0 0 0 / 0.02),
+    0 1px 1px lch(0 0 0 / 0.04);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -201,6 +372,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-scrim: var(--scrim);
   --color-sunk: var(--sunk);
   --color-sunk-1: var(--sunk-1);
   --color-control: var(--control);
@@ -257,7 +429,7 @@
 
   /* Two radii, not five. 8px is everything on the stage, 12px is what floats
      above it. The five names are Tailwind's namespace, not five rungs — which
-     means the 23 `rounded-lg` and 4 `rounded-xl` call sites need no edit. */
+     means the `rounded-lg` and `rounded-xl` call sites need no edit. */
   --radius-sm: 8px;
   --radius-md: 8px;
   --radius-lg: 8px;
@@ -281,7 +453,7 @@
 
   /* Measures. A page names one of these; nothing else does. */
   --container-page: 900px;
-  --container-form: 880px;
+  --container-form: 840px;
   --container-sidebar: 244px;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);

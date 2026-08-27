@@ -1,297 +1,530 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 
-/* The colour contract. Every token points at a step, the ladder only ever
-   rises, every line sits below every surface, and every pair clears its floor.
-   Adapted from NightWarden's console suite, which solves the same system at the
-   dark end; the cases that differ are marked, and they differ because light
-   inverts the direction of an edge rather than because the idea changed.
+/* The colour contract.
 
-   Converted here rather than read from a browser: a browser reports oklch()
-   back verbatim, so a naive rgb() regex reads L, C and H as r, g and b. */
+   The system is one anchor plus a table of departures from it, so this suite
+   asserts RELATIONSHIPS and never constants. A test that pins "ink spaced by
+   exactly 0.1425" permits a change of hue and forbids a change of contrast,
+   which is backwards — and that is precisely what the previous version of this
+   file did while every defect in the rebuild shipped underneath it, 26 green.
 
-type Step = { L: number; C: number; H: number };
+   Three of its assertions were actively wrong and are gone:
 
-const css = readFileSync(join(process.cwd(), "src/index.css"), "utf8");
+     - even ink spacing        pinned a constant, forbade a contrast change
+     - global contrast floors  measured ink against surfaces it never lands on
+     - "hovers must be washes" mandated the weaker of the two options; a flat
+                               ink wash is a different ratio at every depth
 
-/* :root carries primitives and semantics; @theme carries everything with no
-   palette dimension. They are parsed separately because only the first is held
-   to the "must resolve to a step" rule. */
-const declarations = new Map<string, string>();
-for (const block of css.matchAll(/:root\s*\{([\s\S]*?)\n\}/g)) {
-  for (const m of block[1].matchAll(/--([a-z][-a-z0-9]*):\s*([^;]+);/g)) {
-    declarations.set(m[1]!, m[2]!.trim().replace(/\s+/g, " "));
+   Values are computed here rather than read from a browser: `getComputedStyle`
+   returns `lch()` verbatim, so a naive rgb regex reads L, C and H as r, g, b. */
+
+const root = process.cwd();
+const css = readFileSync(join(root, "src/index.css"), "utf8");
+
+/* ── Parsing ───────────────────────────────────────────────────────────────── */
+
+/** Every `--name: value;` in the file, last declaration winning. */
+function declarations(source: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const m of source.matchAll(/--([a-z][-a-z0-9]*):\s*([^;]+);/g)) {
+    out.set(m[1]!, m[2]!.trim().replace(/\s+/g, " "));
   }
+  return out;
 }
 
-const scale = new Map<string, Step>();
-const aliases = new Map<string, string>();
-const mixes = new Map<string, { base: string; toward: string; part: number }>();
-const overlays = new Map<string, { ink: string; alpha: number }>();
-
-/* A mix names both poles and blends in OKLab, where the browser blends. */
-const MIX =
-  /^color-mix\(\s*in oklab,\s*var\(--([a-z][-a-z0-9]*)\),\s*var\(--([a-z][-a-z0-9]*)\) ([\d.]+)%\s*\)$/;
-/* An overlay names no base: a control that can sit on four depths has no one
-   surface to be mixed against, so it composites over whatever is beneath. */
-const OVERLAY =
-  /^color-mix\(\s*in srgb,\s*var\(--([a-z][-a-z0-9]*)\) ([\d.]+)%,\s*transparent\s*\)$/;
-
-for (const [name, value] of declarations) {
-  const triple = /^oklch\(([\d.]+) ([\d.]+) ([\d.]+)\)$/.exec(value);
-  if (triple) {
-    scale.set(name, { L: +triple[1]!, C: +triple[2]!, H: +triple[3]! });
-    continue;
+/** Every `selector { … }` pair, so a constant cannot leak across blocks.
+    Parsing the file flat and letting the last declaration win reads the menu's
+    row departures as the page's — which is exactly the bug this suite exists to
+    catch, so it had better not have it itself. */
+function blocks(source: string): Array<{ selector: string; body: string }> {
+  /* Comments first, or a block's selector reads as the whole paragraph above
+     it — and this file is mostly paragraphs. */
+  const bare = source.replace(/\/\*[\s\S]*?\*\//g, "");
+  const out: Array<{ selector: string; body: string }> = [];
+  /* Walked rather than matched. A single regex has to guess where a selector
+     starts, and here it can be preceded by an at-rule, a closing brace or the
+     top of the file — three anchors, each of which the others break. */
+  let cursor = 0;
+  while (true) {
+    const open = bare.indexOf("{", cursor);
+    if (open === -1) break;
+    const close = bare.indexOf("}", open);
+    if (close === -1) break;
+    const selector = bare
+      .slice(cursor, open)
+      .split(/[;}]/)
+      .pop()!
+      .trim()
+      .replace(/\s+/g, " ");
+    out.push({ selector, body: bare.slice(open + 1, close) });
+    cursor = close + 1;
   }
-  const blend = MIX.exec(value);
-  if (blend) {
-    mixes.set(name, { base: blend[1]!, toward: blend[2]!, part: +blend[3]! / 100 });
-    continue;
-  }
-  const wash = OVERLAY.exec(value);
-  if (wash) {
-    overlays.set(name, { ink: wash[1]!, alpha: +wash[2]! / 100 });
-    continue;
-  }
-  const alias = /^var\(--([a-z][-a-z0-9]*)\)$/.exec(value);
-  if (alias) aliases.set(name, alias[1]!);
+  return out;
 }
 
-function blend(x: Step, y: Step, part: number): Step {
-  const polar = ({ L, C, H }: Step) => {
-    const h = (H * Math.PI) / 180;
-    return [L, C * Math.cos(h), C * Math.sin(h)] as const;
+const BLOCKS = blocks(css);
+const bodyOf = (selector: string) =>
+  BLOCKS.filter((b) => b.selector === selector).map((b) => b.body).join("\n");
+
+const all = declarations(css);
+/** The anchor and the departure table live on `:root` and nowhere else. */
+const rootDecls = declarations(bodyOf(":root"));
+/** A menu overrides two of them; nothing else may. */
+const menuDecls = declarations(bodyOf('[data-ground="menu"]'));
+
+const num = (name: string, from: Map<string, string> = rootDecls): number => {
+  const raw = from.get(name);
+  const v = Number(raw);
+  if (!Number.isFinite(v)) throw new Error(`--${name} is not a plain number: ${raw}`);
+  return v;
+};
+
+const BASE_L = num("base-l");
+const BASE_C = num("base-c");
+const BASE_H = num("base-h");
+const CONTRAST = num("contrast");
+
+/** The block that redeclares every ground-dependent token. */
+const derivedBlock = /:root,\s*\[data-ground\]\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? "";
+
+type Step = { L: number; C: number };
+
+/** A ground: its own lightness and chroma, plus any departure it overrides. */
+function ground(name: "base" | "sub" | "card" | "menu", contrast = CONTRAST): Step {
+  if (name === "base") return { L: BASE_L, C: BASE_C };
+  const key = name === "menu" ? "card" : name;
+  return {
+    L: BASE_L + num(`d-${key}`) * contrast,
+    C: BASE_C + num(`dc-${key}`),
   };
-  const [l1, a1, b1] = polar(x);
-  const [l2, a2, b2] = polar(y);
-  const [L, a, b] = [
-    l1 + (l2 - l1) * part,
-    a1 + (a2 - a1) * part,
-    b1 + (b2 - b1) * part,
-  ];
-  let H = (Math.atan2(b, a) * 180) / Math.PI;
-  if (H < 0) H += 360;
-  return { L, C: Math.hypot(a, b), H };
 }
 
-function step(name: string): Step {
-  const target = aliases.get(name) ?? name;
-  const mix = mixes.get(target);
-  if (mix) return blend(step(mix.base), step(mix.toward), mix.part);
-  const value = scale.get(target);
-  if (!value) throw new Error(`--${name} does not resolve to a step on the scale`);
-  return value;
+/** A role on a ground, by the additive law for L and the departure law for C. */
+function role(
+  name: string,
+  on: "base" | "sub" | "card" | "menu",
+  contrast = CONTRAST,
+): Step {
+  const g = ground(on, contrast);
+  /* A menu overrides its row departures — a menu is read by pointing at it, so
+     its highlight travels further than a list's. */
+  const dl =
+    on === "menu" && menuDecls.has(`d-${name}`)
+      ? num(`d-${name}`, menuDecls)
+      : num(`d-${name}`);
+  return {
+    L: clampL(g.L + dl * contrast),
+    C: Math.max(0, g.C + num(`dc-${name}`)),
+  };
 }
 
-/* OKLab to linear sRGB, then luminance. Clamped, because a browser clamps too. */
-function luminance({ L, C, H }: Step): number {
+/** Ink is proportional: a mix toward the pole, not a fixed distance from here. */
+function ink(rung: 1 | 2 | 3, on: "base" | "sub" | "card" | "menu"): Step {
+  const g = ground(on);
+  const POLE = 0; // light: text travels toward black
+  return {
+    L: clampL(g.L + num(`t-ink-${rung}`) * (POLE - g.L)),
+    C: Math.max(0, num("c-ink") + (g.C - BASE_C) / 2),
+  };
+}
+
+const clampL = (l: number) => Math.min(100, Math.max(0, l));
+
+const GROUNDS = ["base", "sub", "card", "menu"] as const;
+const SURFACE_ROLES = ["card", "control"] as const;
+const LINE_ROLES = ["border", "input"] as const;
+
+/* ── Colour maths: CIELCh(D65) → sRGB → relative luminance ─────────────────── */
+
+function luminance({ L, C }: Step, H = BASE_H): number {
   const h = (H * Math.PI) / 180;
-  const a = C * Math.cos(h);
-  const b = C * Math.sin(h);
-  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
-  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
-  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
-  const [r, g, bl] = [
-    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  const [a, bb] = [C * Math.cos(h), C * Math.sin(h)];
+  const fy = (L + 16) / 116;
+  const [fx, fz] = [fy + a / 500, fy - bb / 200];
+  const e = 216 / 24389;
+  const k = 24389 / 27;
+  const inv = (f: number) => (f ** 3 > e ? f ** 3 : (116 * f - 16) / k);
+  const WP = [0.3127 / 0.329, 1, (1 - 0.3127 - 0.329) / 0.329];
+  const [X, Y, Z] = [inv(fx) * WP[0]!, inv(fy) * WP[1]!, inv(fz) * WP[2]!];
+  const lin = [
+    3.2409699419 * X - 1.5373831776 * Y - 0.4986107603 * Z,
+    -0.9692436363 * X + 1.8759675015 * Y + 0.0415550574 * Z,
+    0.0556300797 * X - 0.203976959 * Y + 1.0569715142 * Z,
   ].map((v) => Math.min(1, Math.max(0, v)));
-  return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  return 0.2126 * lin[0]! + 0.7152 * lin[1]! + 0.0722 * lin[2]!;
 }
 
-function contrast(a: string, b: string): number {
-  const [hi, lo] = [luminance(step(a)), luminance(step(b))].sort((x, y) => y - x);
+function contrastRatio(a: Step, b: Step, ha = BASE_H, hb = BASE_H): number {
+  const [hi, lo] = [luminance(a, ha), luminance(b, hb)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 }
 
-const SURFACES = ["n-1", "n-2", "n-3"];
-const LINES = ["line-1", "line-2"];
+/** `lch(L C H)` out of a declaration, for the two absolute hues. */
+function absolute(name: string): Step & { H: number } {
+  const m = /^lch\(([\d.]+) ([\d.]+) ([\d.]+)\)$/.exec(all.get(name) ?? "");
+  if (!m) throw new Error(`--${name} is not an absolute lch() triple`);
+  return { L: +m[1]!, C: +m[2]!, H: +m[3]! };
+}
 
-describe("the ladder", () => {
-  it("rises: the ground is the deepest surface and a card the lightest", () => {
-    /* The relationship the whole system rests on, and the one that was wrong
-       before this test existed: a card sits ABOVE the page, so the page is
-       slightly grey and the card is white — not the other way round. */
-    expect(step("n-1").L).toBeLessThan(step("n-2").L);
-    expect(step("n-2").L).toBeLessThan(step("n-3").L);
-  });
+/* ── The laws ──────────────────────────────────────────────────────────────── */
 
-  it("keeps every surface step big enough to read and small enough to be calm", () => {
-    /* Deliberately NOT an even-spacing rule. These are measured values, and
-       Linear's own ladder is not evenly spaced — an assertion of evenness would
-       contradict the reference this system is built on. What matters is that no
-       rung is so small it is a gesture, nor so large it reads as a new colour. */
-    for (const [below, above] of [
-      ["n-1", "n-2"],
-      ["n-2", "n-3"],
-    ] as const) {
-      const d = step(above).L - step(below).L;
-      expect(d, `${below} to ${above}`).toBeGreaterThan(0.01);
-      expect(d, `${below} to ${above}`).toBeLessThan(0.06);
+describe("the anchor", () => {
+  it("never moves, at any contrast", () => {
+    /* The property the whole architecture rests on. If the base drifts with
+       contrast then contrast is a brightness control, not a contrast one, and
+       every departure below is measured from a moving point. */
+    for (const c of [15, 27, 30, 50, 75, 100]) {
+      expect(ground("base", c).L, `contrast ${c}`).toBe(BASE_L);
     }
   });
 
-  it("sinks a control in two steps, and never below the deepest surface", () => {
-    /* Linear looks raised with no shadow at all — its rest surface simply sits
-       above the page and sinks below it when pressed. Deliberately NOT an
-       evenness rule: their own steps are 5.5 then 1.5 in lch, decreasing, and
-       asserting evenness here would repeat the mistake made on the surfaces. */
-    expect(step("control").L).toBeGreaterThan(step("n-2").L);
-    expect(step("control-hover").L).toBeLessThan(step("control").L);
-    expect(step("control-active").L).toBeLessThan(step("control-hover").L);
-    expect(step("control-active").L).toBeGreaterThan(step("sunk").L);
-    // Each move has to be visible, or it is a token nobody can see.
-    expect(step("control").L - step("control-hover").L).toBeGreaterThan(0.008);
-    expect(step("control-hover").L - step("control-active").L).toBeGreaterThan(0.008);
+  it("multiplies every lightness departure by the contrast dial", () => {
+    /* Asserted against the stylesheet rather than against arithmetic done here,
+       which would only be testing this file against itself. Every derived
+       lightness must be `ground + departure × contrast`; a departure that
+       forgets the multiplier is a rung that ignores the dial. */
+    const derived = declarations(derivedBlock);
+    /* `--n-2` is the anchor itself and has no departure to scale; ink is
+       proportional and takes its scaling through the ground. Everything else
+       must name a departure AND multiply it. */
+    const additive = [...derived].filter(
+      ([n, v]) => /^(n-1|n-3|control|control-hover|control-active|sunk|sunk-1|line-1|line-2)$/.test(n) && v.startsWith("lch("),
+    );
+    expect(additive.length).toBeGreaterThanOrEqual(9);
+    for (const [name, value] of additive) {
+      expect(value, `--${name} names no departure`).toMatch(/var\(--d-[a-z-]+\)/);
+      expect(value, `--${name} ignores the contrast dial`).toMatch(/var\(--contrast\)/);
+    }
+    for (const rung of [1, 2, 3] as const) {
+      expect(derived.get(`ink-${rung}`), `--ink-${rung}`).toMatch(/var\(--t-ink-\d\)/);
+    }
   });
 
-  it("keeps the sidebar's hover and selected fills apart", () => {
-    /* Hovering a selected row still has to say something. */
-    expect(step("sunk-1").L).toBeGreaterThan(step("sunk").L);
-    expect(step("sunk-1").L).toBeLessThan(step("n-1").L);
+  it("clamps rather than overflowing when contrast is pushed", () => {
+    /* Light runs out of room at the top: a card at contrast 60 would land past
+       L 100. It must pin to white, not wrap or go negative. */
+    for (const c of [15, 60, 100]) {
+      for (const g of GROUNDS) {
+        const l = role("control", g, c).L;
+        expect(l, `control on ${g} at contrast ${c}`).toBeGreaterThanOrEqual(0);
+        expect(l).toBeLessThanOrEqual(100);
+      }
+    }
+  });
+});
+
+describe("law 1 — surfaces, borders and controls are additive", () => {
+  it("rises: the rail is below the stage and a card above it", () => {
+    /* The relationship that was wrong before any of these tests existed: a card
+       sits ABOVE the page, so the page is faintly warm and the card is white —
+       not the other way round. */
+    expect(ground("sub").L).toBeLessThan(BASE_L);
+    expect(BASE_L).toBeLessThan(ground("card").L);
   });
 
-  it("drops the selected fill BELOW the ground, never one step up", () => {
-    /* Dark rises to signal state, light sinks. Getting this backwards makes a
-       selected row read as a raised one, which is the wrong affordance. */
-    expect(step("sunk").L).toBeLessThan(step("n-1").L);
+  it("raises a control above its ground and reverses its hover toward the ink", () => {
+    /* Controls move toward WHITE in a light theme while surfaces move toward
+       the ink — the two directions coincide in dark, which is what hides the
+       distinction until somebody ports the system and every control inverts. */
+    for (const g of GROUNDS) {
+      const rest = role("control", g);
+      const hover = role("control-hover", g);
+      const active = role("control-active", g);
+      expect(rest.L, `rest on ${g}`).toBeGreaterThanOrEqual(ground(g).L);
+      expect(hover.L, `hover on ${g}`).toBeLessThan(rest.L);
+      expect(active.L, `active on ${g}`).toBeLessThan(hover.L);
+    }
   });
 
-  it("keeps every line below every surface, so an edge cannot invert", () => {
-    /* In light, "a line sits above every surface" means darker. A line lighter
-       than a raised surface disappears exactly where it is needed most. */
-    for (const line of LINES) {
-      for (const n of SURFACES) {
-        expect(step(line).L, `${line} on ${n}`).toBeLessThan(step(n).L);
+  it("keeps every line below every surface it can land on", () => {
+    /* In light, "a line sits above its surface" means darker. A line lighter
+       than the surface it edges disappears exactly where it is needed. */
+    for (const g of GROUNDS) {
+      for (const line of LINE_ROLES) {
+        for (const surface of SURFACE_ROLES) {
+          expect(
+            role(line, g).L,
+            `${line} against ${surface} on ${g}`,
+          ).toBeLessThan(role(surface, g).L);
+        }
+        expect(role(line, g).L, `${line} on ${g}`).toBeLessThan(ground(g).L);
       }
     }
   });
 
-  it("keeps the input border darker than the card border", () => {
-    /* A card and an input share one fill. The border is the only thing that
-       separates them, so the input's has to be the more defined of the two. */
-    expect(step("line-2").L).toBeLessThan(step("line-1").L);
+  it("keeps the input edge more defined than the card edge", () => {
+    /* A card and an input share one fill, so the input's border is the only
+       thing that separates them. */
+    expect(num("d-input")).toBeLessThan(num("d-border"));
   });
 
-  it("spaces ink evenly", () => {
-    const a = step("ink-2").L - step("ink-1").L;
-    const b = step("ink-3").L - step("ink-2").L;
-    expect(a).toBeCloseTo(b, 2);
+  it("highlights a menu row harder than a list row", () => {
+    /* A list is scanned; a menu is READ by pointing at it. Reusing the general
+       row value in a menu is what makes a ported menu feel dead. */
+    const list = Math.abs(role("row-active", "base").L - ground("base").L);
+    const menu = Math.abs(role("row-active", "menu").L - ground("menu").L);
+    expect(menu).toBeGreaterThan(list * 1.4);
   });
 });
 
-describe("derivation", () => {
-  it("holds every semantic token to a step, a mix, an alias or transparent", () => {
-    for (const [name, value] of declarations) {
-      if (scale.has(name) || aliases.has(name) || mixes.has(name)) continue;
-      if (overlays.has(name)) continue;
-      expect(value, `--${name} is a raw value, not a step`).toBe("transparent");
+describe("law 2 — ink is proportional, not additive", () => {
+  it("darkens monotonically and stops short of the pole", () => {
+    /* Pure black on near-white is harsh in a way pure white on near-black is
+       not, so the darkest rung lands near L 6 rather than at 0. */
+    for (const g of GROUNDS) {
+      expect(ink(1, g).L).toBeGreaterThan(ink(2, g).L);
+      expect(ink(2, g).L).toBeGreaterThan(ink(3, g).L);
+      expect(ink(3, g).L, `ink-3 on ${g}`).toBeGreaterThan(0);
     }
+    for (const r of [1, 2, 3] as const) expect(num(`t-ink-${r}`)).toBeLessThan(1);
   });
 
-  it("keeps raw colour out of everything but the named primitives", () => {
-    for (const name of scale.keys()) {
-      expect(name, `--${name} is a raw colour outside the scale`).toMatch(
-        /^(n|sunk|line|ink|accent-fill|red-fill|white)(-|$)/,
+  it("barely moves when the surface moves", () => {
+    /* The signature of the proportional law, and the reason it is worth having:
+       between the rail and a card the ground travels ~7 L and body ink travels
+       under 1. An additive ladder cannot reproduce that at any other contrast. */
+    const groundTravel = Math.abs(ground("card").L - ground("sub").L);
+    const inkTravel = Math.abs(ink(3, "card").L - ink(3, "sub").L);
+    expect(inkTravel).toBeLessThan(groundTravel / 4);
+  });
+});
+
+describe("law 3 — chroma re-anchors as well as lightness", () => {
+  it("builds every ground-dependent chroma out of the ground's own", () => {
+    /* Asserted against the stylesheet, because the arithmetic version of this
+       test is circular: it recomputes chroma from the same constants it is
+       checking and passes happily while the CSS pins a flat value. Verified by
+       mutation — replacing the ink chroma expression with a bare `var(--c-ink)`
+       must turn this red, and nothing else in the suite notices.
+
+       `--n-1` and `--n-2` name particular surfaces and are anchored absolutely,
+       so they are the only two exempt. */
+    const derived = declarations(derivedBlock);
+    const mustReanchor = /^(n-3|control|control-hover|control-active|sunk|sunk-1|line-1|line-2|ink-1|ink-2|ink-3)$/;
+    let checked = 0;
+    for (const [name, value] of derived) {
+      if (!mustReanchor.test(name)) continue;
+      checked++;
+      expect(value, `--${name} pins chroma instead of departing from the ground`).toMatch(
+        /var\(--ground-c\)/,
+      );
+    }
+    expect(checked).toBeGreaterThanOrEqual(11);
+  });
+
+  it("moves ink chroma at half the ground's rate", () => {
+    /* The half-rate divisor is the law; losing it makes ink follow the surface
+       as hard as a border does, and warm paper turns the body text tan. */
+    const derived = declarations(derivedBlock);
+    for (const rung of [1, 2, 3] as const) {
+      expect(derived.get(`ink-${rung}`), `--ink-${rung}`).toMatch(
+        /var\(--ground-c\)\s*-\s*var\(--base-c\)\)\s*\/\s*2/,
       );
     }
   });
 
-  it("derives every hover and active state rather than naming a rung", () => {
-    /* A state bound to a rung is right at one depth and wrong at every other.
-       Expressed as a mix, it follows whatever it lands on. */
-    const states = [...declarations.keys()].filter((n) => /^(hover|active)$/.test(n));
-    expect(states.length).toBeGreaterThan(0);
-    for (const name of states) {
-      const overlay = overlays.get(name);
-      expect(overlay, `--${name} is not a wash`).toBeDefined();
-      expect(overlay?.ink, `--${name} washes with the wrong pole`).toBe("ink-3");
+  it("departs from the ground's chroma rather than holding a flat constant", () => {
+    /* The trap. Hold chroma flat and the ladder lifts correctly while the
+       colour does not follow, so a control on a card comes out grey where the
+       page reads faintly warm. It is invisible until you rasterise and compare
+       channels, which is why it needs a test rather than an eye. */
+    for (const name of [...SURFACE_ROLES, ...LINE_ROLES]) {
+      for (const g of GROUNDS) {
+        expect(role(name, g).C, `${name} on ${g}`).toBeCloseTo(
+          Math.max(0, ground(g).C + num(`dc-${name}`)),
+          6,
+        );
+      }
+      /* And it must actually differ between two grounds, or the departure is
+         zero and the assertion above is vacuous. */
+      expect(role(name, "sub").C).not.toBeCloseTo(role(name, "card").C, 3);
     }
   });
 
-  it("darkens to make a state, the mirror of the dark theme lightening", () => {
-    expect(overlays.get("active")!.alpha).toBeGreaterThan(overlays.get("hover")!.alpha);
-  });
-
-  it("lifts each fill toward white for its hover", () => {
-    for (const [fill, hover] of [
-      ["primary", "primary-hover"],
-      ["destructive", "destructive-hover"],
-    ] as const) {
-      expect(mixes.get(hover)?.toward, `--${hover}`).toBe("white");
-      expect(step(hover).L).toBeGreaterThan(step(fill).L);
+  it("moves ink chroma at half the ground's rate, one value per ground", () => {
+    for (const g of GROUNDS) {
+      const [a, b, c] = [ink(1, g), ink(2, g), ink(3, g)];
+      expect(a.C, `ink chroma varies by rung on ${g}`).toBeCloseTo(b.C, 6);
+      expect(b.C).toBeCloseTo(c.C, 6);
+      expect(a.C).toBeCloseTo(num("c-ink") + (ground(g).C - BASE_C) / 2, 6);
     }
   });
-});
 
-describe("colour means one thing", () => {
-  it("spends the accent on anything you act on", () => {
-    /* One hue, one meaning: this is interactive. A primary button, a focus
-       ring, and a row still waiting on you are all the same invitation. */
-    expect(aliases.get("primary")).toBe("accent-fill");
-    expect(aliases.get("ring")).toBe("accent-fill");
-    expect(aliases.get("status-pending")).toBe("accent-fill");
-  });
-
-  it("reserves red for destructive and nothing else", () => {
-    const red = [...declarations].filter(([, v]) => v === "var(--red-fill)").map(([n]) => n);
-    expect(red.sort()).toEqual(["destructive", "status-error"]);
-  });
-
-  it("keeps the accent to interactive things and nothing else", () => {
-    const accented = [...declarations]
-      .filter(([, v]) => v === "var(--accent-fill)")
-      .map(([n]) => n)
-      .sort();
-    expect(accented).toContain("primary");
-    expect(accented).toContain("ring");
-    expect(accented).toContain("status-pending");
-  });
-
-  it("states a fact in ink, not in green", () => {
-    for (const s of ["status-booked", "status-confirmed"]) {
-      expect(step(s)).toEqual(step("ink-3"));
+  it("caps ink chroma, so the greys cannot drift", () => {
+    /* The ceiling the previous contract did not have, which is how a ladder
+       that climbed 5.79 → 7.44 → 6.19 shipped unnoticed. Warm paper wants warm
+       ink; it does not want tan. */
+    for (const g of GROUNDS) {
+      for (const r of [1, 2, 3] as const) {
+        expect(ink(r, g).C, `ink-${r} on ${g}`).toBeLessThanOrEqual(6.5);
+      }
     }
   });
 });
 
-describe("contrast floors", () => {
-  it("clears AAA for body ink on every surface", () => {
-    for (const n of SURFACES) {
-      expect(contrast("ink-3", n), `ink-3 on ${n}`).toBeGreaterThanOrEqual(7);
+describe("contrast floors, within each ground", () => {
+  /* Measured against the ground the ink actually lands on. Testing ink in a
+     menu against the page's background measures a pair that never appears on
+     screen, which is what the previous suite did. */
+  it("clears AAA for body ink on every ground", () => {
+    for (const g of GROUNDS) {
+      expect(contrastRatio(ink(3, g), ground(g)), `ink-3 on ${g}`).toBeGreaterThanOrEqual(7);
     }
   });
 
-  it("clears AA for muted ink on every surface", () => {
-    for (const n of SURFACES) {
-      expect(contrast("ink-1", n), `ink-1 on ${n}`).toBeGreaterThanOrEqual(4.5);
+  it("clears AA for muted ink on every ground", () => {
+    for (const g of GROUNDS) {
+      expect(contrastRatio(ink(1, g), ground(g)), `ink-1 on ${g}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("clears AA for the accent wherever it is read", () => {
+    const accent = absolute("accent-fill");
+    for (const g of GROUNDS) {
+      expect(
+        contrastRatio(accent, ground(g), accent.H, BASE_H),
+        `accent on ${g}`,
+      ).toBeGreaterThanOrEqual(4.5);
     }
   });
 
   it("clears AA for a fill against the text it carries", () => {
-    expect(contrast("primary-foreground", "primary")).toBeGreaterThanOrEqual(4.5);
-    expect(contrast("destructive-foreground", "destructive")).toBeGreaterThanOrEqual(4.5);
-  });
-
-  it("clears AA for the accent wherever it is read", () => {
-    for (const n of SURFACES) {
-      expect(contrast("accent-fill", n), `accent on ${n}`).toBeGreaterThanOrEqual(4.5);
+    for (const fill of ["accent-fill", "red-fill"] as const) {
+      const f = absolute(fill);
+      expect(contrastRatio(absolute("white"), f, 0, f.H), fill).toBeGreaterThanOrEqual(4.5);
     }
   });
 
-  it("keeps a hairline visible but calm", () => {
+  it("keeps a hairline visible but calm on every ground", () => {
     /* Between 1.2 and 3: below that an edge vanishes, above it the page turns
        into a wireframe. */
-    for (const line of LINES) {
-      const c = contrast(line, "n-3");
-      expect(c, `${line} on a card`).toBeGreaterThan(1.2);
-      expect(c, `${line} on a card`).toBeLessThan(3);
+    for (const g of GROUNDS) {
+      for (const line of LINE_ROLES) {
+        const c = contrastRatio(role(line, g), ground(g));
+        expect(c, `${line} on ${g}`).toBeGreaterThan(1.2);
+        expect(c, `${line} on ${g}`).toBeLessThan(3);
+      }
     }
   });
 });
 
-describe("type and depth", () => {
+describe("derivation", () => {
+  it("derives every ground-dependent token rather than naming a value", () => {
+    /* Each of these must be an `lch(calc(...))` built from `--ground-*`. A raw
+       triple here is a rung that is right at one depth and wrong at every
+       other — the exact failure the rebuild removed. */
+    const derived = declarations(derivedBlock);
+    const mustDerive = /^(n-3|control|control-hover|control-active|sunk|sunk-1|line-1|line-2|ink-1|ink-2|ink-3)$/;
+    for (const [name, value] of derived) {
+      if (!mustDerive.test(name)) continue;
+      expect(value, `--${name} does not derive from the ground`).toMatch(/var\(--ground-[lc]\)/);
+      expect(value, `--${name} holds a literal`).not.toMatch(/lch\(\s*[\d.]+\s+[\d.]+/);
+    }
+  });
+
+  it("re-declares the derived layer on every ground, not only on :root", () => {
+    /* A custom property substitutes its `var()`s where it is DECLARED, so a
+       token declared once on `:root` bakes in `:root`'s ground and
+       re-anchoring silently does nothing. The failure looks exactly like
+       success until you measure two depths and get one answer. */
+    expect(css).toMatch(/:root,\s*\[data-ground\]\s*\{/);
+    expect(derivedBlock).toMatch(/--ink-1:/);
+    expect(derivedBlock).toMatch(/--control:/);
+  });
+
+  it("keeps the anchor and the two hues as the only absolute colours", () => {
+    const literals = [...all]
+      .filter(([, v]) => /^lch\([\d.]+ [\d.]+ [\d.]+\)$/.test(v))
+      .map(([n]) => n)
+      .sort();
+    expect(literals).toEqual(["accent-fill", "red-fill", "white"]);
+  });
+});
+
+describe("colour means one thing", () => {
+  it("spends the accent on anything you act on, and nothing else", () => {
+    const accented = [...all].filter(([, v]) => v === "var(--accent-fill)").map(([n]) => n);
+    expect(accented).toEqual(
+      expect.arrayContaining(["primary", "ring", "status-pending", "accent-ink"]),
+    );
+  });
+
+  it("reserves red for destructive and nothing else", () => {
+    const red = [...all].filter(([, v]) => v === "var(--red-fill)").map(([n]) => n).sort();
+    expect(red).toEqual(["destructive", "status-error"]);
+  });
+
+  it("states a fact in ink, not in green", () => {
+    /* A booking is not a celebration and an escalation is not a failure. */
+    for (const s of ["status-booked", "status-confirmed"]) {
+      expect(all.get(s)).toBe("var(--ink-3)");
+    }
+  });
+});
+
+describe("the elevation ladder", () => {
+  const ui = (f: string) => readFileSync(join(root, "src/components/ui", f), "utf8");
+
+  it("gives every overlay an edge", () => {
+    /* Light compresses at the top: a menu and a card both land on L 100, so
+       fill cannot separate them and the border and shadow are the entire
+       boundary. Without this a dropdown over a card is invisible, which is the
+       defect that started the rebuild — and the old contract could not see it
+       because it only ever read `index.css`. */
+    for (const file of ["dropdown-menu.tsx", "select.tsx", "dialog.tsx", "sheet.tsx"]) {
+      const source = ui(file);
+      expect(source, `${file} declares no ground`).toMatch(/data-ground="menu"/);
+      /* The class string that carries the ground is the one that must carry the
+         edge — a shadow elsewhere in the file is not the popup's. */
+      const popup = source.slice(source.indexOf('data-ground="menu"'));
+      const classes = /className=\{cn\(\s*(?:\/\*[\s\S]*?\*\/\s*)?"([^"]*)"/.exec(popup)?.[1] ?? "";
+      expect(classes, `${file} carries no shadow`).toMatch(/shadow-(medium|high)/);
+    }
+  });
+
+  it("targets the orientation attribute Base UI actually emits", () => {
+    /* The registry's base-nova components style orientation with
+       `data-horizontal:` / `data-vertical:`, which compile to `[data-horizontal]`
+       — an attribute @base-ui/react 1.5 does not emit. It emits
+       `data-orientation="horizontal"`.
+
+       Nothing errors; the utility simply never matches. The slider's track came
+       out `height: 0` — a scrubber with no bar — and `Separator` rendered at
+       zero height inside the sidebar. Re-running `shadcn add` reintroduces it,
+       so it needs a test rather than a memory. */
+    const files = readdirSync(join(root, "src/components/ui"));
+    for (const file of files) {
+      const source = readFileSync(join(root, "src/components/ui", file), "utf8");
+      const offenders = source.match(/data-(horizontal|vertical):/g) ?? [];
+      expect(offenders, `${file} styles an attribute Base UI never sets`).toEqual([]);
+    }
+  });
+
+  it("declares the shadow tiers and clears Tailwind's default scale", () => {
+    expect(css).toMatch(/--shadow-\*:\s*initial/);
+    const declared = [...css.matchAll(/--shadow-([a-z]+):/g)].map((m) => m[1]!).sort();
+    expect(declared).toEqual(["control", "high", "low", "medium", "ring"]);
+  });
+
+  it("draws the control ring as a spread of white, not a border colour", () => {
+    /* White composites over whatever it lands on, so one value works at every
+       depth where a `--border` ring would have to re-derive. */
+    expect(all.get("shadow-ring")).toMatch(/^0 0 0 0\.5px lch\(100 0 0 \/ [\d.]+\)$/);
+  });
+
+  it("stacks each tier rather than using one large blur", () => {
+    /* Three shadows at low opacity is what makes an edge read soft without the
+       panel looking hazy. */
+    for (const tier of ["low", "medium", "high"]) {
+      const layers = (all.get(`shadow-${tier}`)?.match(/lch\(/g) ?? []).length;
+      expect(layers, `shadow-${tier}`).toBeGreaterThanOrEqual(2);
+    }
+  });
+});
+
+describe("type and geometry", () => {
   const theme = /@theme\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? "";
 
   it("puts nothing below the 14px floor", () => {
@@ -309,15 +542,11 @@ describe("type and depth", () => {
     expect([...radii].sort()).toEqual(["12", "8"]);
   });
 
-  it("clears the default shadow scale and declares only edge and raised", () => {
-    expect(css).toMatch(/--shadow-\*:\s*initial/);
-    const declared = [...css.matchAll(/--shadow-([a-z]+):/g)].map((m) => m[1]!);
-    expect(declared.sort()).toEqual(["edge", "raised"]);
-  });
-
-  it("draws the hairline as a spread, not a blur", () => {
-    /* A 0.5px spread at low alpha darkens the surface exactly at the edge.
-       A blurred drop would be a second depth cue arguing with the ladder. */
-    expect(css).toMatch(/--shadow-edge:\s*0 0 0 0\.5px/);
+  it("names every measure once", () => {
+    /* `PageContainer` hardcoded 900 and 840 while these declared 900 and 880,
+       so the token and the page disagreed and neither was obviously wrong. */
+    for (const m of ["page", "form", "sidebar"]) {
+      expect(theme, `--container-${m}`).toMatch(new RegExp(`--container-${m}:\\s*\\d+px`));
+    }
   });
 });
