@@ -8,6 +8,12 @@ type CreateAppointmentInput = {
   tenantId: string;
   clientId: string | null;
   callerPhone: string | null;
+  /**
+   * The name the caller gave when booking. Independent of `clients.name`: an
+   * anonymous caller has no client row to hang a name on, but the business still
+   * needs to know who is turning up.
+   */
+  callerName?: string | null;
   /** The service record this was booked against; null if it is since deleted. */
   serviceId?: string | null;
   service: string;
@@ -24,6 +30,7 @@ export async function createAppointment(input: CreateAppointmentInput): Promise<
       tenantId: input.tenantId,
       clientId: input.clientId,
       callerPhone: input.callerPhone,
+      callerName: input.callerName ?? null,
       serviceId: input.serviceId ?? null,
       service: input.service,
       startTime: input.startTime,
@@ -40,6 +47,7 @@ export async function listAppointments(tenantId: string) {
     .select({
       id: appointments.id,
       callerPhone: appointments.callerPhone,
+      callerName: appointments.callerName,
       service: appointments.service,
       startTime: appointments.startTime,
       endTime: appointments.endTime,

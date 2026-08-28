@@ -1,10 +1,15 @@
-import { llm, voice } from "@livekit/agents";
+import { llm } from "@livekit/agents";
 import { z } from "zod";
 import type { AgentDeps } from "./types.js";
 import { createEscalation } from "../services/escalations.js";
 import { setClientName } from "../services/clients.js";
-import { fetchBusyRanges, createCalendarEvent, deleteCalendarEvent } from "../services/calendar.js";
 import {
+  fetchBusyRanges,
+  createCalendarEvent,
+  deleteCalendarEvent,
+} from "../services/calendar.js";
+import {
+  describeAppointmentWindow,
   describeDate,
   describeSlot,
   filterByBusy,
@@ -12,7 +17,11 @@ import {
   generateCandidateSlots,
   isOpenOn,
 } from "./scheduling.js";
-import { createAppointment, getUpcomingByPhone, cancelAppointmentById } from "../services/appointments.js";
+import {
+  createAppointment,
+  getUpcomingByPhone,
+  cancelAppointmentById,
+} from "../services/appointments.js";
 
 /** How many times the agent reads out at once. More than three is unfollowable. */
 const MAX_SLOTS_OFFERED = 3;
@@ -21,19 +30,50 @@ const MAX_SLOTS_OFFERED = 3;
 const DEFAULT_SEARCH_DAYS = 14;
 
 export function createAgentTools(deps: AgentDeps) {
-  const holdPhrase = deps.tenant.agentProfile.holdPhrase;
   const tenantId = deps.tenant.id;
   const timeZone = deps.tenant.timezone;
 
-  function sayHold(ctx: voice.RunContext) {
-    if (!holdPhrase) return;
-    ctx.session.say(holdPhrase);
-  }
+  /**
+   * NO HOLD PHRASE. This is deliberate, and it was removed after it ate three
+   * answers in three test calls.
+   *
+   * The idea was benign: a tool is slow, so say "one moment" to cover the gap.
+   * The reality is that speech is a QUEUE and a hold phrase is a second speech
+   * handle. It does not fill silence beside the answer — it stands in front of
+   * it. Measured on 2026-08-28:
+   *
+   *   40.463  hold phrase starts
+   *   42.770  bookAppointment returns booked:true
+   *   44.358  the model finishes writing "Yes, I've booked your haircut..."
+   *   45.465  hold phrase finally stops
+   *   45.467  the confirmation is DISCARDED, never spoken
+   *
+   * The caller then sat in silence until they asked "Did you do it?".
+   *
+   * Switching to LiveKit's own `RunContext.filler` did not help, because it
+   * speaks through `AgentSession.say` and so creates the same competing handle.
+   * The problem is not which API says it; it is that anything said during a tool
+   * call is in the way of that tool's answer.
+   *
+   * And the gap being covered is small: these tools measure 400ms to 3.2s. Two
+   * seconds of quiet is a receptionist thinking. A lost confirmation is a
+   * customer who does not know whether they have an appointment.
+   *
+   * `agentProfile.holdPhrase` was removed from the type, the API and the
+   * dashboard too — a setting that changes nothing is worse than no setting. If
+   * genuinely slow work arrives later the mechanism is `RunContext.update()`,
+   * which marks the tool NON-BLOCKING so the conversation continues rather than
+   * queueing behind it. That needs no editable phrase.
+   */
 
   return {
     createEscalation: llm.tool({
       description:
-        "Escalate a question you cannot answer to the business team. Use this when the answer is not in your instructions or knowledge base. Do not escalate the same question twice.",
+        "Record a question you could not answer, so the business owner can answer it later. " +
+        "Use this only after checking everything you were given — the services, hours and knowledge in your instructions. " +
+        "Also use it when the caller wants something you have no way to do, such as booking when no calendar is connected. " +
+        "Say the fallback line to the caller first; this tool records the question, it does not reply to anyone. " +
+        "At most once per question per call.",
       parameters: z.object({
         question: z.string().describe("The caller's question, as asked."),
         transcriptExcerpt: z
@@ -65,9 +105,16 @@ export function createAgentTools(deps: AgentDeps) {
 
     rememberCallerName: llm.tool({
       description:
-        "Save the caller's name once they have given it, so they are recognised on future calls and their bookings are titled correctly. Call this at most once per call, and only with a name the caller actually stated.",
+        "Remember the caller's name for future calls, when they offer it in conversation. " +
+        "Do NOT ask for a name just to call this — only use a name the caller actually said. " +
+        "You do not need this before booking: bookAppointment takes the name itself. " +
+        "At most once per call.",
       parameters: z.object({
-        name: z.string().describe("The caller's name exactly as they gave it."),
+        name: z
+          .string()
+          .describe(
+            "The caller's name as they said it, first name alone is fine. Not a spelling, not a title.",
+          ),
       }),
       execute: async ({ name }) => {
         // No client row for an anonymous caller, so there is nothing to attach
@@ -85,20 +132,29 @@ export function createAgentTools(deps: AgentDeps) {
 
     checkAvailability: llm.tool({
       description:
-        "Find real appointment times for a service. Always call this before offering any time to a caller. It returns slots with ids; read the times out and remember the ids.",
+        "Find real, bookable times for one service. " +
+        "You must call this before saying any time out loud — you have no way to know what is free otherwise, and a time you invent is a customer turning up to a closed door. " +
+        "Returns up to three slots, each with an id. Read the times to the caller in plain words and keep the ids to yourself.",
       parameters: z.object({
-        service: z.string().describe("The service the caller wants, as they said it."),
+        service: z
+          .string()
+          .describe("The service the caller wants, as they said it."),
         preferredDate: z
           .string()
           .nullable()
-          .describe("The date the caller asked for, as YYYY-MM-DD. Null if they did not name one."),
+          .describe(
+            "The date the caller asked for, as YYYY-MM-DD. Null if they did not name one.",
+          ),
         partOfDay: z
           .enum(["morning", "afternoon", "evening"])
           .nullable()
           .describe("Only if the caller asked for one. Null otherwise."),
       }),
-      execute: async ({ service, preferredDate, partOfDay }, { ctx }) => {
-        if (!deps.calendarExternalId) {
+      execute: async ({ service, preferredDate, partOfDay }) => {
+        // Captured before the filler scope below: narrowing from the guard does
+        // not survive into a closure.
+        const calendarId = deps.calendarExternalId;
+        if (!calendarId) {
           return {
             error:
               "No calendar is connected, so times cannot be checked. Create an escalation so the team can follow up.",
@@ -116,11 +172,12 @@ export function createAgentTools(deps: AgentDeps) {
           };
         }
 
-        // sayHold fires FIRST — before any await — so the caller hears it immediately
-        sayHold(ctx);
         const token = await deps.getGoogleToken();
         if (!token) {
-          return { error: "Calendar authentication unavailable. Create an escalation." };
+          return {
+            error:
+              "Calendar authentication unavailable. Create an escalation.",
+          };
         }
 
         const now = new Date();
@@ -149,7 +206,9 @@ export function createAgentTools(deps: AgentDeps) {
           return {
             slots: [],
             note: `No times are available${
-              preferredDate ? ` around ${describeDate(preferredDate, timeZone)}` : ""
+              preferredDate
+                ? ` around ${describeDate(preferredDate, timeZone)}`
+                : ""
             }. Offer to have the team call back, or create an escalation.`,
           };
         }
@@ -158,14 +217,16 @@ export function createAgentTools(deps: AgentDeps) {
         try {
           const busy = await fetchBusyRanges(
             token,
-            deps.calendarExternalId,
+            calendarId,
             candidates[0]!.blockStart.toISOString(),
-            candidates.at(-1)!.blockEnd.toISOString()
+            candidates.at(-1)!.blockEnd.toISOString(),
           );
           free = filterByBusy(candidates, busy);
         } catch (err) {
           console.error("[agent] freeBusy lookup failed:", err);
-          return { error: "Could not check the calendar. Create an escalation." };
+          return {
+            error: "Could not check the calendar. Create an escalation.",
+          };
         }
 
         if (free.length === 0) {
@@ -191,11 +252,24 @@ export function createAgentTools(deps: AgentDeps) {
 
     bookAppointment: llm.tool({
       description:
-        "Book one of the slots returned by checkAvailability, using its slotId. Only call this once the caller has confirmed a specific time. Never invent a slotId.",
+        "Confirm a booking for a slot that checkAvailability already offered. " +
+        "Before calling this you need two things: the caller has chosen one of the times you read out, and you know their name. " +
+        "If you do not have a name yet, ask for it now — 'Can I take your name?' — because the booking goes in the diary under it. " +
+        "Never invent a slotId, and never call this for a time you did not offer.",
       parameters: z.object({
-        slotId: z.string().describe("The slotId of the time the caller chose."),
+        slotId: z
+          .string()
+          .describe(
+            "The id of the slot the caller chose, exactly as checkAvailability returned it.",
+          ),
+        callerName: z
+          .string()
+          .nullable()
+          .describe(
+            "The name to put in the diary. Ask the caller for it before booking if you do not already know it. Pass null only if they were asked and declined to give one.",
+          ),
       }),
-      execute: async ({ slotId }, { ctx }) => {
+      execute: async ({ slotId, callerName }) => {
         const held = deps.slots.held.get(slotId);
         if (!held) {
           // The model made one up, or referred to an offer from before a
@@ -206,15 +280,30 @@ export function createAgentTools(deps: AgentDeps) {
           };
         }
 
-        // sayHold fires FIRST — before any await — so the caller hears it immediately
-        sayHold(ctx);
         const { slot, service } = held;
         const token = await deps.getGoogleToken();
+
+        // A name given at booking beats one we already had — people correct
+        // themselves, and this is the name they just said for this booking.
+        const bookedName = callerName?.trim() || deps.client?.name || null;
+
+        // Persist it so the next call recognises them. Only possible when a
+        // client row exists, which needs a phone number; an anonymous caller's
+        // name still reaches the diary and the appointment below.
+        if (callerName?.trim() && deps.client) {
+          const updated = await setClientName(
+            tenantId,
+            deps.client.id,
+            callerName,
+          );
+          if (updated) deps.client = updated;
+        }
 
         const appointmentBase = {
           tenantId,
           clientId: deps.client?.id ?? null,
           callerPhone: deps.callerPhone,
+          callerName: bookedName,
           serviceId: service.id,
           service: service.name,
           startTime: slot.start,
@@ -222,11 +311,15 @@ export function createAgentTools(deps: AgentDeps) {
         };
 
         if (!token || !deps.calendarExternalId) {
-          await createAppointment({ ...appointmentBase, status: "requested" });
+          await createAppointment({
+            ...appointmentBase,
+            status: "requested",
+          });
           deps.callState.wasBooked = true;
           return {
             booked: false,
-            reason: "Calendar not connected — appointment request saved, team will confirm.",
+            reason:
+              "Calendar not connected — appointment request saved, team will confirm.",
           };
         }
 
@@ -238,7 +331,7 @@ export function createAgentTools(deps: AgentDeps) {
             token,
             deps.calendarExternalId,
             slot.blockStart.toISOString(),
-            slot.blockEnd.toISOString()
+            slot.blockEnd.toISOString(),
           );
           if (filterByBusy([slot], busy).length === 0) {
             deps.slots.held.delete(slotId);
@@ -253,15 +346,26 @@ export function createAgentTools(deps: AgentDeps) {
               ? ` (appointment ${describeSlot(slot, timeZone)}; includes setup and cleanup)`
               : "";
 
-          const eventId = await createCalendarEvent(token, deps.calendarExternalId, {
-            summary: `${service.name} — ${deps.client?.name ?? deps.callerPhone ?? "caller ID withheld"}`,
-            // The block, not the appointment: the event must reserve setup and
-            // cleanup or the next booking lands on top of them.
-            startIso: slot.blockStart.toISOString(),
-            endIso: slot.blockEnd.toISOString(),
-            timezone: timeZone,
-            description: `Booked by the AI receptionist${padded}`,
-          });
+          const eventId = await createCalendarEvent(
+            token,
+            deps.calendarExternalId,
+            {
+              // The appointment window leads, because the event itself spans
+              // the padded block and Google renders it in whatever timezone
+              // the viewer's calendar is set to. Without this the owner reads
+              // a 40-minute event at 6:30pm and cannot tell that they booked a
+              // 30-minute haircut at 9am.
+              summary: `${service.name} ${describeAppointmentWindow(slot, timeZone)} — ${
+                bookedName ?? deps.callerPhone ?? "name not given"
+              }`,
+              // The block, not the appointment: the event must reserve setup and
+              // cleanup or the next booking lands on top of them.
+              startIso: slot.blockStart.toISOString(),
+              endIso: slot.blockEnd.toISOString(),
+              timezone: timeZone,
+              description: `Booked by the AI receptionist${padded}`,
+            },
+          );
 
           await createAppointment({
             ...appointmentBase,
@@ -274,11 +378,15 @@ export function createAgentTools(deps: AgentDeps) {
           return { booked: true, time: describeSlot(slot, timeZone) };
         } catch (err) {
           console.error("[agent] bookAppointment failed:", err);
-          await createAppointment({ ...appointmentBase, status: "requested" });
+          await createAppointment({
+            ...appointmentBase,
+            status: "requested",
+          });
           deps.callState.wasBooked = true;
           return {
             booked: false,
-            reason: "Booking failed — appointment request saved, team will confirm.",
+            reason:
+              "Booking failed — appointment request saved, team will confirm.",
           };
         }
       },
@@ -288,7 +396,7 @@ export function createAgentTools(deps: AgentDeps) {
       description:
         "Look up a caller's upcoming appointments by their phone number. Use when a caller asks about existing bookings or wants to cancel/reschedule.",
       parameters: z.object({}),
-      execute: async (_params, { ctx }) => {
+      execute: async () => {
         // Anonymous caller: there is no identity to look up. Ask for a number
         // rather than querying with a placeholder — a shared placeholder key is
         // how one caller's appointments got read to another (PLAN.md 1.8.1).
@@ -300,9 +408,16 @@ export function createAgentTools(deps: AgentDeps) {
               "Ask the caller to read out the phone number their appointment was booked under.",
           };
         }
-        sayHold(ctx);
-        const upcoming = await getUpcomingByPhone(tenantId, deps.callerPhone);
-        if (upcoming.length === 0) return { appointments: [], message: "No upcoming appointments found." };
+        const upcoming = await getUpcomingByPhone(
+          tenantId,
+          deps.callerPhone!,
+        );
+        if (upcoming.length === 0) {
+          return {
+            appointments: [],
+            message: "No upcoming appointments found.",
+          };
+        }
         return {
           appointments: upcoming.map((a) => ({
             id: a.id,
@@ -319,18 +434,26 @@ export function createAgentTools(deps: AgentDeps) {
       description:
         "Cancel a confirmed appointment. Only call after you have read the appointment details back to the caller and they explicitly confirmed they want to cancel.",
       parameters: z.object({
-        appointmentId: z.string().describe("The ID of the appointment to cancel."),
+        appointmentId: z
+          .string()
+          .describe("The ID of the appointment to cancel."),
       }),
-      execute: async ({ appointmentId }, { ctx }) => {
-        sayHold(ctx);
-        const cancelled = await cancelAppointmentById(appointmentId, tenantId);
+      execute: async ({ appointmentId }) => {
+        const cancelled = await cancelAppointmentById(
+          appointmentId,
+          tenantId,
+        );
         if (!cancelled) return { error: "Appointment not found." };
 
         if (cancelled.externalEventId && deps.calendarExternalId) {
           const token = await deps.getGoogleToken();
           if (token) {
             try {
-              await deleteCalendarEvent(token, deps.calendarExternalId, cancelled.externalEventId);
+              await deleteCalendarEvent(
+                token,
+                deps.calendarExternalId,
+                cancelled.externalEventId,
+              );
             } catch (err) {
               console.error("[agent] deleteCalendarEvent failed:", err);
             }

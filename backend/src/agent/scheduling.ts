@@ -284,6 +284,31 @@ export function describeSlot(slot: Slot, timeZone: string): string {
     .replace(",", "");
 }
 
+/**
+ * "9:00–9:30 AM" — the appointment's own window, in the business's timezone.
+ *
+ * The calendar event spans the padded BLOCK, so a 30-minute haircut with ten
+ * minutes of cleanup shows as a 40-minute event. And Google renders every event
+ * in the *viewer's* timezone, so an owner reading a New York calendar from India
+ * sees 6:30pm. Both are correct and together they are unreadable: the title has
+ * to state the real appointment window, in the business's own clock, or nobody
+ * can tell what was actually booked.
+ */
+export function describeAppointmentWindow(slot: Slot, timeZone: string): string {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+  // The meridiem is said once, at the end, unless the window crosses noon.
+  const start = fmt.format(slot.start);
+  const end = fmt.format(slot.end);
+  const [startClock, startMeridiem] = start.split(" ");
+  const [, endMeridiem] = end.split(" ");
+  return startMeridiem === endMeridiem ? `${startClock}–${end}` : `${start}–${end}`;
+}
+
 /** "Sunday 23 August" — for telling a caller which day is closed. */
 export function describeDate(dateIso: string, timeZone: string): string {
   return new Intl.DateTimeFormat("en-US", {

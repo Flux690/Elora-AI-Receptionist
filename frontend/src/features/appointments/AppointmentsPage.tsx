@@ -72,8 +72,18 @@ export default function AppointmentsPage() {
                 <TableCell className="max-w-0 truncate px-2.5 py-0 font-medium text-foreground">
                   {a.service}
                 </TableCell>
-                <TableCell className="px-2.5 py-0 text-muted-foreground tabular-nums">
-                  {a.callerPhone ? formatPhone(a.callerPhone) : 'Withheld'}
+                {/* The name they gave at booking leads, because that is who the
+                    business is expecting through the door. The number is the
+                    fallback, and "not given" is honest where a placeholder is
+                    not — a caller may decline, and many have no number at all. */}
+                <TableCell className="px-2.5 py-0 text-muted-foreground">
+                  {a.callerName ? (
+                    <span className="text-foreground">{a.callerName}</span>
+                  ) : a.callerPhone ? (
+                    <span className="tabular-nums">{formatPhone(a.callerPhone)}</span>
+                  ) : (
+                    'Name not given'
+                  )}
                 </TableCell>
                 <TableCell className="px-2.5 py-0 text-muted-foreground">
                   {a.startTime ? formatDateTime(a.startTime) : 'Time to be confirmed'}

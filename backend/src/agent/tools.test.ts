@@ -1,0 +1,139 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createAgentTools } from "./tools.js";
+import { makeAgentDeps } from "../test/agent-fixtures.js";
+
+/**
+ * Every tool's `execute` must actually RETURN something to the model.
+ *
+ * This file exists because of a real outage I caused. Removing the hold phrase
+ * left each tool body wrapped in `return await (async () => { ... })` — an arrow
+ * function that is never invoked. `await` on a function object yields the
+ * function, so every wrapped tool returned a closure instead of a result:
+ *
+ *   Tool call execution finished
+ *     args: "{\\"service\\":\\"Beard Trim\\", ...}"
+ *     isError: false          ← no `output` field at all
+ *   ...2ms later
+ *
+ * The model asked for availability, got nothing back, retried, got nothing
+ * again, gave up and escalated — and the caller was told "someone from our team
+ * will follow up". Booking was silently dead.
+ *
+ * Typecheck passed (the code is valid), and every existing test passed, because
+ * nothing anywhere called a tool's `execute`. A tool that cannot be shown to
+ * return a value is a tool nobody has tested.
+ */
+
+const okCalendar = () =>
+  makeAgentDeps({
+    calendarExternalId: "cal-1",
+    getGoogleToken: async () => "token-1",
+  });
+
+beforeEach(() => {
+  vi.restoreAllMocks();
+});
+
+vi.mock("../services/calendar.js", () => ({
+  fetchBusyRanges: vi.fn(async () => []),
+  createCalendarEvent: vi.fn(async () => "evt-1"),
+  deleteCalendarEvent: vi.fn(async () => {}),
+}));
+
+vi.mock("../services/appointments.js", () => ({
+  createAppointment: vi.fn(async () => ({ id: "appt-1" })),
+  getUpcomingByPhone: vi.fn(async () => []),
+  cancelAppointmentById: vi.fn(async () => null),
+}));
+
+vi.mock("../services/escalations.js", () => ({
+  createEscalation: vi.fn(async () => ({ id: "esc-1" })),
+}));
+
+vi.mock("../services/clients.js", () => ({
+  setClientName: vi.fn(async () => null),
+}));
+
+/** The RunContext the SDK passes; only `session` is touched by these tools. */
+const runCtx = () => ({ ctx: { session: { say: vi.fn(), shutdown: vi.fn() } } }) as never;
+
+describe("every tool returns a result to the model", () => {
+  it("checkAvailability returns slots, not a function", async () => {
+    const tools = createAgentTools(okCalendar());
+    const result = await tools.checkAvailability.execute(
+      { service: "Haircut", preferredDate: null, partOfDay: null },
+      runCtx()
+    );
+
+    expect(typeof result, "a tool must never resolve to a function").not.toBe("function");
+    expect(result).toBeDefined();
+    // Either real slots or an explicit note — never undefined, never a closure.
+    expect(result).toEqual(
+      expect.objectContaining({ ...(("slots" in result!) ? {} : { note: expect.anything() }) })
+    );
+    expect("slots" in result! || "note" in result! || "error" in result!).toBe(true);
+  });
+
+  it("bookAppointment returns a result for an unknown slot", async () => {
+    const tools = createAgentTools(okCalendar());
+    const result = await tools.bookAppointment.execute(
+      { slotId: "nope", callerName: "Prabhat" },
+      runCtx()
+    );
+
+    expect(typeof result).not.toBe("function");
+    expect(result).toHaveProperty("error");
+  });
+
+  it("bookAppointment returns a result for a held slot", async () => {
+    const deps = okCalendar();
+    const tools = createAgentTools(deps);
+
+    // Offer a slot first, exactly as a real call does.
+    const offered = (await tools.checkAvailability.execute(
+      { service: "Haircut", preferredDate: null, partOfDay: null },
+      runCtx()
+    )) as { slots?: { slotId: string }[] };
+
+    const slotId = offered.slots?.[0]?.slotId;
+    expect(slotId, "checkAvailability produced no bookable slot").toBeDefined();
+
+    const result = await tools.bookAppointment.execute(
+      { slotId: slotId!, callerName: "Prabhat" },
+      runCtx()
+    );
+
+    expect(typeof result).not.toBe("function");
+    expect(result).toEqual(expect.objectContaining({ booked: true }));
+  });
+
+  it("lookupAppointments returns a result", async () => {
+    const tools = createAgentTools(makeAgentDeps({ callerPhone: "+14155550123" }));
+    const result = await tools.lookupAppointments.execute({}, runCtx());
+
+    expect(typeof result).not.toBe("function");
+    expect(result).toHaveProperty("appointments");
+  });
+
+  it("cancelAppointment returns a result", async () => {
+    const tools = createAgentTools(okCalendar());
+    const result = await tools.cancelAppointment.execute(
+      { appointmentId: "appt-1" },
+      runCtx()
+    );
+
+    expect(typeof result).not.toBe("function");
+    expect(result).toHaveProperty("error");
+  });
+
+  it("createEscalation returns a result", async () => {
+    const tools = createAgentTools(makeAgentDeps());
+    const result = await tools.createEscalation.execute(
+      { question: "Do you have parking?", transcriptExcerpt: null },
+      { ctx: { speechHandle: {}, session: { say: vi.fn() } } } as never
+    );
+
+    expect(typeof result).not.toBe("function");
+    expect(result).toEqual({ escalated: true });
+  });
+});

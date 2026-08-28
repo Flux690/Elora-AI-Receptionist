@@ -211,3 +211,48 @@ describe("buildSystemPrompt", () => {
     });
   });
 });
+
+describe("the prompt states facts; the tools state procedure", () => {
+  /**
+   * The system prompt is tool-agnostic on purpose. It says who the agent is,
+   * what the business is, and how to behave. *How and when to use a tool* lives
+   * on that tool's own description and its parameter descriptions, where the
+   * model reads it at the moment it matters.
+   *
+   * This used to be mixed: the prompt carried "use checkAvailability before
+   * offering times" and "use rememberCallerName once. Never ask for it outright"
+   * — the second of which is why a caller was never asked their name and every
+   * booking landed in the diary as "caller ID withheld".
+   */
+  const TOOL_NAMES = [
+    "checkAvailability",
+    "bookAppointment",
+    "createEscalation",
+    "rememberCallerName",
+    "lookupAppointments",
+    "cancelAppointment",
+    "endCall",
+  ];
+
+  it("never names a tool", () => {
+    const prompt = buildSystemPrompt(
+      makeAgentDeps({
+        calendarExternalId: "cal-1",
+        knowledge: [{ question: "Do you have parking?", answer: "Yes, out front." }],
+      })
+    );
+
+    const named = TOOL_NAMES.filter((tool) => prompt.includes(tool));
+    expect(named, `the prompt names ${named.join(", ")} — that belongs on the tool`).toEqual([]);
+  });
+
+  it("still states whether booking is possible at all", () => {
+    // A fact about the tenant, which the model needs before it reaches for
+    // anything. Not an instruction about which tool to call.
+    const connected = buildSystemPrompt(makeAgentDeps({ calendarExternalId: "cal-1" }));
+    expect(connected.toLowerCase()).toContain("calendar is connected");
+
+    const disconnected = buildSystemPrompt(makeAgentDeps({ calendarExternalId: null }));
+    expect(disconnected.toLowerCase()).toContain("no calendar connected");
+  });
+});

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { BookingPolicy, BusinessHours, Service } from "@receptionist/shared";
 import {
   addDays,
+  describeAppointmentWindow,
   describeDate,
   describeSlot,
   filterByBusy,
@@ -11,6 +12,7 @@ import {
   localDateIso,
   weekdayOf,
   zonedWallClockToUtc,
+  type Slot,
 } from "./scheduling.js";
 
 const NY = "America/New_York";
@@ -377,5 +379,47 @@ describe("findService", () => {
 
   it("returns null for something not offered", () => {
     expect(findService(services, "massage")).toBeNull();
+  });
+});
+
+describe("describeAppointmentWindow", () => {
+  const NY = "America/New_York";
+
+  it("states the appointment window, not the padded block", () => {
+    // The event spans 9:00–9:40 (30min haircut + 10min cleanup). The title must
+    // say what was booked, which is 9:00–9:30.
+    const slot: Slot = {
+      start: new Date("2026-08-31T13:00:00Z"),
+      end: new Date("2026-08-31T13:30:00Z"),
+      blockStart: new Date("2026-08-31T13:00:00Z"),
+      blockEnd: new Date("2026-08-31T13:40:00Z"),
+      dateIso: "2026-08-31",
+    };
+    expect(describeAppointmentWindow(slot, NY)).toBe("9:00–9:30 AM");
+  });
+
+  it("reads in the business timezone regardless of where it is rendered", () => {
+    // 13:00Z is 9:00 AM in New York and 6:30 PM in IST. An owner in India
+    // reading a New York calendar must still see the business's own clock.
+    const slot: Slot = {
+      start: new Date("2026-08-31T13:00:00Z"),
+      end: new Date("2026-08-31T13:30:00Z"),
+      blockStart: new Date("2026-08-31T13:00:00Z"),
+      blockEnd: new Date("2026-08-31T13:30:00Z"),
+      dateIso: "2026-08-31",
+    };
+    expect(describeAppointmentWindow(slot, NY)).toBe("9:00–9:30 AM");
+    expect(describeAppointmentWindow(slot, "Asia/Kolkata")).toBe("6:30–7:00 PM");
+  });
+
+  it("says the meridiem twice when the window crosses noon", () => {
+    const slot: Slot = {
+      start: new Date("2026-08-31T15:30:00Z"), // 11:30 AM NY
+      end: new Date("2026-08-31T16:30:00Z"), // 12:30 PM NY
+      blockStart: new Date("2026-08-31T15:30:00Z"),
+      blockEnd: new Date("2026-08-31T16:30:00Z"),
+      dateIso: "2026-08-31",
+    };
+    expect(describeAppointmentWindow(slot, NY)).toBe("11:30 AM–12:30 PM");
   });
 });
