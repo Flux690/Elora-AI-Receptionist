@@ -20,8 +20,16 @@ a release you would actually describe to a customer as new capability, and
 `major` for a break in the API contract or the database shape that needs a
 migration somebody has to think about.
 
-Bump in the same commit as the work. A version that lands in its own commit tells
-you nothing about what changed.
+**One patch bump per commit that changes the product.** Not one per batch of
+work — four product commits is four bumps, and that number is how you see at a
+glance how much has been patched since a release.
+
+Commits that change nothing a customer runs do not bump: documentation, tests,
+tooling, comments. A version is a claim about the product, and a docs commit
+makes no such claim.
+
+The bump lands in the same commit as the work it describes. A version that
+arrives in its own commit tells you nothing about what changed.
 
 ## Commands
 

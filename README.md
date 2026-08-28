@@ -36,7 +36,7 @@ Built as a multi-tenant B2B SaaS.
 
 ## Versioning
 
-`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.2**.
+`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.5**.
 
 ## Screenshots
 
