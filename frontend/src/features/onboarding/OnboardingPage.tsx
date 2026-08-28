@@ -45,7 +45,6 @@ export default function OnboardingPage() {
     greeting: 'Hello, thank you for calling! How can I help you today?',
     farewell: 'Thanks for calling. Have a wonderful day!',
     fallback: "I'm not sure about that, but someone from our team will follow up with you shortly.",
-    holdPhrase: 'Just a moment while I look that up for you.',
   })
 
   async function finish() {

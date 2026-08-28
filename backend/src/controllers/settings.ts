@@ -20,6 +20,7 @@ export async function getSettings(c: AppContext) {
       services,
       businessHours: tenant.businessHours,
       bookingPolicy: tenant.bookingPolicy,
+      recordCalls: tenant.recordCalls,
       phoneNumber: tenant.phoneNumber ?? null,
       calendarProvider: tenant.calendarProvider ?? null,
       calendarExternalId: tenant.calendarExternalId ?? null,
@@ -44,6 +45,7 @@ export async function updateSettings(c: AppContext) {
     if (body.business.description !== undefined) patch.description = body.business.description;
     if (body.business.businessHours !== undefined) patch.businessHours = body.business.businessHours;
     if (body.business.bookingPolicy !== undefined) patch.bookingPolicy = body.business.bookingPolicy;
+    if (body.business.recordCalls !== undefined) patch.recordCalls = body.business.recordCalls;
   }
 
   if (body.agent) {

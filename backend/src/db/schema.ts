@@ -1,4 +1,5 @@
 import {
+  boolean,
   customType,
   index,
   integer,
@@ -104,8 +105,18 @@ export const tenants = pgTable("tenants", {
     greeting: "",
     farewell: "",
     fallback: "",
-    holdPhrase: "",
   }),
+  /**
+   * Whether calls are recorded to R2.
+   *
+   * Defaults true, which is what every existing tenant was already getting — a
+   * default of false would silently stop recording for everyone on deploy.
+   *
+   * Not purely a storage switch: it selects which AI disclosure plays, because a
+   * greeting that claims the call is recorded when it is not is its own kind of
+   * wrong. See `agent/disclosure.ts`.
+   */
+  recordCalls: boolean("record_calls").notNull().default(true),
   phoneNumber: text("phone_number").unique(),
   clerkUserId: text("clerk_user_id").unique(),
   /**
@@ -278,6 +289,14 @@ export const appointments = pgTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
     callerPhone: text("caller_phone"),
+    /**
+     * The name the caller gave at booking.
+     *
+     * Separate from `clients.name` on purpose: a caller with no number has no
+     * client row, so there is nowhere else to put it — and the business still
+     * needs to know who to expect. Nullable because a caller may decline.
+     */
+    callerName: text("caller_name"),
     /**
      * The service booked. `serviceId` is the live link; `service` is the name as
      * it stood at booking time, kept so history stays readable after a rename

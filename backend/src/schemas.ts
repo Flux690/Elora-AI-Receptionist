@@ -111,7 +111,6 @@ const agentProfileSchema = z.object({
   greeting: z.string(),
   farewell: z.string(),
   fallback: z.string(),
-  holdPhrase: z.string(),
 });
 
 export const updateSettingsSchema = z.object({
@@ -123,6 +122,7 @@ export const updateSettingsSchema = z.object({
       description: z.string().optional(),
       businessHours: businessHoursSchema.optional(),
       bookingPolicy: bookingPolicySchema.optional(),
+      recordCalls: z.boolean().optional(),
     })
     .optional(),
   agent: agentProfileSchema.partial().optional(),

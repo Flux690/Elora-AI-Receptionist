@@ -361,6 +361,12 @@
   --color-primary-hover: var(--primary-hover);
   --color-primary-subtle: var(--primary-subtle);
 
+  /* The pole itself. Already one of the three sanctioned absolutes; exposed as a
+     utility so a component that genuinely needs white — a switch thumb, which is
+     white on the accent track and white on the neutral one — reaches for the
+     token rather than Tailwind's raw `bg-white`. */
+  --color-white: var(--white);
+
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent-ink: var(--accent-ink);

@@ -36,6 +36,20 @@
       "when": 1787389494375,
       "tag": "0004_minor_xorn",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787864461822,
+      "tag": "0005_reflective_cassandra_nova",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787909606501,
+      "tag": "0006_uneven_monster_badoon",
+      "breakpoints": true
     }
   ]
 }

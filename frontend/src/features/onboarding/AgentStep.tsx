@@ -16,7 +16,6 @@ const FIELDS: AgentField[] = [
   { key: 'greeting',   label: 'Greeting',         hint: 'Said verbatim when a call is answered.' },
   { key: 'farewell',   label: 'Farewell',         hint: 'Said when ending the call normally.' },
   { key: 'fallback',   label: 'Fallback message', hint: 'Used when the AI does not know how to respond.' },
-  { key: 'holdPhrase', label: 'Hold phrase',      hint: 'Said while the AI is searching for information.' },
 ]
 
 interface AgentStepProps {

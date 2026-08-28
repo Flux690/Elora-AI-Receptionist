@@ -13,6 +13,9 @@ const tenantFields = {
   businessHours: tenants.businessHours,
   bookingPolicy: tenants.bookingPolicy,
   agentProfile: tenants.agentProfile,
+  // Read on the call path: it selects which disclosure plays and whether egress
+  // starts at all, so the worker needs it on every call.
+  recordCalls: tenants.recordCalls,
   phoneNumber: tenants.phoneNumber,
   clerkUserId: tenants.clerkUserId,
   calendarProvider: tenants.calendarProvider,
@@ -71,7 +74,7 @@ export async function createTenant(input: {
     .insert(tenants)
     .values({
       description: "",
-      agentProfile: { name: "", greeting: "", farewell: "", fallback: "", holdPhrase: "" },
+      agentProfile: { name: "", greeting: "", farewell: "", fallback: "" },
       ...input,
     })
     .returning(tenantFields);
@@ -86,7 +89,7 @@ export async function updateTenant(
   id: string,
   patch: Partial<Pick<TenantRow,
     | "name" | "industry" | "description" | "agentProfile"
-    | "businessHours" | "bookingPolicy"
+    | "businessHours" | "bookingPolicy" | "recordCalls"
     | "timezone" | "phoneNumber"
     | "calendarProvider" | "calendarExternalId" | "calendarPayload"
   >>

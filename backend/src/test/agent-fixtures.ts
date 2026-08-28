@@ -19,6 +19,8 @@ export function makeWorkerTenant(overrides: Partial<WorkerTenant> = {}): WorkerT
     businessHours: DEFAULT_BUSINESS_HOURS,
     bookingPolicy: DEFAULT_BOOKING_POLICY,
     agentProfile: AGENT_PROFILE,
+    // Matches the column default: recording on unless a tenant turns it off.
+    recordCalls: true,
     phoneNumber: "+15550000000",
     clerkUserId: "user_test",
     calendarProvider: null,

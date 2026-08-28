@@ -113,13 +113,68 @@ export const DEFAULT_BUSINESS_HOURS: BusinessHours = {
   exceptions: [],
 };
 
+/**
+ * The phrases an owner controls.
+ *
+ * `holdPhrase` was removed on 2026-08-28. It was spoken during a slow tool call,
+ * which put a second speech handle in front of the tool's own answer — speech is
+ * a queue — and it discarded the reply three times in three test calls. There is
+ * no hold phrase now, so offering a field to edit one was offering a setting
+ * that did nothing. See `agent/tools.ts`.
+ */
 export type AgentProfile = {
   name: string;
   greeting: string;
   farewell: string;
   fallback: string;
-  holdPhrase: string;
 };
+
+/**
+ * The sentence every caller hears before the tenant's own greeting.
+ *
+ * Platform-owned and not editable from the dashboard, deliberately. California
+ * AB 2905 and SB 243 require a caller to be told they are speaking to an AI
+ * *before any substantive interaction*, at $500 per call, and `agentProfile.greeting`
+ * is entirely tenant-authored free text — so a tenant could and would write a
+ * greeting with no disclosure at all. The platform built the system that omits
+ * it, so the platform carries the exposure.
+ *
+ * It lives here rather than in the agent because the dashboard has to show the
+ * owner what plays. That was a hand-copied string in `AgentTab.tsx` with a
+ * comment promising to keep it in step; a second wording would have doubled the
+ * drift.
+ */
+export const AI_DISCLOSURE_RECORDED =
+  "Just so you know, you're speaking with an AI assistant, and this call is recorded.";
+
+/**
+ * The same disclosure minus the recording clause, for a tenant who has turned
+ * recording off. The AI half is never optional; only the recording half is,
+ * because only the recording half describes something we are actually doing.
+ */
+export const AI_DISCLOSURE_NOT_RECORDED =
+  "Just so you know, you're speaking with an AI assistant.";
+
+/**
+ * Which wording played, recorded against every call.
+ *
+ * The recorded id keeps its original value: rows written before the toggle
+ * existed heard exactly this sentence, so re-labelling them would make the audit
+ * trail lie. The new wording gets a new id rather than a version bump — these
+ * are two concurrent wordings, not an old one and its replacement.
+ */
+export const DISCLOSURE_VERSION_RECORDED = "2026-08-v1";
+export const DISCLOSURE_VERSION_NOT_RECORDED = "2026-08-norec-v1";
+
+export type Disclosure = { text: string; version: string };
+
+/** The wording and its id, together — so nothing can stamp a call with an id
+ *  that does not match what the caller actually heard. */
+export function disclosureFor(recordCalls: boolean): Disclosure {
+  return recordCalls
+    ? { text: AI_DISCLOSURE_RECORDED, version: DISCLOSURE_VERSION_RECORDED }
+    : { text: AI_DISCLOSURE_NOT_RECORDED, version: DISCLOSURE_VERSION_NOT_RECORDED };
+}
 
 /**
  * Which system holds the tenant's calendar.
@@ -204,6 +259,8 @@ export interface KnowledgeItem {
 export interface AppointmentItem {
   id: string;
   callerPhone: string | null;
+  /** The name given at booking. Null when the caller declined or predates this. */
+  callerName: string | null;
   service: string;
   startTime: string | null;
   endTime: string | null;
@@ -235,6 +292,11 @@ export interface BusinessSettings {
   businessHours: BusinessHours;
   bookingPolicy: BookingPolicy;
   agentProfile: AgentProfile;
+  /**
+   * Whether calls are recorded. Changes what the disclosure says, so it is not
+   * only a storage decision — see `disclosureFor`.
+   */
+  recordCalls: boolean;
   phoneNumber: string | null;
   calendarProvider: CalendarProvider | null;
   calendarExternalId: string | null;

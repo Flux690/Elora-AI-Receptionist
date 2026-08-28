@@ -24,6 +24,8 @@ export interface AppSettings {
     services: Service[]
     businessHours: BusinessHours
     bookingPolicy: BookingPolicy
+    /** Whether calls are recorded. Also selects which AI disclosure plays. */
+    recordCalls: boolean
     phoneNumber: string | null
     /**
      * Which system holds the calendar, its id there, and its display name.
