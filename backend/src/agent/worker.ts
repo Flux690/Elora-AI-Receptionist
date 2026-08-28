@@ -23,7 +23,7 @@ import type { AgentDeps, CallState, SlotStore } from "./types.js";
 import type { KnowledgeEntry } from "./prompt.js";
 import { buildSessionConfig, buildKeyterms } from "./session-config.js";
 import { resolveCallerPhone } from "./caller.js";
-import { buildGreeting, DISCLOSURE_VERSION } from "./disclosure.js";
+import { buildGreeting } from "./disclosure.js";
 import { ReceptionistAgent } from "./receptionist.js";
 import { CallMetrics } from "./metrics.js";
 import { extractTranscript } from "./transcript.js";
@@ -251,6 +251,39 @@ export default defineAgent({
     //    suspiciously fast performLLMInference and an agent that never spoke,
     //    with nothing in the logs to say why. A receptionist that cannot think
     //    should be loud about it.
+    // 8b. Speech lifecycle, for diagnosing a reply that is generated and never
+    //     heard. Twice in a browser test session the agent found appointment
+    //     times, wrote the sentence, and said nothing until the caller prodded
+    //     it — and the logs could not say which gate swallowed it.
+    //
+    //     A reply must clear three of them before it plays: the handle has to be
+    //     scheduled, then authorised, then (when interruptions are allowed) the
+    //     user has to be silent. Any one failing looks identical from outside:
+    //     silence. These three events name which.
+    //
+    //     `agent_false_interruption` is the one to watch in a browser session.
+    //     A laptop plays the agent through its speakers and hears it back on the
+    //     mic; telephony noise cancellation is deliberately not applied there
+    //     (it is tuned for 8kHz phone audio), so the agent can interrupt itself.
+    session.on(voice.AgentSessionEventTypes.SpeechCreated, (ev) => {
+      console.log(
+        `[speech] created call=${callId} source=${ev.source ?? "?"} ` +
+          `userInitiated=${ev.userInitiated ?? "?"}`
+      );
+    });
+
+    session.on(voice.AgentSessionEventTypes.AgentFalseInterruption, () => {
+      console.warn(
+        `[speech] FALSE INTERRUPTION call=${callId} — the agent was cut off by ` +
+          `something that turned out not to be the caller. On a laptop this is ` +
+          `usually the agent's own voice returning through the microphone.`
+      );
+    });
+
+    session.on(voice.AgentSessionEventTypes.OverlappingSpeech, (ev) => {
+      console.log(`[speech] overlap call=${callId} ${JSON.stringify(ev)}`);
+    });
+
     session.on(voice.AgentSessionEventTypes.Error, (ev) => {
       const err = ev.error;
       // InterruptionDetectionError carries no nested `error`, unlike the
@@ -331,23 +364,35 @@ export default defineAgent({
     // The platform disclosure always leads, including in browser test sessions:
     // the owner should hear exactly what their callers hear, and the part they
     // cannot edit is the part most worth them knowing about.
-    session.say(buildGreeting(tenant.agentProfile.greeting), {
+    //
+    // Which wording plays follows the tenant's recording setting, and the
+    // version comes back with it so the row below cannot claim a sentence the
+    // caller never heard.
+    const greeting = buildGreeting(tenant.agentProfile.greeting, tenant.recordCalls);
+    session.say(greeting.text, {
       allowInterruptions: false,
     });
 
     // 10. Recording + DB writes — skipped for test sessions
     if (!isTestSession) {
-      // Start recording simultaneously with greeting
-      startCallRecording(roomName, callId)
-        .then((result) => {
-          egressId = result.egressId;
-          callRecordingKey = result.recordingKey;
-          console.log(`[worker] egress started: ${egressId}`);
-        })
-        .catch((err: unknown) => {
-          // callRecordingKey stays null, so finishCall writes no recording_url.
-          console.error("[worker] failed to start recording:", err);
-        });
+      // Recording is the tenant's call. With it off nothing starts, so egressId
+      // and callRecordingKey stay null and finishCall writes no recording_url —
+      // which the dashboard already reads as "no audio for this call".
+      if (tenant.recordCalls) {
+        // Start recording simultaneously with greeting
+        startCallRecording(roomName, callId)
+          .then((result) => {
+            egressId = result.egressId;
+            callRecordingKey = result.recordingKey;
+            console.log(`[worker] egress started: ${egressId}`);
+          })
+          .catch((err: unknown) => {
+            // callRecordingKey stays null, so finishCall writes no recording_url.
+            console.error("[worker] failed to start recording:", err);
+          });
+      } else {
+        console.log(`[worker] recording disabled for tenant ${tenant.id}`);
+      }
 
       // upsertClient + createCall run concurrently WHILE greeting plays
       let client: Awaited<ReturnType<typeof upsertClient>> = null;
@@ -360,7 +405,7 @@ export default defineAgent({
             clientId: null,
             callerPhone,
             livekitRoomName: roomName,
-            disclosureVersion: DISCLOSURE_VERSION,
+            disclosureVersion: greeting.version,
           }),
         ]);
         markCallRowReady(true);

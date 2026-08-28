@@ -32,10 +32,14 @@ describe("buildSessionConfig", () => {
       expect(sessionOptions.turnHandling?.turnDetection).toBeUndefined();
     });
 
-    it("keeps preemptive TTS on", () => {
+    it("keeps preemptive generation but never speaks a guess", () => {
+      // TTS must not run before the turn is confirmed. LiveKit's docs: "if the
+      // chat context or tools change... the speculative response is discarded
+      // and regenerated" — and a discarded guess that has already become audio
+      // is audio the caller may already have heard.
       const { sessionOptions } = buildSessionConfig({ isTestSession: false, vad });
       expect(sessionOptions.turnHandling?.preemptiveGeneration).toEqual({
-        preemptiveTts: true,
+        preemptiveTts: false,
       });
     });
   });

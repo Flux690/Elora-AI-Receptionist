@@ -93,7 +93,19 @@ export function buildSessionConfig({
       // the endpointing floor from 500/3000ms to 300/2500ms. Setting anything
       // here — including the old MultilingualModel — forfeits both.
       turnDetection: undefined,
-      preemptiveGeneration: { preemptiveTts: true },
+      // Preemptive generation stays ON: the LLM starts before end-of-turn is
+      // confirmed, which is where most of the latency win is, and a discarded
+      // guess costs only tokens.
+      //
+      // preemptiveTts stays OFF, which is LiveKit's default and what their own
+      // examples use. With it on, TTS synthesises a guess before the turn is
+      // confirmed — and the docs are explicit that "if the chat context or tools
+      // change... the speculative response is discarded and regenerated". A
+      // discarded guess that has already been turned into audio is audio that
+      // was already on its way to the caller. That is the shape of the two
+      // failures seen in production: a turn spoken that should not have been,
+      // and a real answer that never played.
+      preemptiveGeneration: { preemptiveTts: false },
     },
   };
 
