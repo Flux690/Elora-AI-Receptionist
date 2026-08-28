@@ -15,7 +15,6 @@ export const AGENT_PROFILE: AgentProfile = {
   greeting: "Thanks for calling Test Salon, this is Riley.",
   farewell: "Thanks for calling, goodbye.",
   fallback: "Let me check with the team and get back to you.",
-  holdPhrase: "One moment while I check that.",
 };
 
 /**

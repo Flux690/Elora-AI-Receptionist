@@ -95,7 +95,8 @@ Google Calendar OAuth: `redirectUrl` includes `?returnTo=/appointments`. `SSOCal
 ```
 ctx.connect() → waitForParticipant() → resolveTenant (trunkPhone, or tenantId for test)
 → session.start() → session.say(greeting)
-→ [background, after greeting fires] startCallRecording + upsertClient + createCall
+→ [background, after greeting fires] startCallRecording (only if tenant.recordCalls)
+                                    + upsertClient + createCall
 ```
 
 DB writes and recording are deliberately deferred until after the greeting plays - they're off the critical path so the caller hears audio with zero blocking DB roundtrips.
@@ -106,7 +107,7 @@ SIP attribute names:
 
 ### Test sessions (browser)
 
-The worker serves two participant types. Real SIP calls resolve the tenant from `sip.trunkPhoneNumber`. **Browser test sessions** (`POST /api/admin/agent/test`) carry `testSession: "true"` and `tenantId` in participant attributes - the worker branches on `testSession`, resolves the tenant by ID, and **skips recording and all DB writes** (no call/client rows, no egress). Test rooms use explicit agent dispatch via the join token's `RoomConfiguration` (`RoomAgentDispatch`), not the universal SIP dispatch rule.
+The worker serves two participant types. Real SIP calls resolve the tenant from `sip.trunkPhoneNumber`. **Browser test sessions** (`POST /api/admin/agent/test`) carry `testSession: "true"` and `tenantId` in participant attributes - the worker branches on `testSession`, resolves the tenant by ID, and **skips recording, the call row and the client row** (no egress). It does **not** skip booking: `checkAvailability` and `bookAppointment` run exactly as on a phone call, so a browser test writes a real appointment row and a real Google Calendar event. That is deliberate — it is the only way to exercise booking without placing a call — but it is a real side effect, not a simulation. Test rooms use explicit agent dispatch via the join token's `RoomConfiguration` (`RoomAgentDispatch`), not the universal SIP dispatch rule.
 
 Frontend uses the LiveKit Session API (`useSession` + `SessionProvider` from `@livekit/components-react`), not `LiveKitRoom`. The session lifecycle effect must be StrictMode-safe - defer `session.end()` so a throwaway dev unmount doesn't kill the live connection.
 
@@ -150,23 +151,79 @@ block, not the appointment, or freeBusy reports the buffers free.
 
 ### AI disclosure
 
-`agent/disclosure.ts` holds a platform-owned constant played **before** the
-tenant's greeting, on real calls and browser test sessions alike. Not a column,
-not editable: California AB 2905 / SB 243 carry $500 per call and the platform,
-not the tenant, built the omission. `calls.disclosure_version` records which
-wording played.
+The wordings live in `@receptionist/shared` (`disclosureFor`), re-exported by
+`agent/disclosure.ts`. They play **before** the tenant's greeting, on real calls
+and browser test sessions alike, and are not editable: California AB 2905 / SB 243
+carry $500 per call and the platform, not the tenant, built the omission.
+
+**Two wordings, chosen by `tenants.record_calls`.** The AI half is never optional.
+The recording clause is, because a greeting claiming the call is recorded when it
+is not is its own kind of wrong. `buildGreeting(greeting, recordCalls)` returns
+the text *and* its version together, so nothing can stamp a call with a version
+that disagrees with what the caller heard. `calls.disclosure_version` records
+which one played — `2026-08-v1` recorded, `2026-08-norec-v1` not. The recorded id
+keeps its original value so rows written before the toggle stay truthful.
+
+They live in `shared` rather than the agent because the dashboard has to show the
+owner what plays; it was a hand-copied string in `AgentTab.tsx`, and a second
+wording would have doubled the drift.
 
 ### Tools
 
 `createAgentTools(deps)` closes over `tenant`, `services`, `client`, `callId`. The LLM never receives or chooses tenant IDs - backend code always injects them.
 
-Hold phrase: call `ctx.session.say(holdPhrase)` at the start of any slow tool. Fires the instant the LLM decides to invoke the tool, so the caller hears something immediately while it runs.
+**The prompt states facts; the tools state procedure.** `buildSystemPrompt` says
+who the agent is, what the business sells, when it opens and what it knows — and
+**never names a tool**, which `prompt.test.ts` asserts. How and when to use a tool
+lives on that tool's `description` and on each parameter's `.describe()`, where
+the model reads it at the moment it matters. The prompt used to carry "use
+checkAvailability before offering times" and "use rememberCallerName once. Never
+ask for it outright" — the second of which is why a caller was never asked their
+name and every booking landed in the diary as "caller ID withheld".
+
+**`bookAppointment` takes `callerName`.** Asking is enforced by the schema rather
+than requested in prose: the model cannot book without confronting the field, and
+only confronts it at booking — never while somebody is just asking about parking.
+The name goes to the calendar title, to `clients.name` when a client row exists,
+and to `appointments.caller_name` always.
+
+**There is no hold phrase, and adding one back is a regression.** This file has
+now been wrong about it twice — first "say it at the top of every slow tool",
+then "use `ctx.filler`". Both eat the tool's answer, because speech is a **queue**
+and a hold phrase is a second speech handle standing in front of the reply, not
+beside it. Measured 2026-08-28: filler at 40.463, `booked:true` at 42.770, the
+model finishes the confirmation at 44.358, filler stops at 45.465, confirmation
+**discarded** at 45.467. The caller sat in silence until they asked "Did you do
+it?". `RunContext.filler` does not fix it — it speaks through `AgentSession.say`
+and creates the same competing handle.
+
+The gap is small: these tools measure 400ms–3.2s. If genuinely slow work arrives
+later, the mechanism is `RunContext.update()`, which makes the tool
+**non-blocking** so the conversation continues rather than queueing behind it.
+`agentProfile.holdPhrase` stays in the schema and the dashboard for that.
+
+**A turn either calls a tool or it talks, never both.** `ReceptionistAgent`
+overrides `llmNode` and drops every spoken word from any turn that also carries a
+tool call (`agent/speech-guard.ts`). This exists because a caller once heard
+`"_1} Wait, the user did not offer their name yet..."` — tool-call JSON followed
+by the model's private deliberation. It is a rule about the *shape* of the turn,
+not a filter over the words: `_1}` is easy to pattern-match, but "Wait, the user
+did not offer their name yet" is ordinary English, and any regex strong enough to
+catch it will eventually eat a real sentence. The turn is buffered to end of
+stream first, because the tool call can arrive after the text.
 
 `endCall`: use `ctx.session.shutdown({ drain: true })`. Never `RoomServiceClient.deleteRoom()`.
 
 ### LLM model matters for voice
 
-With a slow LLM (>5s to first token), preemptive TTS opens a WebSocket that times out before the first token arrives - the agent produces correct text but **no audio plays**.
+**`preemptiveTts` is off, and stays off.** Preemptive *generation* is on — the LLM
+starts before end-of-turn is confirmed, which is where the latency win is, and a
+discarded guess costs only tokens. Preemptive *TTS* is different: it synthesises
+that guess into audio, and LiveKit's docs are explicit that "if the chat context
+or tools change... the speculative response is discarded and regenerated". Audio
+made from a discarded guess is audio already on its way to the caller. Turning it
+on is also how a slow LLM (>5s to first token) opens a TTS WebSocket that times
+out before the first token arrives — correct text, **no audio**.
 
 Measured time to first token through LiveKit Inference (3 samples, from India): `openai/gpt-4o-mini` 935/1616/822ms, `google/gemini-3.5-flash` 1628/1859/1268ms. Never assume - `MetricsCollected` is wired, so `grep '\[metrics\]'` in the worker log gives real p50/p95 per call.
 
@@ -223,7 +280,9 @@ The Phone Numbers API is **not in `livekit-server-sdk` (Node.js)** - purchasing 
 - `tenants.business_hours` - `jsonb` typed as `BusinessHours`: `weekly` (multiple intervals per weekday; `[]` means closed) plus date `exceptions` that replace the weekly pattern outright. **Local wall-clock strings plus `tenants.timezone`, never UTC** — "we open at 9" has to survive daylight saving
 - `tenants.booking_policy` - `jsonb` typed as `BookingPolicy`: `minNoticeMinutes` (default 30) and `maxAdvanceDays` (default 60)
 - `tenants.calendar_provider` / `calendar_external_id` / `calendar_payload` - the scheduling adapter, replacing `google_calendar_id`. `appointments.external_event_id` replaces `google_event_id`. The provider lives on the tenant, so it is not repeated per row
-- `calls.disclosure_version` - which AI-disclosure wording that caller heard. The audit trail for a per-call penalty regime
+- `tenants.record_calls` - boolean, default true. Whether egress runs at all, **and** which disclosure wording plays. Default true because that is what every tenant already had; false would have silently stopped recording for everyone on deploy
+- `calls.disclosure_version` - which AI-disclosure wording that caller heard. The audit trail for a per-call penalty regime. Two possible values now, one per wording
+- `appointments.caller_name` - the name given at booking. Separate from `clients.name` on purpose: a caller with no number has no client row, so there is nowhere else to put it, and the business still needs to know who to expect
 - `tenants.agentProfile` - `jsonb` typed as `AgentProfile`; holds greeting, farewell, fallback, holdPhrase, name
 - `knowledge_items.embedding` - `vector(1536)`; must match `EMBEDDING_DIMENSIONS` env var and the embedding model's actual output dimension
 - Embeddings stored directly on `knowledge_items` - no separate chunks table; HNSW index (m=16, ef_construction=64, cosine ops)

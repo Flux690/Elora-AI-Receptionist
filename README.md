@@ -12,10 +12,12 @@ Built as a multi-tenant B2B SaaS.
 - **Real opening hours** - a weekly pattern with lunch closures, days you're shut, and one-off dates for holidays. Your agent answers "are you open Saturday?" without asking you
 - **Services with real durations** - each one has its own length, plus optional setup and cleanup time that blocks your calendar without the caller ever hearing about it
 - **Appointment booking that respects both** - the agent only offers times you're actually open, long enough for the service booked, and free on your calendar. It re-checks the moment before it books, so a slot taken mid-conversation doesn't become a double booking
-- **AI disclosure on every call** - callers are told they're speaking to an AI on a recorded line before anything else is said. Required by law in several US states
+- **AI disclosure on every call** - callers are told they're speaking to an AI before anything else is said. Required by law in several US states, and not editable by the business
+- **Recording is the business's choice** - turn it off and nothing is stored, and the disclosure stops claiming otherwise. Two wordings, and each call records which one it played
+- **Bookings have a name on them** - the agent asks who is coming *when it books*, never while you're just asking a question. The name lands on the calendar entry, the appointment, and the caller's record for next time
 - **Escalation loop** - unanswerable questions flagged for admin review; resolved answers auto-populate the knowledge base
-- **Call recordings** - every call recorded with full transcript and AI-generated summary
-- **In-browser agent test** - talk to your agent live from the dashboard, no phone call (no recording, no call log)
+- **Call recordings** - recorded calls get audio alongside the full transcript and AI-generated summary; transcript and summary are kept either way
+- **In-browser agent test** - talk to your agent live from the dashboard, no phone call. Nothing is recorded and no call is logged, but booking is real: a test session writes a genuine appointment and calendar event
 - **Admin dashboard** - calls, escalations, appointments, knowledge base, and settings
 - **Multi-tenant** - every table is tenant-scoped; each business is fully isolated
 
@@ -24,17 +26,17 @@ Built as a multi-tenant B2B SaaS.
 
 1. Customer calls the business's US phone number
 2. LiveKit routes the call to the AI agent worker via SIP
-3. Agent resolves the tenant from the number dialed, builds a system prompt with business context, and answers - the AI-and-recording disclosure first, then the business's own greeting
+3. Agent resolves the tenant from the number dialed, builds a system prompt with business context, and answers - the AI disclosure first (mentioning recording only if recording is on), then the business's own greeting
 4. STT → LLM → TTS pipeline handles the conversation; the audio turn detector decides when the caller has finished
 5. Pricing, opening hours and knowledge-base answers come straight from the system prompt - no tool calls needed
 6. Genuinely unknown questions are flagged for admin review
-7. Bookings: the agent asks what service and roughly when, the backend works out which slots actually exist from your hours and that service's length, and reads back two or three. The caller picks one and it's confirmed into your calendar
+7. Bookings: the agent asks what service and roughly when, the backend works out which slots actually exist from your hours and that service's length, and reads back two or three. The caller picks one, the agent takes their name, and it's confirmed into your calendar
 8. On hang-up: transcript extracted, summary generated, call record finalized
 
 
 ## Versioning
 
-`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.1**.
+`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.2**.
 
 ## Screenshots
 
@@ -156,9 +158,19 @@ any empty Postgres - no manual console step.
 docker compose up -d          # throwaway Postgres on host port 5433
 pnpm -F backend test          # unit + agent tests (no DB, no network)
 pnpm -F backend test:int      # service tests against the Docker Postgres
+pnpm -F backend test:live     # real Google Calendar; needs backend/.env
 pnpm -F frontend test         # the design-token contract
 pnpm typecheck                # tsc --noEmit across all workspaces
 ```
+
+`test:live` is the only suite that runs against real credentials. It reads the
+production database to find a tenant with a connected calendar, gets that
+tenant's Google token the same way a live call does, and books and cancels one
+clearly-labelled event to prove the padded block is actually reserved — because
+if an event covers only the appointment and not its buffers, freeBusy reports
+the setup and cleanup free and the next caller is offered them. It writes
+nothing to the database, and skips with a reason if no calendar is connected.
+Point it at a specific tenant with `LIVE_TENANT_ID`.
 
 The frontend suite is the colour contract, not component tests. One surface is
 given — the stage — and every other colour is a departure from it, so the suite
@@ -215,7 +227,7 @@ Admin - `Authorization: Bearer <clerk_jwt>` required:
 | GET | `/api/admin/calendar/list` | Calendars the connected Google account can write to |
 | PATCH | `/api/admin/calendar` | Choose which calendar holds appointments |
 | DELETE | `/api/admin/calendar` | Disconnect the calendar |
-| GET | `/api/admin/settings` | Tenant settings, opening hours and booking window |
+| GET | `/api/admin/settings` | Tenant settings, opening hours, booking window and recording |
 | PATCH | `/api/admin/settings` | Update settings, hours or booking window |
 | GET | `/api/admin/phone/search?areaCode=415` | Search available numbers (`areaCode` optional) |
 | POST | `/api/admin/phone/provision` | Purchase phone number |
