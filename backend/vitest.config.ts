@@ -64,11 +64,23 @@ export default defineConfig({
       },
       {
         test: {
-          ...base,
+          // Deliberately NOT `...base`, because `base` carries `testEnv`.
+          //
+          // Vitest writes `test.env` into process.env before any module loads,
+          // and dotenv does not overwrite a variable that already exists — so a
+          // live project spreading `base` would keep CLERK_SECRET_KEY at
+          // "sk_test_dummy" and DATABASE_URL pointed at the Docker container,
+          // and every "live" test would quietly be exercising a fake.
+          //
+          // setup.live.ts loads the real backend/.env and refuses to run if a
+          // placeholder survived anyway.
+          globals: true,
+          environment: "node" as const,
           name: "live",
           include: ["src/**/*.live.test.ts"],
-          setupFiles: ["src/test/setup.unit.ts"],
-          // Real network calls to an LLM. Generous timeout, no parallelism.
+          setupFiles: ["src/test/setup.live.ts"],
+          // Real network calls to Google and an LLM. Generous timeout, and no
+          // parallelism: these touch shared external state.
           testTimeout: 60_000,
           fileParallelism: false,
         },
