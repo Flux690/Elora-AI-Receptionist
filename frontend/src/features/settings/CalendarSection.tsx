@@ -199,7 +199,23 @@ export function CalendarSection({ settings }: { settings: AppSettings }) {
           <div className="flex gap-2">
             <Select value={choice ?? ''} onValueChange={(v) => setChoice(v ?? null)}>
               <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Select a calendar" />
+                {/* Base UI's Select.Value renders the VALUE, not the chosen
+                    item's label, unless given an `items` map or this children
+                    function — it falls through to `resolveSelectedLabel(value,
+                    items, …)` and with no items that resolves to the value.
+
+                    Here the value is a Google calendar id, so picking a
+                    secondary calendar replaced its name with
+                    `c_…@group.calendar.google.com`. It went unnoticed because
+                    the product's other two Selects use the same string for value
+                    and label, and this picker had only ever seen a PRIMARY
+                    calendar — whose id is the account's email address, and so
+                    happens to read as a name. */}
+                <SelectValue placeholder="Select a calendar">
+                  {(value) =>
+                    calendars.find((c) => c.id === value)?.summary ?? 'Select a calendar'
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {calendars.map((cal) => (

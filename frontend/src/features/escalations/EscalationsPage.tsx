@@ -148,8 +148,17 @@ export default function EscalationsPage() {
             onValueChange={([id]) => id && select(id)}
           >
             {escalations.map((e: EscalationItem) => (
-              <ToggleGroupItem key={e.id} value={e.id} variant="row" size="row" className="group">
-                <p className="text-sm font-medium leading-snug text-foreground">
+              <ToggleGroupItem
+                key={e.id}
+                value={e.id}
+                variant="row"
+                size="row"
+                className="group w-full min-w-0"
+              >
+                {/* Two lines' worth at most. A question can be a paragraph, and
+                    the list is for choosing between them, not reading them —
+                    the whole question is in the pane to the right. */}
+                <p className="line-clamp-2 w-full text-sm font-medium leading-snug text-foreground">
                   {e.question}
                 </p>
                 <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">

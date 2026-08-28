@@ -152,7 +152,7 @@ export function PhoneStep({ selectedNumber, onSelect, onBack, onFinish, submitti
                   value={n.e164_format}
                   variant="row"
                   size="row"
-                  className="flex items-center justify-between px-4 py-2.5 text-sm text-foreground"
+                  className="flex-row items-center justify-between px-4 py-2.5 text-sm text-foreground"
                 >
                   <span className="font-medium">{formatPhone(n.e164_format)}</span>
                   <span className="text-xs text-muted-foreground">

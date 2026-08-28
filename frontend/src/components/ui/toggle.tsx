@@ -32,7 +32,17 @@ const toggleVariants = cva(
         pill: "rounded-full border border-transparent bg-control bg-clip-padding text-muted-foreground shadow-control hover:bg-control-hover hover:text-foreground aria-pressed:bg-control-active aria-pressed:font-medium aria-pressed:text-foreground aria-pressed:shadow-none data-[state=on]:bg-control-active data-[state=on]:font-medium data-[state=on]:text-foreground data-[state=on]:shadow-none",
         /* A row is not a control: no rest fill at all, so its states are the row
            rungs and its hover travels further to say the same amount. */
-        row: "w-full justify-start bg-transparent text-left font-normal hover:bg-hover aria-pressed:bg-active data-[state=on]:bg-active",
+        /* A row STACKS and WRAPS. The root string is written for a pill —
+           `inline-flex items-center justify-center whitespace-nowrap` — which is
+           right for a button with an icon and a word, and wrong for a list row
+           carrying a title and a line of metadata. Inheriting it laid the two
+           side by side on one unwrapping line, so a long question and a full
+           date ran straight out of a 320px column.
+
+           A caller that genuinely wants side-by-side says so: `flex-row` and
+           `items-center` are the same Tailwind groups as the defaults here, so a
+           className overrides them. See `PhoneStep`. */
+        row: "w-full flex-col items-start justify-start whitespace-normal bg-transparent text-left font-normal hover:bg-hover aria-pressed:bg-active data-[state=on]:bg-active",
       },
       size: {
         default:
