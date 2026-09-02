@@ -3,9 +3,8 @@ import { useLayoutEffect } from 'react'
 import { setTokenGetter } from '@/lib/apiClient'
 
 /**
- * Wires Clerk's getToken into apiClient via the setTokenGetter contract.
- * useLayoutEffect runs synchronously before children paint so the very first
- * request from a child component already has the token attached.
+ * Wires Clerk's `getToken` into the API client. `useLayoutEffect` runs before
+ * children paint, so the first request already carries a token.
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { getToken, isLoaded } = useAuth()

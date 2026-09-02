@@ -13,6 +13,11 @@ import type { Period } from './types'
 import type { AppSettings } from './settings-types'
 
 export const keys = {
+  /* The prefixes exist so an invalidation that means "every period" or "every
+     status" is still written in terms of these keys, rather than a bare array
+     that silently stops matching if the shape below ever changes. */
+  metricsAll: ['metrics'] as const,
+  escalationsAll: ['escalations'] as const,
   metrics: (period: Period) => ['metrics', period] as const,
   escalations: (status: EscalationStatus) => ['escalations', status] as const,
   knowledge: ['knowledge'] as const,

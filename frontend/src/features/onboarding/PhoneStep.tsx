@@ -30,15 +30,18 @@ export function PhoneStep({ selectedNumber, onSelect, onBack, onFinish, submitti
     try {
       const res = await apiClient.get<AvailableNumber[]>('/onboarding/phone/search')
       if (res.data.length > 0) {
-        setDefaultNumber(res.data[0])
-        onSelect(res.data[0].e164_format)
+        const first = res.data[0]
+        if (first) {
+          setDefaultNumber(first)
+          onSelect(first.e164_format)
+        }
       }
     } catch {
-      /* ignore — user can search manually */
+      /* Falls through to the manual area-code search. */
     } finally {
       setLoading(false)
     }
-    // onSelect is stable from parent; don't re-run on its identity change
+    // onSelect is stable from the parent, so its identity is not a dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -72,23 +75,23 @@ export function PhoneStep({ selectedNumber, onSelect, onBack, onFinish, submitti
     moreNumbers.find((n) => n.e164_format === selectedNumber) ?? defaultNumber
 
   return (
-    <div className="space-y-5">
-      <div className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-lg border border-border bg-card p-6">
+    <div className="flex flex-col gap-5">
+      <div className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-xl bg-card p-6 shadow-control">
         {loading ? (
           <Skeleton className="h-9 w-48" />
         ) : displayNumber ? (
           <>
-            <p className="text-3xl font-bold tracking-tight text-foreground">
+            <p className="text-2xl font-semibold tracking-tight text-foreground tabular-nums">
               {formatPhone(displayNumber)}
             </p>
             {displayLocation && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground">
                 {displayLocation.locality}, {displayLocation.region}
               </p>
             )}
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground">
             No number available. Try searching below.
           </p>
         )}
@@ -106,9 +109,9 @@ export function PhoneStep({ selectedNumber, onSelect, onBack, onFinish, submitti
       )}
 
       {showMore && (
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <p className="font-medium text-muted-foreground">
               Search by US area code
             </p>
             <div className="flex gap-2">
@@ -122,7 +125,7 @@ export function PhoneStep({ selectedNumber, onSelect, onBack, onFinish, submitti
                 }}
                 placeholder="e.g. 415"
                 maxLength={3}
-                className="w-24 text-center font-semibold"
+                className="w-field-xs text-center font-medium tabular-nums"
               />
               <Button
                 variant="outline"
@@ -135,10 +138,9 @@ export function PhoneStep({ selectedNumber, onSelect, onBack, onFinish, submitti
             </div>
           </div>
 
-          {searchError && <p className="text-xs text-destructive">{searchError}</p>}
+          {searchError && <p className="text-destructive">{searchError}</p>}
 
-          {/* Picking one of several is a single-choice control, not a stack of
-              buttons that happen to track their own state. */}
+          {/* Picking one of several is a single-choice control. */}
           {moreNumbers.length > 0 && (
             <ToggleGroup
               className="max-h-48 flex-col gap-1.5 overflow-y-auto"
@@ -155,7 +157,7 @@ export function PhoneStep({ selectedNumber, onSelect, onBack, onFinish, submitti
                   className="flex-row items-center justify-between px-4 py-2.5 text-sm text-foreground"
                 >
                   <span className="font-medium">{formatPhone(n.e164_format)}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-muted-foreground">
                     {n.locality}, {n.region}
                   </span>
                 </ToggleGroupItem>

@@ -5,20 +5,13 @@ import type {
 } from '@receptionist/shared'
 
 /**
- * Status has three roles, and colour only appears for one of them.
+ * Status has four roles and colour appears for two of them.
  *
- *   fact      a booking happened. Ink, carried in weight — a completed booking
- *             is not a celebration, and a green chip for every one of them
- *             spends the loudest thing on screen on the least urgent news.
- *   waiting   something needs a person. The accent, and the only place it
- *             appears in a list, so it is findable by colour alone.
- *   quiet     answered, abandoned, resolved, cancelled. Muted ink; these are
- *             outcomes you read, not ones you act on.
- *   failed    an error. Red, and red is used for nothing else in the product,
- *             so it still means what people expect it to.
- *
- * Green and amber are gone on purpose. An escalation is not a failure, and
- * amber said it was.
+ *   fact     something happened. Ink, carried in weight.
+ *   waiting  something needs a person. The accent, and the only place it appears
+ *            in a list, so it is findable by colour alone.
+ *   quiet    an outcome you read rather than act on. Muted ink.
+ *   failed   an error. Red, which is used for nothing else.
  */
 export type StatusTone = 'fact' | 'waiting' | 'quiet' | 'failed'
 

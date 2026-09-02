@@ -1,21 +1,14 @@
 import { useUser } from '@clerk/react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { Skeleton } from '@/components/ui/skeleton'
+import { RouteSkeleton } from '@/layout/RouteSkeleton'
 
-/**
- * Routes the user to /onboarding if they haven't onboarded, or away from it
- * if they have. Shows a minimal skeleton while Clerk loads.
- */
+/** Sends a user to onboarding until they have finished it, and away after. */
 export function TenantGate() {
   const { isLoaded, user } = useUser()
   const location = useLocation()
 
   if (!isLoaded) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Skeleton className="size-10 rounded-full" />
-      </div>
-    )
+    return <RouteSkeleton />
   }
 
   const hasOnboarded = !!user?.publicMetadata?.onboarded

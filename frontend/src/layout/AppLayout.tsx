@@ -65,12 +65,8 @@ export default function AppLayout() {
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader>
-          {/* One row, always. It used to be two — a brand row with a trigger and
-              a second collapsed-only row with another trigger — so collapsing
-              swapped which trigger was visible and moved it down the y axis,
-              taking every icon below it along. The label hides; nothing moves.
-              h-8 matches a nav row, so the trigger sits on the same rhythm and,
-              when collapsed, on the same centreline as the icons. */}
+          {/* One row. The label hides when collapsed and nothing moves, and h-8
+              puts the trigger on the same centreline as the nav icons. */}
           <div className="flex h-8 items-center gap-2">
             <span className="truncate text-base font-semibold tracking-tight text-foreground group-data-[collapsible=icon]:hidden">
               DeskRoute
@@ -98,7 +94,7 @@ export default function AppLayout() {
                         <span>{item.label}</span>
                       </SidebarMenuButton>
                       {item.to === '/escalations' && pendingCount > 0 && (
-                        <SidebarMenuBadge className="text-xs font-semibold">
+                        <SidebarMenuBadge className="text-sm font-semibold">
                           {pendingCount}
                         </SidebarMenuBadge>
                       )}
@@ -124,12 +120,9 @@ export default function AppLayout() {
               </SidebarMenuButton>
             </SidebarMenuItem>
 
-            {/* Profile: avatar acts as the icon to share the nav centerline.
-                Sign-out lives as a SidebarMenuAction — auto-hides when collapsed. */}
-            {/* Who you are is a label, not a control. It used to be a
-                SidebarMenuButton, so it lit up on hover and read as clickable
-                while doing nothing at all. Signing out is the only action here,
-                so it is the only thing that reacts to a pointer. */}
+            {/* Who you are is a label, not a control. Signing out is the only
+                action here, so it is the only thing that reacts to a pointer.
+                The avatar shares the nav centreline. */}
             <SidebarMenuItem>
               <div
                 className="flex h-8 items-center gap-2 rounded-lg p-2 text-sm text-sidebar-foreground"
@@ -160,7 +153,7 @@ export default function AppLayout() {
         </SidebarFooter>
       </Sidebar>
 
-      <SidebarInset className="stage-float my-2.5 mr-2.5">
+      <SidebarInset className="stage-float my-2.5 mr-3">
         <div className="flex flex-col flex-1 overflow-auto">
           <Suspense fallback={<RouteSkeleton />}>
             <Outlet />

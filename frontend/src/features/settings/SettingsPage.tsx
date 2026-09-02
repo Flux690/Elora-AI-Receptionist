@@ -1,27 +1,36 @@
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
+import { FilterPills } from '@/components/ui/filter-pills'
 import { PageContainer } from '@/layout/PageContainer'
 import { PageHeader } from '@/layout/PageHeader'
 import { keys, fetchers } from '@/lib/queries'
-import { BusinessTab } from './BusinessTab'
-import { HoursTab } from './HoursTab'
-import { AgentTab } from './AgentTab'
-import { AccountTab } from './AccountTab'
+import { BusinessPanel } from './BusinessPanel'
+import { HoursPanel } from './HoursPanel'
+import { AgentPanel } from './AgentPanel'
+import { ConnectionsPanel } from './ConnectionsPanel'
+import { AccountPanel } from './AccountPanel'
 
-const TAB_IDS = ['business', 'hours', 'agent', 'account'] as const
-type TabId = (typeof TAB_IDS)[number]
+const PANELS = [
+  { id: 'business', label: 'Business' },
+  { id: 'hours', label: 'Hours' },
+  { id: 'agent', label: 'Agent' },
+  { id: 'connections', label: 'Connections' },
+  { id: 'account', label: 'Account' },
+] as const
 
-function isTabId(v: string | null): v is TabId {
-  return TAB_IDS.includes(v as TabId)
+type PanelId = (typeof PANELS)[number]['id']
+
+function isPanelId(v: string | null): v is PanelId {
+  return PANELS.some((p) => p.id === v)
 }
 
 export default function SettingsPage() {
   const [params, setParams] = useSearchParams()
-  const tab: TabId = isTabId(params.get('tab')) ? (params.get('tab') as TabId) : 'business'
+  const raw = params.get('tab')
+  const panel: PanelId = isPanelId(raw) ? raw : 'business'
 
-  function setTab(next: TabId) {
+  function setPanel(next: PanelId) {
     const p = new URLSearchParams(params)
     p.set('tab', next)
     setParams(p, { replace: true })
@@ -34,62 +43,36 @@ export default function SettingsPage() {
 
   return (
     <PageContainer size="form">
-      <PageHeader title="Settings" />
+      <PageHeader
+        title="Settings"
+        description="How your agent introduces the business, when it offers times, and what it is connected to."
+      />
 
-      <Tabs
-        value={tab}
-        onValueChange={(v) => isTabId(v) && setTab(v)}
-        className="gap-6"
-      >
-        {/* Sized to its labels, top-left, and carrying no rule of its own. The
-            only mark is the underline under whichever option you are on. */}
-        <TabsList variant="line" className="justify-start rounded-none" aria-label="Settings sections">
-          <TabsTrigger value="business" className="flex-none">Business</TabsTrigger>
-          <TabsTrigger value="hours" className="flex-none">Hours</TabsTrigger>
-          <TabsTrigger value="agent" className="flex-none">Agent</TabsTrigger>
-          <TabsTrigger value="account" className="flex-none">Account</TabsTrigger>
-        </TabsList>
+      <FilterPills
+        options={PANELS}
+        value={panel}
+        onChange={setPanel}
+        label="Settings section"
+        className="mb-7"
+      />
 
-        <TabsContent value="business">
-          {isLoading || !settings ? (
-            <div className="flex flex-col gap-4">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          ) : (
-            <BusinessTab settings={settings} />
-          )}
-        </TabsContent>
-
-        <TabsContent value="hours">
-          {isLoading || !settings ? (
-            <div className="flex flex-col gap-4">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          ) : (
-            <HoursTab settings={settings} />
-          )}
-        </TabsContent>
-
-        <TabsContent value="agent">
-          {isLoading || !settings ? (
-            <div className="flex flex-col gap-4">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          ) : (
-            <AgentTab settings={settings} />
-          )}
-        </TabsContent>
-
-        <TabsContent value="account">
-          <AccountTab />
-        </TabsContent>
-      </Tabs>
+      {panel === 'account' ? (
+        <AccountPanel />
+      ) : isLoading || !settings ? (
+        <div className="flex flex-col gap-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-xl" />
+          ))}
+        </div>
+      ) : panel === 'business' ? (
+        <BusinessPanel settings={settings} />
+      ) : panel === 'hours' ? (
+        <HoursPanel settings={settings} />
+      ) : panel === 'agent' ? (
+        <AgentPanel settings={settings} />
+      ) : (
+        <ConnectionsPanel settings={settings} />
+      )}
     </PageContainer>
   )
 }

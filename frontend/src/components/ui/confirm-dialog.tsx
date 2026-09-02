@@ -21,9 +21,8 @@ export interface ConfirmDialogProps {
 }
 
 /**
- * Replaces native confirm() across the app.
- * Caller controls open state and provides the action; the dialog handles
- * pending state and auto-closes on success.
+ * The one confirmation in the product. The caller owns the open state and the
+ * action; the dialog owns the pending state and closes on success.
  */
 export function ConfirmDialog({
   open,

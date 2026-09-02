@@ -35,7 +35,7 @@ apiClient.interceptors.response.use(
           config.headers.Authorization = `Bearer ${fresh}`
           return apiClient.request(config)
         }
-      } catch { /* fall through to reject */ }
+      } catch { /* fall through to the rejection below */ }
     }
     return Promise.reject(error)
   }

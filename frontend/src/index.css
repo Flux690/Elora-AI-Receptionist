@@ -1,34 +1,19 @@
-@import "@fontsource-variable/schibsted-grotesk/index.css";
+@import "@fontsource-variable/host-grotesk/index.css";
 @import "tailwindcss";
 
-/* This product is light-only: `color-scheme: light`, one palette, and no dark
-   rung anywhere in the ladder. Tailwind's default `dark:` variant keys on the
-   OS `prefers-color-scheme`, so every `dark:` utility the shadcn components ship
-   was silently winning for anyone whose machine is in dark mode — which is how
-   an input came to render as `bg-input/30` over the stage instead of taking the
-   card fill, and why fields looked sunk and grey rather than raised and light.
-
-   Binding the variant to a class that is never applied neutralises all of them
-   at once. If a real dark theme ever lands, it arrives by adding `.dark` and a
-   second set of token values, not by reverting this line. */
+/* The product is light-only. Tailwind's `dark:` keys on the OS preference, so it
+   is bound here to a class nothing applies, neutralising every `dark:` utility
+   the shadcn components ship. A real dark theme arrives by adding `.dark` and a
+   second set of token values. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ═══ THE ANCHOR ═══════════════════════════════════════════════════════════════
+/* The anchor.
 
-   One surface is given; every other colour in the product is a departure from
-   it. That is the whole architecture, and it is what the previous system did
-   not have: thirteen absolute values, none derived from any other, so
-   `--contrast` could not exist and depth could not re-anchor.
+   One surface is given and every other colour is a departure from it. The stage
+   is the anchor: content sits on it, the sidebar is the ground below it, a card
+   floats above.
 
-   PAPER, in LCH. The stage is the anchor — content sits on it, the sidebar is
-   the ground below it, a card floats above. Warm hue 97 with real chroma in the
-   surfaces: the page reads as paper rather than glass, which is the right
-   register for a business that answers a phone.
-
-   Authored in `lch()` rather than `oklch()` deliberately. The departure
-   constants below are LCH units, and letting the browser do the conversion is
-   what keeps them meaning what they say. See ~/Projects/nightwatch-docs.
-   ────────────────────────────────────────────────────────────────────────── */
+   Authored in `lch()` because the departure constants below are LCH units. */
 :root {
   color-scheme: light;
 
@@ -36,93 +21,74 @@
   --base-c: 2.288;
   --base-h: 97.4;
 
-  /* How far every departure travels. The anchor does not move when this
-     changes — that is the property that makes it a contrast control rather
-     than a brightness one. 30 is the reference the constants are quoted at. */
+  /* How far every departure travels. The anchor holds still when this moves,
+     which is what makes it a contrast control rather than a brightness one.
+     Constants below are quoted at 30. */
   --contrast: 30;
 
-  /* ── Departures ────────────────────────────────────────────────────────────
-     Per unit of contrast, so a value here times `--contrast` is the distance in
-     LCH lightness. Quoted at 30 in the comments because that is the scale they
-     were measured on.
-
-     Surfaces and lines move TOWARD THE INK — darker, in a light theme. Controls
-     move TOWARD WHITE, and their hover reverses back toward the ink. In a dark
-     theme those two directions coincide, which is what hides the distinction
-     until somebody ports the system and every control comes out inverted.
-     ─────────────────────────────────────────────────────────────────────── */
-  --d-sub: -0.16233;            /* -4.87  the rail, below the stage */
-  --d-card: 0.077;              /* +2.31  a card, above it */
-  --d-control: 0.077;           /* +2.31  a control rests above its ground */
+  /* Lightness departures
+     Per unit of contrast: a value here times `--contrast` is the distance in
+     LCH lightness. Surfaces and lines move toward the ink; controls move toward
+     white and reverse when pointed at. */
+  --d-sub: -0.11667;            /* -3.50  the rail, below the stage */
+  --d-card: 0.06867;            /* +2.06  a card, above it */
+  --d-control: 0.06867;         /* +2.06  a control rests above its ground */
   --d-control-hover: -0.02333;  /* -0.70  and sinks when pointed at */
   --d-control-active: -0.12367; /* -3.71  and further when pressed */
   --d-row-hover: -0.10033;      /* -3.01  a row in a list or a rail */
-  --d-row-active: -0.174;       /* -5.22  and the one you have selected */
+  --d-row-active: -0.174;       /* -5.22  and the one selected */
   --d-border: -0.464;           /* -13.92 a hairline */
-  --d-input: -0.50267;          /* -15.08 an input's edge, the more defined one */
+  --d-input: -0.50267;          /* -15.08 a control's own edge */
 
-  /* Chroma is a departure too, and it re-anchors exactly as lightness does.
-     Holding it flat is what makes a ported card look duller than its page: the
-     lightness lifts and the colour does not follow. */
-  --dc-sub: 0.382;
-  --dc-card: -1.146;
-  --dc-control: -1.146;
-  --dc-control-hover: 0;
-  --dc-control-active: 0.382;
-  --dc-row-hover: 0.766;
-  --dc-row-active: 1.149;
-  --dc-border: 1.15;
-  --dc-input: 1.15;
+  /* Chroma departures
+     Chroma follows lightness: `dc = -0.145 × ΔL`, capped at ±1.20. A surface
+     that rises loses a little warmth and one that sinks gains a little, which is
+     how a single paper behaves at different depths. Departures that ignore their
+     own lightness step make a card read as a different material from its page. */
+  --dc-sub: 0.508;
+  --dc-card: -0.299;
+  --dc-control: -0.299;
+  --dc-control-hover: 0.102;
+  --dc-control-active: 0.538;
+  --dc-row-hover: 0.436;
+  --dc-row-active: 0.757;
+  --dc-border: 1.2;
+  --dc-input: 1.2;
 
-  /* Ink is PROPORTIONAL, not additive — a mix toward the dark pole rather than
-     a fixed distance. It is why text barely moves when the surface does, and an
-     additive ladder cannot reproduce it at any other contrast.
-
-     Light stops short of the pole on purpose: `--t-ink-3` at 0.94 lands on
-     L 5.8, never pure black. Black on near-white is harsh in a way white on
-     near-black is not. */
+  /* Ink is proportional rather than additive: a mix toward the dark pole, so
+     text barely moves when the surface does. `--t-ink-3` lands on L 5.8 rather
+     than the pole, because black on near-white is harsh. */
   --t-ink-1: 0.60;
   --t-ink-2: 0.77;
   --t-ink-3: 0.94;
 
   /* One chroma for every ink rung on a given ground, at half the ground's own
-     shift. The old ladder climbed — 5.79, 7.44, 6.19 — which no law permits and
-     nothing in the contract caught. 5.7 is where the warmth already was: it is
-     both the measured value of the lightest rung and what Linear's own
-     ink-to-ground ratio predicts against paper this warm. */
+     shift. */
   --c-ink: 5.7;
 
-  /* Two hues, one job each, and neither re-anchors — an accent that shifted
-     with depth would stop being findable, which is the only thing it is for.
-     Ink carries every other action.
+  /* Two hues, one job each, and neither re-anchors: an accent that shifted with
+     depth stops being findable. The accent is the only cool thing on warm paper,
+     which is what makes it carry "act on this" alone.
 
-     The accent stays cool on a warm ladder deliberately. It measures 7.00
-     white-on-accent and 6.90 as text on a card, and because it is the only cool
-     thing on the page the one colour that means "act on this" is more findable
-     for being alone. Warm paper and cool ink is the oldest pairing in print. */
-  --accent-fill: lch(37.85 60.35 258); /* something is waiting on you */
-  --red-fill: lch(44.47 71.57 25);     /* destructive, and nothing else */
+     Measured: white on accent 7.56, accent as text 6.97 on the stage and 6.15 on
+     the rail. White on red 7.67, red as text 7.08 and 6.24. */
+  --accent-fill: lch(32 55 258);
+  --red-fill: lch(36 60 25);
   --white: lch(100 0 0);
 
-  /* The ground every departure is measured from. `:root` is the stage; the
-     blocks below move it, and everything inside re-derives. */
+  /* The ground every departure is measured from. `:root` is the stage. */
   --ground-l: var(--base-l);
   --ground-c: var(--base-c);
 }
 
-/* ═══ THE GROUNDS ══════════════════════════════════════════════════════════════
+/* The grounds.
 
-   A container states its own ground and nothing inside it has to know. This is
-   the mechanism that retires a whole class of wrong-at-depth bugs: a control in
-   a menu derives against the menu, not against the page, so it cannot come out
-   the same colour as the surface it sits on.
+   A container states its own ground and nothing inside it has to know, so a
+   control in a menu derives against the menu rather than the page.
 
-   Light compresses at the top and there is no way around it. The card ground
-   sits at L 99.07 against a ceiling of 100, so a control on a card clamps to
-   white — measured, not assumed. Depth above the card rung is therefore carried
-   by the ring and the shadow, never by fill. `--shadow-*` below is not
-   decoration; it is the other half of the ladder.
-   ────────────────────────────────────────────────────────────────────────── */
+   Light compresses near white: the card ground sits at L 98.82 against a ceiling
+   of 100, so depth above that rung is carried by radius, the ring and the
+   shadow. `--shadow-*` is half the ladder, not decoration. */
 [data-ground="sub"] {
   --ground-l: calc(var(--base-l) + var(--d-sub) * var(--contrast));
   --ground-c: calc(var(--base-c) + var(--dc-sub));
@@ -134,34 +100,26 @@
   --ground-c: calc(var(--base-c) + var(--dc-card));
 }
 
-/* A menu highlights about twice as hard as a list, and the difference is not a
-   flourish. A list is scanned and its hover only has to follow the pointer; a
-   menu is READ by pointing at it, so the row under the cursor has to be
-   unmistakable. Reusing the general row value here is the specific thing that
-   makes a ported menu feel dead. */
+/* A menu highlights about twice as hard as a list: a list is scanned and its
+   hover only follows the pointer, a menu is read by pointing at it. Chroma
+   follows the same law as everywhere else. */
 [data-ground="menu"] {
-  --d-row-hover: -0.21;  /* -6.3 at contrast 30 */
-  --d-row-active: -0.267; /* -8.0 */
+  --d-row-hover: -0.21;
+  --d-row-active: -0.267;
+  --dc-row-hover: 0.914;
+  --dc-row-active: 1.161;
 }
 
-/* ── The derived layer ────────────────────────────────────────────────────────
-   Declared on every element that carries a ground, not just on `:root`.
-
-   That repetition is load-bearing rather than sloppy. A custom property
-   substitutes its `var()`s where it is DECLARED, so a token declared once on
-   `:root` bakes in `:root`'s ground and re-anchoring silently does nothing —
-   the failure looks exactly like success until you measure two depths and get
-   one answer. Re-declaring here is the CSS equivalent of what Linear's theme
-   generator does when it emits a whole new set of properties per sub-theme.
-   ────────────────────────────────────────────────────────────────────────── */
+/* The derived layer
+   Declared on every element carrying a ground, not only on `:root`. A custom
+   property substitutes its `var()`s where it is declared, so one declaration on
+   `:root` bakes in `:root`'s ground and re-anchoring silently does nothing. */
 :root,
 [data-ground] {
-  /* Surfaces. `--n-1` and `--n-2` name PARTICULAR surfaces — the rail and the
-     stage — so they are absolute and do not follow the ground; the sidebar is
-     the sidebar wherever you read it from. `--n-3` is not a third rung but THE
-     LIFT: one step above whatever you are already on. That is what lets `--card`
-     and `--popover` both point at it and still land in the right place at two
-     different depths. */
+  /* `--n-1` and `--n-2` name particular surfaces, the rail and the stage, so
+     they are absolute. `--n-3` is the lift: one step above whatever you are on,
+     which lets `--card` and `--popover` both point at it and land correctly at
+     two different depths. */
   --n-1: lch(
     calc(var(--base-l) + var(--d-sub) * var(--contrast))
     calc(var(--base-c) + var(--dc-sub)) var(--base-h)
@@ -172,7 +130,6 @@
     calc(var(--ground-c) + var(--dc-card)) var(--base-h)
   );
 
-  /* Controls, against whatever they actually sit on. */
   --control: lch(
     calc(var(--ground-l) + var(--d-control) * var(--contrast))
     calc(var(--ground-c) + var(--dc-control)) var(--base-h)
@@ -186,8 +143,8 @@
     calc(var(--ground-c) + var(--dc-control-active)) var(--base-h)
   );
 
-  /* Rows. A row is not a control: it has no rest fill, so its hover has to
-     travel further than a control's to say the same amount. */
+  /* A row has no rest fill, so its hover travels further than a control's to say
+     the same amount. */
   --sunk-1: lch(
     calc(var(--ground-l) + var(--d-row-hover) * var(--contrast))
     calc(var(--ground-c) + var(--dc-row-hover)) var(--base-h)
@@ -197,9 +154,9 @@
     calc(var(--ground-c) + var(--dc-row-active)) var(--base-h)
   );
 
-  /* Lines sit below every surface, so an edge can never be lighter than what it
-     lands on. `--line-2` is the darker of the two on purpose: a card and an
-     input share one fill, so the input's border is all that defines it. */
+  /* Lines sit below every surface, so an edge is never lighter than what it
+     lands on. `--line-2` is the darker of the two: a card and an input share one
+     fill, so the input's edge is all that defines it. */
   --line-1: lch(
     calc(var(--ground-l) + var(--d-border) * var(--contrast))
     calc(var(--ground-c) + var(--dc-border)) var(--base-h)
@@ -209,7 +166,6 @@
     calc(var(--ground-c) + var(--dc-input)) var(--base-h)
   );
 
-  /* Ink, proportional toward the pole, at half the ground's chroma shift. */
   --ink-1: lch(
     calc(var(--ground-l) + var(--t-ink-1) * (0 - var(--ground-l)))
     calc(var(--c-ink) + (var(--ground-c) - var(--base-c)) / 2) var(--base-h)
@@ -223,13 +179,9 @@
     calc(var(--c-ink) + (var(--ground-c) - var(--base-c)) / 2) var(--base-h)
   );
 
-  /* ── Semantics ────────────────────────────────────────────────────────────
-     Each names a job and points at a rung above. Every name here predates the
-     rebuild and has call sites across the app — retuning the architecture cost
-     no call site, which is the point of having named the jobs in the first
-     place. They live in this block rather than on `:root` for the same
-     substitution reason the primitives do.
-     ────────────────────────────────────────────────────────────────────── */
+  /* Semantics
+     Each names a job and points at a rung above. They live in this block for the
+     same substitution reason the primitives do. */
   --background: var(--n-1);
   --foreground: var(--ink-3);
   --stage: var(--n-2);
@@ -242,15 +194,13 @@
   --muted: var(--n-2);
   --muted-foreground: var(--ink-1);
 
-  /* The accent carries action. One hue with one meaning — "this is something
-     you act on" — so a primary button, a focus ring and a row still waiting on
-     you are all the same invitation rather than three unrelated signals. */
+  /* One hue with one meaning, so a primary button, a focus ring and a row
+     waiting on you are the same invitation rather than three signals. */
   --primary: var(--accent-fill);
   --primary-foreground: var(--white);
   --primary-subtle: color-mix(in srgb, var(--accent-fill) 8%, transparent);
   --primary-hover: color-mix(in oklab, var(--accent-fill), var(--white) 12%);
 
-  /* shadcn spends `accent` on hover and selected fills. */
   --accent: var(--sunk);
   --accent-foreground: var(--ink-3);
   --accent-ink: var(--accent-fill);
@@ -263,20 +213,17 @@
   --input: var(--line-2);
   --ring: var(--accent-fill);
 
-  /* The scrim behind a modal. Absolute, because it is not on the ladder — it
-     covers the ladder. Linear's light theme measures 25%; this is lighter
-     because a blur sits under it here and the two compound. */
+  /* The scrim behind a modal. Absolute, because it covers the ladder rather than
+     sitting on it, and light because a blur sits under it. */
   --scrim: lch(0 0 0 / 0.1);
 
-  /* States derive from the ground rather than washing over it. A flat ink wash
-     is a different ratio at every depth — 8% measures 1.97:1 on the stage and
-     1.47:1 in a menu — which is the specific thing re-anchoring fixes. */
+  /* States derive from the ground rather than washing over it: a flat ink wash
+     is a different ratio at every depth. */
   --hover: var(--sunk-1);
   --active: var(--sunk);
 
-  /* The sidebar has no fill of its own: it is the ground showing through, and
-     the stage floats against it. Colour is a fifth of that effect — the gutter,
-     the radius and the hairline carry the rest. */
+  /* The sidebar has no fill of its own. It is the ground showing through, and
+     the stage floats against it. */
   --sidebar: var(--n-1);
   --sidebar-foreground: var(--ink-1);
   --sidebar-muted: var(--ink-1);
@@ -285,14 +232,11 @@
   --sidebar-accent-foreground: var(--ink-3);
   --sidebar-border: transparent;
 
-  /* Status. Three roles, and colour only appears for one of them: ink states a
-     fact, the accent flags something waiting on you, red is destructive. Green
-     and amber are gone — a booking is not a celebration and an escalation is
-     not a failure.
+  /* Status has three roles and colour appears for one of them: ink states a
+     fact, the accent flags something waiting on you, red is destructive.
 
-     `-dot` is split from the text rung on purpose. A dot is a graphical object
-     and needs 3:1; text needs 4.5:1. One token serving both forces a value too
-     pale for the dot or too dark for the words. */
+     `-dot` splits from the text rung because a dot is a graphical object needing
+     3:1 while text needs 4.5:1. */
   --status-booked: var(--ink-3);
   --status-confirmed: var(--ink-3);
   --status-escalated: var(--accent-fill);
@@ -307,26 +251,20 @@
 
 /* Tailwind's colour utilities, resolving through the semantic layer above. */
 @theme inline {
-  /* The default scale is cleared so `shadow-md` stops generating a rule, then
-     the ladder is declared — and only the ladder.
-
-     Four levels, and each is a pairing of radius, edge and shadow rather than a
-     colour. That matters most in light, where the fills run out of room above
-     the card rung and depth has nowhere else to live:
+  /* The default scale is cleared so `shadow-md` generates nothing, then the
+     ladder is declared and only the ladder. Each level pairs a radius, an edge
+     and a shadow:
 
        control  8px   ring + low      a button, a trigger
-       card    12px   hairline + low  a panel, the stage
-       menu    12px   hairline + med  a dropdown, a select
-       modal   12px   hairline + high a dialog, a sheet
+       card    10px   ring + low      a panel, a settings card
+       menu    12px   ring + medium   a dropdown, a select
+       modal   12px   ring + high     a dialog, a sheet
 
-     `ring` is white at 14.3% rather than a border colour, so one value works at
-     every depth where a bordered ring would have to re-derive. It is what makes
-     a control read as lit from above rather than cut out of the page.
-
-     The stacks are three shadows at low opacity rather than one large blur.
-     That is what makes an edge read soft without the panel looking hazy. */
+     `ring` is black at 8.8%, which is what a light theme needs: white composites
+     to nothing on paper. The stacks are three shadows at low opacity rather than
+     one large blur, so an edge reads soft without the panel looking hazy. */
   --shadow-*: initial;
-  --shadow-ring: 0 0 0 0.5px lch(100 0 0 / 0.143);
+  --shadow-ring: 0 0 0 0.5px lch(0 0 0 / 0.088);
   --shadow-low:
     0 3px 6px -2px lch(0 0 0 / 0.02),
     0 1px 1px lch(0 0 0 / 0.04);
@@ -340,7 +278,7 @@
     0 1px 1px lch(0 0 0 / 0.04);
   /* A control at rest: the ring, and the faintest lift under it. */
   --shadow-control:
-    0 0 0 0.5px lch(100 0 0 / 0.143),
+    0 0 0 0.5px lch(0 0 0 / 0.088),
     0 3px 6px -2px lch(0 0 0 / 0.02),
     0 1px 1px lch(0 0 0 / 0.04);
 
@@ -361,10 +299,8 @@
   --color-primary-hover: var(--primary-hover);
   --color-primary-subtle: var(--primary-subtle);
 
-  /* The pole itself. Already one of the three sanctioned absolutes; exposed as a
-     utility so a component that genuinely needs white — a switch thumb, which is
-     white on the accent track and white on the neutral one — reaches for the
-     token rather than Tailwind's raw `bg-white`. */
+  /* Exposed so a component that genuinely needs white reaches for the token
+     rather than Tailwind's raw `bg-white`. */
   --color-white: var(--white);
 
   --color-accent: var(--accent);
@@ -409,13 +345,10 @@
 }
 
 /* The stage floats on the ground rather than sitting flush against it.
-
-   Separation between the rail and the page is carried by five things at once —
-   a lighter fill, the fall toward the ground at its foot, a gutter, a radius and
-   a hairline. Fill alone is a fifth of the effect, and on its own the two
-   surfaces read as one however far apart their colours are. */
+   Separation is carried by five things at once: a lighter fill, the fall toward
+   the ground at its foot, a gutter, a radius and a hairline. */
 .stage-float {
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-2xl);
   background-image: linear-gradient(
     180deg,
     var(--n-2) 0%,
@@ -426,26 +359,31 @@
 
 /* Tokens with no palette dimension. */
 @theme {
-  --font-sans: "Schibsted Grotesk Variable", system-ui, sans-serif;
+  --font-sans: "Host Grotesk Variable", system-ui, sans-serif;
 
-  --font-weight-normal: 400;
+  /* 450 is the body weight. A half step above regular is what lets 14px read
+     crisp without reading bold. */
+  --font-weight-normal: 450;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 
-  /* Two radii, not five. 8px is everything on the stage, 12px is what floats
-     above it. The five names are Tailwind's namespace, not five rungs — which
-     means the `rounded-lg` and `rounded-xl` call sites need no edit. */
+  /* Three radii, one per rung of the elevation ladder. In a light theme the
+     fills run out of room near white, so radius carries depth alongside the
+     shadow. The five names are Tailwind's namespace, not five rungs.
+
+       8px   a control, an input, a row highlight  → rounded-lg
+      10px   a card, a panel                       → rounded-xl
+      12px   a menu, a dialog, the shell           → rounded-2xl */
   --radius-sm: 8px;
   --radius-md: 8px;
   --radius-lg: 8px;
-  --radius-xl: 12px;
+  --radius-xl: 10px;
   --radius-2xl: 12px;
 
-  /* 14px floor. `--text-xs` is 14 rather than 12 so existing `text-xs` uses
-     comply without being touched; there is deliberately nothing below it. */
-  --text-xs: 14px;
-  --text-xs--line-height: calc(20 / 14);
+  /* Five sizes, and the default scale is cleared so there is no sixth beneath
+     them. 14px is the floor: this is read by owners on laptops. */
+  --text-*: initial;
   --text-sm: 14px;
   --text-sm--line-height: calc(20 / 14);
   --text-base: 16px;
@@ -457,24 +395,59 @@
   --text-2xl: 32px;
   --text-2xl--line-height: calc(36 / 32);
 
-  /* Measures. A page names one of these; nothing else does. */
-  --container-page: 900px;
+  /* Measures. A page names one of the first three, a field one of the rest, and
+     nothing states a width in pixels. A field's width is a claim about the
+     answer: a number, a time, a name, a line. */
+  --container-page: 960px;
   --container-form: 840px;
   --container-sidebar: 244px;
+  --container-field-2xs: 64px;  /* minutes, a count */
+  --container-field-xs: 88px;   /* a price */
+  --container-field-sm: 128px;
+  --container-field-md: 208px;
+  --container-field-lg: 288px;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --duration-fast: 120ms;
   --duration-base: 180ms;
+  --duration-instant: 0s;
+  --duration-out: 150ms;
   --default-transition-duration: var(--duration-base);
   --default-transition-timing-function: var(--ease-out);
+
+  --focus-width: 1px;
 }
 
-/* One lit edge on focus, laid over the control's own border rather than beside
-   it — so focus never recolours a border and never grows a ring. Excluded:
-   containers focused only to reach their contents. */
+/* Six layers, one number each, with a backdrop at n−1 so a panel and its scrim
+   cannot be separated by a third thing. z-index has no Tailwind namespace, so
+   these are read at call sites as `z-(--z-popover)`. */
+:root {
+  --z-sticky: 30;
+  --z-sidebar: 40;
+  --z-modal-backdrop: 49;
+  --z-modal: 50;
+  --z-popover: 60;
+  --z-toast: 70;
+  --z-tooltip: 80;
+}
+
+/* Focus.
+
+   One lit edge laid over the control's own border. The control does not grow,
+   nothing shifts, and no second ring appears outside the first. Focus never
+   recolours a border: this rule is the only focus treatment in the product.
+   Excluded are containers focused only to reach their contents. */
 :focus-visible:not([tabindex="-1"]):not([role="tabpanel"]):not([role="option"]) {
-  outline: 1px solid var(--ring);
+  outline: var(--focus-width) solid var(--ring);
   outline-offset: -1px;
+}
+
+/* A control already wearing the ring's colour steps outside by a pixel instead,
+   because an accent line inset on an accent fill measures 1.00:1. What separates
+   it is that pixel of page, and accent against paper measures 6.97:1. An
+   ancestor with `overflow: hidden` clips it. */
+[data-on-accent]:focus-visible {
+  outline-offset: 1px;
 }
 
 ::selection {
@@ -499,10 +472,34 @@
     color: var(--foreground);
     font-family: var(--font-sans);
     font-size: 14px;
-    font-feature-settings: "ss01", "cv11";
+    font-weight: var(--font-weight-normal);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     margin: 0;
+  }
+
+  /* A pointer on anything that acts when pressed. Menu and select rows opt out
+     with `cursor-default`, which beats an element selector. */
+  :is(button, [role="button"], [role="switch"], a[href], label[for], summary):not(
+      :disabled
+    ):not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  /* A highlight arrives at once and leaves gently: the declared duration is the
+     leaving one and hover collapses it to zero. Switch and the slider thumb are
+     excluded, because on those two hover coincides with a transition that is not
+     a fill. */
+  :is(a, button, [role="button"], [data-slot="table-row"]):not(
+      [data-slot="switch"]
+    ):not([data-slot="slider-thumb"]) {
+    transition-duration: var(--duration-out);
+  }
+
+  :is(a, button, [role="button"], [data-slot="table-row"]):not(
+      [data-slot="switch"]
+    ):not([data-slot="slider-thumb"]):hover {
+    transition-duration: var(--duration-instant);
   }
 }
 
@@ -517,7 +514,35 @@
   }
 }
 
-/* Test Agent live visualiser — bars inherit button text colour, no background */
+/* Overlays enter and leave. A menu and a dialog scale a little as they fade so
+   they read as arriving above the page; a drawer slides in from its own edge. */
+@keyframes fade-in { from { opacity: 0 } }
+@keyframes fade-out { to { opacity: 0 } }
+@keyframes zoom-in { from { opacity: 0; scale: 0.97 } }
+@keyframes zoom-out { to { opacity: 0; scale: 0.97 } }
+@keyframes slide-in-right { from { translate: 100% 0 } }
+@keyframes slide-out-right { to { translate: 100% 0 } }
+@keyframes slide-in-left { from { translate: -100% 0 } }
+@keyframes slide-out-left { to { translate: -100% 0 } }
+@keyframes slide-in-top { from { translate: 0 -100% } }
+@keyframes slide-out-top { to { translate: 0 -100% } }
+@keyframes slide-in-bottom { from { translate: 0 100% } }
+@keyframes slide-out-bottom { to { translate: 0 100% } }
+
+@utility enter-fade { animation: fade-in var(--duration-base) var(--ease-out); }
+@utility exit-fade { animation: fade-out var(--duration-base) var(--ease-out); }
+@utility enter-zoom { animation: zoom-in var(--duration-base) var(--ease-out); }
+@utility exit-zoom { animation: zoom-out var(--duration-base) var(--ease-out); }
+@utility enter-right { animation: slide-in-right var(--duration-base) var(--ease-out); }
+@utility exit-right { animation: slide-out-right var(--duration-base) var(--ease-out); }
+@utility enter-left { animation: slide-in-left var(--duration-base) var(--ease-out); }
+@utility exit-left { animation: slide-out-left var(--duration-base) var(--ease-out); }
+@utility enter-top { animation: slide-in-top var(--duration-base) var(--ease-out); }
+@utility exit-top { animation: slide-out-top var(--duration-base) var(--ease-out); }
+@utility enter-bottom { animation: slide-in-bottom var(--duration-base) var(--ease-out); }
+@utility exit-bottom { animation: slide-out-bottom var(--duration-base) var(--ease-out); }
+
+/* Test Agent live visualiser: bars inherit button text colour. */
 .test-agent-viz {
   display: flex;
   align-items: center;

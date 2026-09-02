@@ -2,6 +2,16 @@ import { Slider as SliderPrimitive } from "@base-ui/react/slider"
 
 import { cn } from "@/lib/utils"
 
+/** One thumb per value. A scalar `value` is one thumb, an array is one each. */
+function thumbCount(
+  value: SliderPrimitive.Root.Props["value"],
+  defaultValue: SliderPrimitive.Root.Props["defaultValue"]
+): number {
+  if (Array.isArray(value)) return value.length
+  if (Array.isArray(defaultValue)) return defaultValue.length
+  return 1
+}
+
 function Slider({
   className,
   defaultValue,
@@ -10,15 +20,12 @@ function Slider({
   max = 100,
   ...props
 }: SliderPrimitive.Root.Props) {
-  const _values = Array.isArray(value)
-    ? value
-    : Array.isArray(defaultValue)
-      ? defaultValue
-      : [min, max]
-
   return (
     <SliderPrimitive.Root
-      className={cn("data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full", className)}
+      className={cn(
+        "data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full",
+        className
+      )}
       data-slot="slider"
       defaultValue={defaultValue}
       value={value}
@@ -37,11 +44,13 @@ function Slider({
             className="bg-primary select-none data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full"
           />
         </SliderPrimitive.Track>
-        {Array.from({ length: _values.length }, (_, index) => (
+        {Array.from({ length: thumbCount(value, defaultValue) }, (_, index) => (
           <SliderPrimitive.Thumb
             data-slot="slider-thumb"
+            data-on-accent=""
             key={index}
-            className="relative block size-3 shrink-0 rounded-full border border-transparent bg-primary bg-clip-padding shadow-control transition-[scale,box-shadow] select-none after:absolute after:-inset-2 hover:scale-110 active:scale-110 disabled:pointer-events-none disabled:opacity-50"
+            /* The `after` inset widens the hit target without widening the mark. */
+            className="relative block size-3 shrink-0 rounded-full bg-primary shadow-control transition-[scale] select-none after:absolute after:-inset-2 hover:scale-110 active:scale-110"
           />
         ))}
       </SliderPrimitive.Control>

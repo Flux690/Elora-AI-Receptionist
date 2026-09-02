@@ -89,6 +89,7 @@ export async function listEscalations(tenantId: string, status: "pending" | "res
   return db
     .select({
       id: escalations.id,
+      callId: escalations.callId,
       callerPhone: escalations.callerPhone,
       question: escalations.question,
       status: escalations.status,

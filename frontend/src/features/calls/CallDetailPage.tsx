@@ -5,20 +5,27 @@ import type { CallDetail } from '@receptionist/shared'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { PageContainer } from '@/layout/PageContainer'
+import { PageHeader } from '@/layout/PageHeader'
 import { keys, fetchers } from '@/lib/queries'
+import { useTenantZone } from '@/hooks/useTenantZone'
 import { callOutcomeConfig } from '@/lib/status-config'
 import { formatPhone, formatDateTime, formatDuration } from '@/lib/formatters'
 import AudioPlayer from './AudioPlayer'
 
-/**
- * A call, on its own page rather than in a drawer.
- *
- * It was a Sheet reached through a `?call=` search param, which meant a call
- * could not be linked to, opened in a tab, or arrived at from anywhere but the
- * table. A call is a record with a URL; a drawer is for something transient.
- */
+/** A labelled fact in the header strip. */
+function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 truncate font-medium text-foreground tabular-nums">{children}</dd>
+    </div>
+  )
+}
+
+/** A call is a record with a URL, so it gets a page rather than a drawer. */
 export default function CallDetailPage() {
   const { id = '' } = useParams()
+  const zone = useTenantZone()
 
   const { data: call, isLoading } = useQuery<CallDetail>({
     queryKey: keys.call(id),
@@ -26,84 +33,69 @@ export default function CallDetailPage() {
     enabled: !!id,
   })
 
+  if (isLoading || !call) {
+    return (
+      <PageContainer>
+        <Skeleton className="h-5 w-28" />
+        <Skeleton className="mt-6 h-7 w-64" />
+        <Skeleton className="mt-4 h-16 w-full rounded-xl" />
+        <Skeleton className="mt-6 h-14 w-full rounded-xl" />
+        <Skeleton className="mt-8 h-52 w-full" />
+      </PageContainer>
+    )
+  }
+
+  const length = formatDuration(call.startedAt, call.endedAt)
+
   return (
-    <PageContainer size="page">
+    <PageContainer>
       <Link
         to="/"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="mb-5 inline-flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
       >
-        <ChevronLeft className="size-3.5" />
-        Back to calls
+        <ChevronLeft className="size-4" />
+        All calls
       </Link>
 
-      {isLoading || !call ? (
-        <div className="mt-6 flex flex-col gap-4">
-          <Skeleton className="h-7 w-52" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-52 w-full" />
-        </div>
-      ) : (
-        /* One column. The summary sat in a second column beside the
-           transcript, which put the thing you read first furthest from the
-           thing that identifies the call, and left a tall empty gutter on any
-           call short enough not to have much of a transcript. */
-        <div className="mt-6 max-w-[640px]">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-foreground">
-                {call.callerPhone ? formatPhone(call.callerPhone) : 'Caller ID withheld'}
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground tabular-nums">
-                {formatDateTime(call.startedAt)}
-                {formatDuration(call.startedAt, call.endedAt) && (
-                  <> · {formatDuration(call.startedAt, call.endedAt)}</>
-                )}
-              </p>
-            </div>
-            <StatusBadge value={call.outcome} config={callOutcomeConfig} />
-          </div>
+      <PageHeader
+        className="mb-5"
+        title={call.summary || 'This call was too short to summarise'}
+        actions={<StatusBadge value={call.outcome} config={callOutcomeConfig} />}
+      />
 
-          <p className="mt-4 text-sm leading-relaxed text-secondary-foreground">
-            {call.summary || (
+      <dl className="mb-7 grid grid-cols-3 gap-x-6 gap-y-4 rounded-xl bg-card p-4 shadow-control">
+        <Fact label="Caller ID">
+          {call.callerPhone ? formatPhone(call.callerPhone) : 'No caller ID'}
+        </Fact>
+        <Fact label="When">{formatDateTime(call.startedAt, zone)}</Fact>
+        <Fact label="Length">{length ?? 'Still running'}</Fact>
+      </dl>
+
+      <AudioPlayer callId={id} hasRecording={!!call.recordingUrl} />
+
+      <h2 className="mt-8 mb-2 font-medium text-foreground">Transcript</h2>
+      <div className="border-t border-border">
+        {call.transcript?.length ? (
+          call.transcript.map((entry, i) => (
+            <div key={i} className="grid grid-cols-[64px_1fr] gap-4 py-2.5">
               <span className="text-muted-foreground">
-                This call was too short to summarise.
+                {entry.role === 'user' ? 'Caller' : 'Agent'}
               </span>
-            )}
-          </p>
-
-          <div className="mt-6">
-            <AudioPlayer callId={id} hasRecording={!!call.recordingUrl} />
-          </div>
-
-          <h2 className="mt-8 text-sm font-medium text-foreground">Transcript</h2>
-          {/* Plain text. These were buttons that seeked the audio; they are
-              not focusable and not announced as interactive any more. */}
-          <div className="mt-2 flex flex-col">
-            {call.transcript?.length ? (
-              call.transcript.map((entry, i) => (
-                <div key={i} className="grid grid-cols-[58px_1fr] gap-4 py-2">
-                  <span className="text-sm text-muted-foreground">
-                    {entry.role === 'user' ? 'Caller' : 'Agent'}
-                  </span>
-                  <span
-                    className={
-                      entry.role === 'user'
-                        ? 'text-sm leading-relaxed text-foreground'
-                        : 'text-sm leading-relaxed text-secondary-foreground'
-                    }
-                  >
-                    {entry.text}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No transcript was captured for this call.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
+              <span
+                className={
+                  entry.role === 'user'
+                    ? 'leading-relaxed text-foreground'
+                    : 'leading-relaxed text-secondary-foreground'
+                }
+              >
+                {entry.text}
+              </span>
+            </div>
+          ))
+        ) : (
+          <p className="py-3 text-muted-foreground">No transcript was captured for this call.</p>
+        )}
+      </div>
     </PageContainer>
   )
 }

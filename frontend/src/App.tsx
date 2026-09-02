@@ -7,20 +7,22 @@ import { TenantGate } from '@/features/auth/TenantGate'
 import AppLayout from '@/layout/AppLayout'
 import { RouteSkeleton } from '@/layout/RouteSkeleton'
 import { ErrorFallback } from '@/layout/ErrorFallback'
+import { NotFound } from '@/layout/NotFound'
 
-const SignIn      = lazy(() => import('@/features/public/SignInPage'))
+const SignIn = lazy(() => import('@/features/public/SignInPage'))
 const SSOCallback = lazy(() => import('@/features/public/SSOCallbackPage'))
-const Home        = lazy(() => import('@/features/home/HomePage'))
-const CallDetail  = lazy(() => import('@/features/calls/CallDetailPage'))
+const Home = lazy(() => import('@/features/home/HomePage'))
+const CallDetail = lazy(() => import('@/features/calls/CallDetailPage'))
 const Escalations = lazy(() => import('@/features/escalations/EscalationsPage'))
+const Queue = lazy(() => import('@/features/escalations/QueuePage'))
 const Appointments = lazy(() => import('@/features/appointments/AppointmentsPage'))
-const Knowledge   = lazy(() => import('@/features/knowledge/KnowledgePage'))
-const Onboarding  = lazy(() => import('@/features/onboarding/OnboardingPage'))
-const Settings    = lazy(() => import('@/features/settings/SettingsPage'))
+const Knowledge = lazy(() => import('@/features/knowledge/KnowledgePage'))
+const Onboarding = lazy(() => import('@/features/onboarding/OnboardingPage'))
+const Settings = lazy(() => import('@/features/settings/SettingsPage'))
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded } = useAuth()
-  if (!isLoaded) return null
+  if (!isLoaded) return <RouteSkeleton />
   if (!isSignedIn) return <Navigate to="/sign-in" replace />
   return <>{children}</>
 }
@@ -31,32 +33,48 @@ export default function App() {
       <Routes>
         <Route
           path="/sign-in"
-          element={<Suspense fallback={<RouteSkeleton />}><SignIn /></Suspense>}
+          element={
+            <Suspense fallback={<RouteSkeleton />}>
+              <SignIn />
+            </Suspense>
+          }
         />
         <Route
           path="/sso-callback"
-          element={<Suspense fallback={<RouteSkeleton />}><SSOCallback /></Suspense>}
+          element={
+            <Suspense fallback={<RouteSkeleton />}>
+              <SSOCallback />
+            </Suspense>
+          }
         />
 
-        <Route element={
-          <ProtectedRoute>
-            <AuthProvider>
-              <TenantGate />
-            </AuthProvider>
-          </ProtectedRoute>
-        }>
+        <Route
+          element={
+            <ProtectedRoute>
+              <AuthProvider>
+                <TenantGate />
+              </AuthProvider>
+            </ProtectedRoute>
+          }
+        >
           <Route
             path="/onboarding"
-            element={<Suspense fallback={<RouteSkeleton />}><Onboarding /></Suspense>}
+            element={
+              <Suspense fallback={<RouteSkeleton />}>
+                <Onboarding />
+              </Suspense>
+            }
           />
 
           <Route element={<AppLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/calls/:id" element={<CallDetail />} />
             <Route path="/escalations" element={<Escalations />} />
+            <Route path="/escalations/queue" element={<Queue />} />
             <Route path="/appointments" element={<Appointments />} />
             <Route path="/knowledge" element={<Knowledge />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<NotFound />} />
           </Route>
         </Route>
       </Routes>

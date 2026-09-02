@@ -114,13 +114,9 @@ export const DEFAULT_BUSINESS_HOURS: BusinessHours = {
 };
 
 /**
- * The phrases an owner controls.
- *
- * `holdPhrase` was removed on 2026-08-28. It was spoken during a slow tool call,
- * which put a second speech handle in front of the tool's own answer — speech is
- * a queue — and it discarded the reply three times in three test calls. There is
- * no hold phrase now, so offering a field to edit one was offering a setting
- * that did nothing. See `agent/tools.ts`.
+ * The phrases an owner controls. There is no hold phrase: speech is a queue, so
+ * a phrase spoken during a slow tool call stands in front of that tool's own
+ * answer and the reply is discarded. See `agent/tools.ts`.
  */
 export type AgentProfile = {
   name: string;
@@ -242,6 +238,8 @@ export interface CallDetail extends CallListItem {
 
 export interface EscalationItem {
   id: string;
+  /** The call it came from, so the dashboard can link to the recording. */
+  callId: string | null;
   callerPhone: string | null;
   question: string;
   status: EscalationStatus;

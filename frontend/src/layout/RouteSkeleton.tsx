@@ -1,18 +1,17 @@
 import { Skeleton } from '@/components/ui/skeleton'
+import { PageContainer } from './PageContainer'
 
-/**
- * Generic Suspense fallback for lazy-loaded routes.
- * Mimics page-shell density so chunk-load doesn't flash blank.
- */
+/** Suspense fallback for a lazy route. Matches the page shell so nothing jumps. */
 export function RouteSkeleton() {
   return (
-    <div className="mx-auto max-w-6xl px-8 py-8">
-      <Skeleton className="mb-6 h-7 w-48" />
-      <div className="flex flex-col gap-3">
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-24 w-full" />
+    <PageContainer>
+      <Skeleton className="h-7 w-56" />
+      <Skeleton className="mt-2 h-5 w-72" />
+      <div className="mt-7 flex flex-col gap-2">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Skeleton key={i} className="h-8 w-full" />
+        ))}
       </div>
-    </div>
+    </PageContainer>
   )
 }

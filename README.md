@@ -18,7 +18,7 @@ Built as a multi-tenant B2B SaaS.
 - **Escalation loop** - unanswerable questions flagged for admin review; resolved answers auto-populate the knowledge base
 - **Call recordings** - recorded calls get audio alongside the full transcript and AI-generated summary; transcript and summary are kept either way
 - **In-browser agent test** - talk to your agent live from the dashboard, no phone call. Nothing is recorded and no call is logged, but booking is real: a test session writes a genuine appointment and calendar event
-- **Admin dashboard** - calls, escalations, appointments, knowledge base, and settings
+- **Admin dashboard** - the call log, a queue for answering escalations, a day-by-day view of what is booked, the knowledge base, and settings
 - **Multi-tenant** - every table is tenant-scoped; each business is fully isolated
 
 
@@ -36,7 +36,7 @@ Built as a multi-tenant B2B SaaS.
 
 ## Versioning
 
-`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.5**.
+`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.6**.
 
 ## Screenshots
 
@@ -49,13 +49,13 @@ Built as a multi-tenant B2B SaaS.
 **Escalations** - what your agent could not answer. Answer once, and it never asks again
 <img src="screenshots/escalation.png" alt="Escalations - questions the agent could not answer" width="780">
 
-**Services** - what you offer, how long each takes, and the setup and cleanup that block your calendar without the caller hearing about it
+**Settings** - one row per setting: what it is and what it does on the left, the control on the right
 <img src="screenshots/settings.png" alt="Settings - services, phone number and Google Calendar" width="780">
 
 **Opening hours** - a weekly pattern with lunch closures and days you're shut, plus one-off dates for holidays
 <img src="screenshots/settings-hours.png" alt="Settings - opening hours, holidays and the booking window" width="780">
 
-**Your agent's voice** - the disclosure it must say, then the four phrases that repeat on every call
+**Your agent** - the disclosure it must say, then the phrases that repeat on every call
 <img src="screenshots/settings-agent.png" alt="Settings - the AI disclosure and the agent's phrases" width="780">
 
 
@@ -79,8 +79,9 @@ Built as a multi-tenant B2B SaaS.
 | Calendar | Google Calendar API |
 | Recordings | Cloudflare R2 |
 | Frontend | React 19 + Vite + TypeScript |
+| Typeface | Host Grotesk, body weight 450 |
 | UI | Tailwind v4 + shadcn/ui on Base UI primitives |
-| Design tokens | Warm LCH ladder generated from one anchor plus a contrast dial, re-anchored per depth; laws and contrast floors enforced by test |
+| Design tokens | Warm LCH ladder from one anchor plus a contrast dial, re-anchored per depth, with chroma proportional to lightness; laws and contrast floors enforced by test |
 | Data fetching | TanStack Query v5 |
 
 
@@ -172,18 +173,16 @@ the setup and cleanup free and the next caller is offered them. It writes
 nothing to the database, and skips with a reason if no calendar is connected.
 Point it at a specific tenant with `LIVE_TENANT_ID`.
 
-The frontend suite is the colour contract, not component tests. One surface is
-given — the stage — and every other colour is a departure from it, so the suite
-asserts the *relationships* rather than any value: that the anchor holds still
-as contrast moves, that surfaces and controls travel in opposite directions,
-that ink mixes toward the pole instead of stepping a fixed distance, that chroma
-re-anchors with depth rather than being pinned flat, that no line is ever
-lighter than what it edges, that every overlay carries an edge, and that every
-pair clears its floor **on the ground it actually lands on**.
+The frontend suite is the colour contract rather than component tests. One
+surface is given, the stage, and every other colour is a departure from it, so
+the suite asserts *relationships* rather than values: the anchor holds still as
+contrast moves, surfaces and controls travel in opposite directions, ink mixes
+toward the pole instead of stepping a fixed distance, chroma moves in proportion
+to lightness, no line is ever lighter than what it edges, every overlay carries
+an edge, nothing anywhere is smaller than 14px, and every pair clears its floor
+**on the ground it actually lands on**.
 
-Each of those was verified by mutation: break the law in `index.css` and the
-suite must go red. A green contract that cannot see a defect is how the previous
-one passed 26 of 26 while a dropdown over a card was invisible.
+Break a law in `index.css` and the suite goes red. That is the point of it.
 
 ### Run
 

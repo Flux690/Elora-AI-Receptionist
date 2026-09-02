@@ -12,15 +12,15 @@ import { PhoneStep } from './PhoneStep'
 const STEP_TITLES = {
   1: {
     heading: 'Tell us about your business',
-    sub: 'This helps the AI introduce your business correctly to callers.',
+    sub: 'Your agent uses this to introduce you to callers.',
   },
   2: {
-    heading: 'Customize your AI receptionist',
-    sub: 'Set the voice and phrases your agent will use on every call.',
+    heading: 'Set what your agent says',
+    sub: 'The phrases it repeats on every call. You can change them later.',
   },
   3: {
-    heading: 'Get a phone number',
-    sub: 'Every account gets a dedicated number that routes calls to your AI.',
+    heading: 'Pick a phone number',
+    sub: 'The number your customers call, answered by your agent.',
   },
 } as const
 
@@ -65,7 +65,7 @@ export default function OnboardingPage() {
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Setup failed. Please try again.'
+        'Setup failed. Try again.'
       toast.error(message)
     } finally {
       setSubmitting(false)
@@ -76,13 +76,13 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-[600px] min-h-[560px] rounded-xl border border-border bg-card flex flex-col">
+      <div className="flex w-full max-w-[600px] flex-col rounded-xl bg-card shadow-control">
         <div className="flex-1 p-8">
           <StepIndicator current={step} />
 
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-foreground mb-1">{heading}</h1>
-            <p className="text-sm text-muted-foreground">{sub}</p>
+            <h1 className="mb-1 text-xl font-semibold tracking-tight text-foreground">{heading}</h1>
+            <p className="text-muted-foreground">{sub}</p>
           </div>
 
           {step === 1 && (
@@ -114,8 +114,8 @@ export default function OnboardingPage() {
         </div>
       </div>
 
-      <p className="mt-6 text-xs text-muted-foreground">
-        Step {step} of 3 · you can update everything later from Settings
+      <p className="mt-6 text-muted-foreground">
+        Step {step} of 3. Everything here can be changed later in Settings.
       </p>
     </div>
   )

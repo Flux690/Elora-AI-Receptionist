@@ -8,12 +8,8 @@ interface StatusBadgeProps<T extends string> {
 }
 
 /**
- * Generic status badge driven by a single StatusEntry config.
- * Replaces the duplicated OutcomeBadge / appointment StatusBadge components.
- * Falls back to a quiet em-dash if the value is missing or unmapped.
- *
- * A tone is type and weight, not a fill, so there is no chip to pad — status
- * reads inline with the row it belongs to.
+ * A tone is type and weight rather than a fill, so status reads inline with the
+ * row it belongs to. An unmapped value renders nothing.
  */
 export function StatusBadge<T extends string>({
   value,
@@ -21,13 +17,13 @@ export function StatusBadge<T extends string>({
   className,
 }: StatusBadgeProps<T>) {
   const entry = value ? config[value] : undefined
-  const label = entry?.label ?? '—'
+  const label = entry?.label ?? ''
   const tone = entry?.tone ?? 'quiet'
 
   return (
     <span
       className={cn(
-        'inline-flex items-center text-xs',
+        'inline-flex items-center text-sm',
         toneToClasses(tone),
         className,
       )}

@@ -15,18 +15,10 @@ interface FilterPillsProps<T extends string> {
 }
 
 /**
- * The filter control, and the only one. It sits on the left edge of a page
- * because that is where the eye starts, and because a filter is the first
- * decision about a list rather than an afterthought parked opposite the title.
- *
- * Deliberately not a segmented control in a sunk track: that reads as a mode
- * switch for the whole screen, and these only ever narrow a list.
- *
- * The look is unchanged; what changed is underneath. This was a row of
- * `<button aria-pressed>`, which a screen reader announces as several unrelated
- * toggles rather than one control with a chosen value, and which a keyboard
- * user walks with Tab instead of arrow keys. `ToggleGroup` is the primitive for
- * exactly this and it ships with the library.
+ * The one control for choosing which subset of a list to see, used for page
+ * filters and for the settings panels alike. A `ToggleGroup` rather than a row
+ * of buttons, so a screen reader announces one control with a chosen value and
+ * the arrow keys walk it.
  */
 export function FilterPills<T extends string>({
   options,
@@ -40,9 +32,8 @@ export function FilterPills<T extends string>({
       className={className}
       aria-label={label}
       value={[value]}
-      /* One at a time. An empty array means the pressed pill was pressed
-         again — a filter always has a value, so that is a no-op rather than
-         "no filter". */
+      /* One at a time. An empty array means the chosen pill was pressed again,
+         and a filter always has a value, so that is a no-op. */
       onValueChange={(next) => {
         const [chosen] = next as T[]
         if (chosen) onChange(chosen)

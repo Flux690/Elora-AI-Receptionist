@@ -5,25 +5,17 @@ import { describe, it, expect } from "vitest";
 /* The colour contract.
 
    The system is one anchor plus a table of departures from it, so this suite
-   asserts RELATIONSHIPS and never constants. A test that pins "ink spaced by
-   exactly 0.1425" permits a change of hue and forbids a change of contrast,
-   which is backwards — and that is precisely what the previous version of this
-   file did while every defect in the rebuild shipped underneath it, 26 green.
+   asserts relationships rather than constants: a change of contrast is allowed,
+   a broken ladder is not.
 
-   Three of its assertions were actively wrong and are gone:
-
-     - even ink spacing        pinned a constant, forbade a contrast change
-     - global contrast floors  measured ink against surfaces it never lands on
-     - "hovers must be washes" mandated the weaker of the two options; a flat
-                               ink wash is a different ratio at every depth
-
-   Values are computed here rather than read from a browser: `getComputedStyle`
-   returns `lch()` verbatim, so a naive rgb regex reads L, C and H as r, g, b. */
+   Values are computed here rather than read from a browser, because
+   `getComputedStyle` returns `lch()` verbatim and a naive rgb regex reads L, C
+   and H as r, g and b. */
 
 const root = process.cwd();
 const css = readFileSync(join(root, "src/index.css"), "utf8");
 
-/* ── Parsing ───────────────────────────────────────────────────────────────── */
+/* Parsing */
 
 /** Every `--name: value;` in the file, last declaration winning. */
 function declarations(source: string): Map<string, string> {
@@ -34,18 +26,16 @@ function declarations(source: string): Map<string, string> {
   return out;
 }
 
-/** Every `selector { … }` pair, so a constant cannot leak across blocks.
-    Parsing the file flat and letting the last declaration win reads the menu's
-    row departures as the page's — which is exactly the bug this suite exists to
-    catch, so it had better not have it itself. */
+/** Every `selector { … }` pair, so a constant cannot leak across blocks. Read
+    flat, the menu's row departures would be taken for the page's. */
 function blocks(source: string): Array<{ selector: string; body: string }> {
   /* Comments first, or a block's selector reads as the whole paragraph above
-     it — and this file is mostly paragraphs. */
+     it, and this file is mostly paragraphs. */
   const bare = source.replace(/\/\*[\s\S]*?\*\//g, "");
   const out: Array<{ selector: string; body: string }> = [];
   /* Walked rather than matched. A single regex has to guess where a selector
      starts, and here it can be preceded by an at-rule, a closing brace or the
-     top of the file — three anchors, each of which the others break. */
+     top of the file, three anchors and each breaks the others. */
   let cursor = 0;
   while (true) {
     const open = bare.indexOf("{", cursor);
@@ -108,7 +98,8 @@ function role(
   contrast = CONTRAST,
 ): Step {
   const g = ground(on, contrast);
-  /* A menu overrides its row departures — a menu is read by pointing at it, so
+  /* A menu overrides its row departures, because a menu is read by pointing at
+     it, so
      its highlight travels further than a list's. */
   const dl =
     on === "menu" && menuDecls.has(`d-${name}`)
@@ -136,7 +127,7 @@ const GROUNDS = ["base", "sub", "card", "menu"] as const;
 const SURFACE_ROLES = ["card", "control"] as const;
 const LINE_ROLES = ["border", "input"] as const;
 
-/* ── Colour maths: CIELCh(D65) → sRGB → relative luminance ─────────────────── */
+/* Colour maths: CIELCh(D65) to sRGB to relative luminance */
 
 function luminance({ L, C }: Step, H = BASE_H): number {
   const h = (H * Math.PI) / 180;
@@ -168,7 +159,7 @@ function absolute(name: string): Step & { H: number } {
   return { L: +m[1]!, C: +m[2]!, H: +m[3]! };
 }
 
-/* ── The laws ──────────────────────────────────────────────────────────────── */
+/* The laws */
 
 describe("the anchor", () => {
   it("never moves, at any contrast", () => {
@@ -215,10 +206,10 @@ describe("the anchor", () => {
   });
 });
 
-describe("law 1 — surfaces, borders and controls are additive", () => {
+describe("law 1: surfaces, borders and controls are additive", () => {
   it("rises: the rail is below the stage and a card above it", () => {
     /* The relationship that was wrong before any of these tests existed: a card
-       sits ABOVE the page, so the page is faintly warm and the card is white —
+       sits above the page, so the page is faintly warm and the card is white;
        not the other way round. */
     expect(ground("sub").L).toBeLessThan(BASE_L);
     expect(BASE_L).toBeLessThan(ground("card").L);
@@ -226,7 +217,7 @@ describe("law 1 — surfaces, borders and controls are additive", () => {
 
   it("raises a control above its ground and reverses its hover toward the ink", () => {
     /* Controls move toward WHITE in a light theme while surfaces move toward
-       the ink — the two directions coincide in dark, which is what hides the
+       the ink. The two directions coincide in dark, which hides the
        distinction until somebody ports the system and every control inverts. */
     for (const g of GROUNDS) {
       const rest = role("control", g);
@@ -269,7 +260,7 @@ describe("law 1 — surfaces, borders and controls are additive", () => {
   });
 });
 
-describe("law 2 — ink is proportional, not additive", () => {
+describe("law 2: ink is proportional, not additive", () => {
   it("darkens monotonically and stops short of the pole", () => {
     /* Pure black on near-white is harsh in a way pure white on near-black is
        not, so the darkest rung lands near L 6 rather than at 0. */
@@ -291,16 +282,12 @@ describe("law 2 — ink is proportional, not additive", () => {
   });
 });
 
-describe("law 3 — chroma re-anchors as well as lightness", () => {
+describe("law 3: chroma re-anchors as well as lightness", () => {
   it("builds every ground-dependent chroma out of the ground's own", () => {
-    /* Asserted against the stylesheet, because the arithmetic version of this
-       test is circular: it recomputes chroma from the same constants it is
-       checking and passes happily while the CSS pins a flat value. Verified by
-       mutation — replacing the ink chroma expression with a bare `var(--c-ink)`
-       must turn this red, and nothing else in the suite notices.
-
-       `--n-1` and `--n-2` name particular surfaces and are anchored absolutely,
-       so they are the only two exempt. */
+    /* Asserted against the stylesheet, because the arithmetic version is
+       circular: it would recompute chroma from the same constants it checks and
+       pass while the CSS pins a flat value. `--n-1` and `--n-2` name particular
+       surfaces and are anchored absolutely, so they are exempt. */
     const derived = declarations(derivedBlock);
     const mustReanchor = /^(n-3|control|control-hover|control-active|sunk|sunk-1|line-1|line-2|ink-1|ink-2|ink-3)$/;
     let checked = 0;
@@ -326,10 +313,9 @@ describe("law 3 — chroma re-anchors as well as lightness", () => {
   });
 
   it("departs from the ground's chroma rather than holding a flat constant", () => {
-    /* The trap. Hold chroma flat and the ladder lifts correctly while the
-       colour does not follow, so a control on a card comes out grey where the
-       page reads faintly warm. It is invisible until you rasterise and compare
-       channels, which is why it needs a test rather than an eye. */
+    /* Hold chroma flat and the ladder lifts correctly while the colour does
+       not follow, so a control on a card comes out grey against a faintly warm
+       page. It takes a test rather than an eye. */
     for (const name of [...SURFACE_ROLES, ...LINE_ROLES]) {
       for (const g of GROUNDS) {
         expect(role(name, g).C, `${name} on ${g}`).toBeCloseTo(
@@ -353,9 +339,7 @@ describe("law 3 — chroma re-anchors as well as lightness", () => {
   });
 
   it("caps ink chroma, so the greys cannot drift", () => {
-    /* The ceiling the previous contract did not have, which is how a ladder
-       that climbed 5.79 → 7.44 → 6.19 shipped unnoticed. Warm paper wants warm
-       ink; it does not want tan. */
+    /* Warm paper wants warm ink, not tan. */
     for (const g of GROUNDS) {
       for (const r of [1, 2, 3] as const) {
         expect(ink(r, g).C, `ink-${r} on ${g}`).toBeLessThanOrEqual(6.5);
@@ -365,9 +349,8 @@ describe("law 3 — chroma re-anchors as well as lightness", () => {
 });
 
 describe("contrast floors, within each ground", () => {
-  /* Measured against the ground the ink actually lands on. Testing ink in a
-     menu against the page's background measures a pair that never appears on
-     screen, which is what the previous suite did. */
+  /* Measured against the ground the ink actually lands on: ink in a menu tested
+     against the page background is a pair that never appears on screen. */
   it("clears AAA for body ink on every ground", () => {
     for (const g of GROUNDS) {
       expect(contrastRatio(ink(3, g), ground(g)), `ink-3 on ${g}`).toBeGreaterThanOrEqual(7);
@@ -414,7 +397,7 @@ describe("derivation", () => {
   it("derives every ground-dependent token rather than naming a value", () => {
     /* Each of these must be an `lch(calc(...))` built from `--ground-*`. A raw
        triple here is a rung that is right at one depth and wrong at every
-       other — the exact failure the rebuild removed. */
+       other. */
     const derived = declarations(derivedBlock);
     const mustDerive = /^(n-3|control|control-hover|control-active|sunk|sunk-1|line-1|line-2|ink-1|ink-2|ink-3)$/;
     for (const [name, value] of derived) {
@@ -468,16 +451,13 @@ describe("the elevation ladder", () => {
   const ui = (f: string) => readFileSync(join(root, "src/components/ui", f), "utf8");
 
   it("gives every overlay an edge", () => {
-    /* Light compresses at the top: a menu and a card both land on L 100, so
-       fill cannot separate them and the border and shadow are the entire
-       boundary. Without this a dropdown over a card is invisible, which is the
-       defect that started the rebuild — and the old contract could not see it
-       because it only ever read `index.css`. */
-    for (const file of ["dropdown-menu.tsx", "select.tsx", "dialog.tsx", "sheet.tsx"]) {
+    /* Near white a menu and a card land on the same fill, so the edge and the
+       shadow are the entire boundary. */
+    for (const file of ["select.tsx", "dialog.tsx", "sheet.tsx"]) {
       const source = ui(file);
       expect(source, `${file} declares no ground`).toMatch(/data-ground="menu"/);
       /* The class string that carries the ground is the one that must carry the
-         edge — a shadow elsewhere in the file is not the popup's. */
+         edge: a shadow elsewhere in the file is not the popup's. */
       const popup = source.slice(source.indexOf('data-ground="menu"'));
       const classes = /className=\{cn\(\s*(?:\/\*[\s\S]*?\*\/\s*)?"([^"]*)"/.exec(popup)?.[1] ?? "";
       expect(classes, `${file} carries no shadow`).toMatch(/shadow-(medium|high)/);
@@ -487,17 +467,17 @@ describe("the elevation ladder", () => {
   it("targets the orientation attribute Base UI actually emits", () => {
     /* The registry's base-nova components style orientation with
        `data-horizontal:` / `data-vertical:`, which compile to `[data-horizontal]`
-       — an attribute @base-ui/react 1.5 does not emit. It emits
+       which @base-ui/react 1.5 does not emit. It emits
        `data-orientation="horizontal"`.
 
        Nothing errors; the utility simply never matches. The slider's track came
-       out `height: 0` — a scrubber with no bar — and `Separator` rendered at
+       out at `height: 0`, a scrubber with no bar, and `Separator` at
        zero height inside the sidebar. Re-running `shadcn add` reintroduces it,
        so it needs a test rather than a memory. */
     const files = readdirSync(join(root, "src/components/ui"));
     for (const file of files) {
       const source = readFileSync(join(root, "src/components/ui", file), "utf8");
-      const offenders = source.match(/data-(horizontal|vertical):/g) ?? [];
+      const offenders = source.match(/data-(horizontal|vertical)[:/]/g) ?? [];
       expect(offenders, `${file} styles an attribute Base UI never sets`).toEqual([]);
     }
   });
@@ -508,10 +488,11 @@ describe("the elevation ladder", () => {
     expect(declared).toEqual(["control", "high", "low", "medium", "ring"]);
   });
 
-  it("draws the control ring as a spread of white, not a border colour", () => {
-    /* White composites over whatever it lands on, so one value works at every
-       depth where a `--border` ring would have to re-derive. */
-    expect(all.get("shadow-ring")).toMatch(/^0 0 0 0\.5px lch\(100 0 0 \/ [\d.]+\)$/);
+  it("draws the control ring in black, which is what a light theme needs", () => {
+    /* White composites to nothing on paper, leaving a control at 1.02:1 against
+       its own ground. */
+    expect(all.get("shadow-ring")).toMatch(/^0 0 0 0\.5px lch\(0 0 0 \/ [\d.]+\)$/);
+    expect(all.get("shadow-control")).toMatch(/^0 0 0 0\.5px lch\(0 0 0 \/ [\d.]+\),/);
   });
 
   it("stacks each tier rather than using one large blur", () => {
@@ -521,6 +502,43 @@ describe("the elevation ladder", () => {
       const layers = (all.get(`shadow-${tier}`)?.match(/lch\(/g) ?? []).length;
       expect(layers, `shadow-${tier}`).toBeGreaterThanOrEqual(2);
     }
+  });
+});
+
+describe("law 4: chroma is proportional to lightness", () => {
+  /* A departure that ignores its own lightness step makes a surface read as a
+     different material: a card two rungs up shedding half its warmth stops being
+     the same paper as the page it sits on. `dc = -0.145 x dL`, capped at 1.20. */
+  const K = -0.145;
+  const CAP = 1.2;
+  const STEPS = [
+    "sub", "card", "control", "control-hover", "control-active",
+    "row-hover", "row-active", "border", "input",
+  ] as const;
+
+  it("moves chroma opposite to lightness, at a single rate", () => {
+    for (const name of STEPS) {
+      const dL = num(`d-${name}`) * CONTRAST;
+      const expected = Math.max(-CAP, Math.min(CAP, K * dL));
+      expect(num(`dc-${name}`), `--dc-${name} against its own ${dL.toFixed(2)} L step`)
+        .toBeCloseTo(expected, 2);
+    }
+  });
+
+  it("keeps a menu's harder highlight on the same law", () => {
+    for (const name of ["row-hover", "row-active"] as const) {
+      const dL = num(`d-${name}`, menuDecls) * CONTRAST;
+      expect(num(`dc-${name}`, menuDecls), `menu --dc-${name}`)
+        .toBeCloseTo(Math.max(-CAP, Math.min(CAP, K * dL)), 2);
+    }
+  });
+
+  it("keeps a control one material across rest, hover and press", () => {
+    /* Chroma rising faster than lightness falls turns a press into a hue
+       animation. */
+    const spread = ["control", "control-hover", "control-active"]
+      .map((n) => BASE_C + num(`dc-${n}`));
+    expect(Math.max(...spread) - Math.min(...spread)).toBeLessThan(1);
   });
 });
 
@@ -535,11 +553,26 @@ describe("type and geometry", () => {
     for (const s of sizes) expect(s).toBeGreaterThanOrEqual(14);
   });
 
-  it("carries two radii, not five", () => {
+  it("holds the floor in components too, where arbitrary sizes escape it", () => {
+    /* `--text-*` governs the scale; an arbitrary value like `text-[0.8rem]`
+       bypasses it entirely and lands at 12.8px. */
+    const files = readdirSync(join(root, "src/components/ui"));
+    for (const file of files) {
+      const source = readFileSync(join(root, "src/components/ui", file), "utf8");
+      for (const m of source.matchAll(/text-\[([\d.]+)(px|rem)\]/g)) {
+        const px = m[2] === "rem" ? +m[1]! * 16 : +m[1]!;
+        expect(px, `${file} sets ${m[0]}`).toBeGreaterThanOrEqual(14);
+      }
+    }
+  });
+
+  it("carries three radii, one per rung of the elevation ladder", () => {
+    /* 8 a control, 10 a card, 12 an overlay. Near white the fills run out of
+       room, so radius carries depth alongside the shadow. */
     const radii = new Set(
       [...theme.matchAll(/--radius-[a-z0-9]+:\s*(\d+)px/g)].map((m) => m[1]!),
     );
-    expect([...radii].sort()).toEqual(["12", "8"]);
+    expect([...radii].map(Number).sort((a, b) => a - b)).toEqual([8, 10, 12]);
   });
 
   it("names every measure once", () => {

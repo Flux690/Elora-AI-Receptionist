@@ -3,18 +3,8 @@ import { cn } from '@/lib/utils'
 type Size = 'page' | 'form'
 
 /**
- * The two measures in the product, and nothing else names a width.
- *
- * `form` is the settings measure: wide enough for the gutter and the field
- * column beside it, and no wider. `page` is a touch wider for lists and tables.
- */
-/**
- * Named in `index.css`, not here. Both measures used to be hardcoded at this
- * call site while `--container-page` and `--container-form` sat in the theme
- * unused — and disagreeing, 880 against 840, with neither obviously wrong.
- *
- * `form` is a 196px gutter, 44px of air and 600px of field. `page` is a touch
- * wider for lists and tables.
+ * The two measures in the product. `form` is the settings measure, `page` a
+ * touch wider for lists and tables. Both are named in `index.css`.
  */
 const sizeWidth: Record<Size, string> = {
   page: 'max-w-page',
@@ -29,7 +19,7 @@ interface PageContainerProps {
 
 export function PageContainer({ children, className, size = 'page' }: PageContainerProps) {
   return (
-    <div className={cn('mx-auto w-full px-5 py-6', sizeWidth[size], className)}>
+    <div className={cn('@container mx-auto w-full px-7 py-7', sizeWidth[size], className)}>
       {children}
     </div>
   )

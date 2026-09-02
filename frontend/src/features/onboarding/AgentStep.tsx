@@ -1,21 +1,23 @@
-import { Info } from 'lucide-react'
 import type { AgentProfile } from '@receptionist/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { Field } from './Field'
 
 interface AgentField {
   key: keyof AgentProfile
   label: string
-  hint: string
+  help: string
 }
 
 const FIELDS: AgentField[] = [
-  { key: 'name',       label: 'Agent name',      hint: 'What the AI introduces itself as when answering calls.' },
-  { key: 'greeting',   label: 'Greeting',         hint: 'Said verbatim when a call is answered.' },
-  { key: 'farewell',   label: 'Farewell',         hint: 'Said when ending the call normally.' },
-  { key: 'fallback',   label: 'Fallback message', hint: 'Used when the AI does not know how to respond.' },
+  { key: 'name', label: 'Agent name', help: 'What it calls itself when it answers a call.' },
+  { key: 'greeting', label: 'Greeting', help: 'The first thing it says once a call connects.' },
+  { key: 'farewell', label: 'Farewell', help: 'What it says as a call ends normally.' },
+  {
+    key: 'fallback',
+    label: 'If it cannot answer',
+    help: 'Said before the question is handed to you.',
+  },
 ]
 
 interface AgentStepProps {
@@ -27,29 +29,19 @@ interface AgentStepProps {
 
 export function AgentStep({ data, onChange, onNext, onBack }: AgentStepProps) {
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-5">
       {FIELDS.map((f) => (
-        <div key={f.key} className="space-y-1.5">
-          <div className="flex items-center gap-1.5">
-            <Label htmlFor={`agent-${f.key}`}>
-              {f.label} <span className="text-destructive">*</span>
-            </Label>
-            <Tooltip>
-              <TooltipTrigger>
-                <Info className="size-3.5 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent>{f.hint}</TooltipContent>
-            </Tooltip>
-          </div>
+        <Field key={f.key} label={f.label} help={f.help} htmlFor={`agent-${f.key}`} required>
           <Input
             id={`agent-${f.key}`}
             value={data[f.key]}
             onChange={(e) => onChange({ ...data, [f.key]: e.target.value })}
+            className="w-full"
           />
-        </div>
+        </Field>
       ))}
 
-      <div className="flex gap-3 pt-2">
+      <div className="mt-1 flex gap-3">
         <Button variant="outline" onClick={onBack} className="flex-1">
           Back
         </Button>

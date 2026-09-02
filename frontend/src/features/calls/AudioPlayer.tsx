@@ -11,26 +11,14 @@ interface AudioPlayerProps {
   hasRecording: boolean
 }
 
-/**
- * Play, pause, scrub. Nothing else.
- *
- * Click-to-seek from a transcript line used to live here and has been removed
- * (PLAN.md 2.8.1). It never worked: a transcript entry stored `item.createdAt`,
- * which for a caller turn is *after* speech-to-text finalised and for an agent
- * turn is *before* the audio played, while offsets were computed against
- * `calls.started_at` — a database default — and the audio file begins whenever
- * egress actually started. Three unrelated clocks, so the seek drifted, and
- * drifted further the longer the call. Fixing it properly means anchoring to
- * the recording start and capturing speech-start times; that is not worth the
- * work for a convenience feature, so the feature is gone rather than wrong.
- */
+/** Play, pause, scrub. */
 export default function AudioPlayer({ callId, hasRecording }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null)
   const [playing, setPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
 
-  // Pre-signed URLs expire in about an hour — never cache them.
+  // Pre-signed URLs expire in about an hour, so they are never cached.
   const { data: recording, isLoading } = useQuery({
     queryKey: keys.callRecording(callId),
     queryFn: () => fetchers.callRecording(callId),
@@ -63,7 +51,7 @@ export default function AudioPlayer({ callId, hasRecording }: AudioPlayerProps) 
 
   if (!hasRecording) {
     return (
-      <p className="text-sm text-muted-foreground">
+      <p className="text-muted-foreground">
         No recording available for this call.
       </p>
     )
@@ -72,8 +60,10 @@ export default function AudioPlayer({ callId, hasRecording }: AudioPlayerProps) 
   if (isLoading) return <Skeleton className="h-14 w-full rounded-lg" />
 
   return (
-    <div className="rounded-lg border border-input bg-card p-3">
+    <div className="rounded-xl bg-card p-3 shadow-control">
       {recording?.url && (
+        // The transcript rendered beside this player is the caption track.
+        // eslint-disable-next-line jsx-a11y/media-has-caption
         <audio
           ref={audioRef}
           src={recording.url}
@@ -93,7 +83,7 @@ export default function AudioPlayer({ callId, hasRecording }: AudioPlayerProps) 
           {playing ? <Pause className="size-3.5" /> : <Play className="ml-0.5 size-3.5" />}
         </Button>
 
-        <span className="w-9 text-sm text-muted-foreground tabular-nums">
+        <span className="w-9 text-muted-foreground tabular-nums">
           {fmtTime(currentTime)}
         </span>
 
@@ -107,7 +97,7 @@ export default function AudioPlayer({ callId, hasRecording }: AudioPlayerProps) 
           aria-label="Seek"
         />
 
-        <span className="w-9 text-sm text-muted-foreground tabular-nums">
+        <span className="w-9 text-muted-foreground tabular-nums">
           {fmtTime(duration)}
         </span>
       </div>
