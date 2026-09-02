@@ -151,8 +151,6 @@ export function createAgentTools(deps: AgentDeps) {
           .describe("Only if the caller asked for one. Null otherwise."),
       }),
       execute: async ({ service, preferredDate, partOfDay }) => {
-        // Captured before the filler scope below: narrowing from the guard does
-        // not survive into a closure.
         const calendarId = deps.calendarExternalId;
         if (!calendarId) {
           return {

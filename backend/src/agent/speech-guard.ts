@@ -29,8 +29,9 @@ import type { llm } from "@livekit/agents";
  *
  * It costs nothing the product wanted. The agent is supposed to speak *after* a
  * tool returns, with the answer — never alongside deciding to call one. The
- * "one moment while I check" gap is covered by `RunContext.filler`, which is
- * built for exactly that and yields to real speech instead of racing it.
+ * "one moment while I check" gap is left as silence deliberately: see the note
+ * on the hold phrase in `tools.ts`, which measured `RunContext.filler` racing
+ * the tool's answer and winning. Nothing is spoken during a tool call.
  *
  * ## The tradeoff, stated plainly
  *
