@@ -575,10 +575,36 @@ describe("type and geometry", () => {
     expect([...radii].map(Number).sort((a, b) => a - b)).toEqual([8, 10, 12]);
   });
 
+  it("keeps pixel widths out of call sites", () => {
+    /* The rule is that a call site NAMES rather than measures — not that pixels
+       are banned, since the tokens themselves are pixel values. A component may
+       own its own width in one place (the drawer does); what is forbidden is the
+       same number pasted at three call sites, which is exactly how the drawer
+       width goes wrong, which is why `sheet.tsx` owns its own. */
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(full);
+        } else if (/\.tsx?$/.test(entry.name)) {
+          const source = readFileSync(full, "utf8");
+          for (const m of source.matchAll(/(?:max-w|min-w|w)-\[(\d+(?:\.\d+)?)px\]/g)) {
+            offenders.push(`${full.replace(root, "")} sets ${m[0]}`);
+          }
+        }
+      }
+    };
+    walk(join(root, "src/features"));
+    walk(join(root, "src/layout"));
+
+    expect(offenders).toEqual([]);
+  });
+
   it("names every measure once", () => {
-    /* `PageContainer` hardcoded 900 and 840 while these declared 900 and 880,
-       so the token and the page disagreed and neither was obviously wrong. */
-    for (const m of ["page", "form", "sidebar"]) {
+    /* Every measure is named here, so a page cannot hardcode one that quietly
+       disagrees with the token of the same name. */
+    for (const m of ["page", "form", "narrow", "sidebar"]) {
       expect(theme, `--container-${m}`).toMatch(new RegExp(`--container-${m}:\\s*\\d+px`));
     }
   });

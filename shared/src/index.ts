@@ -9,9 +9,9 @@ export type AppointmentStatus = "requested" | "confirmed" | "cancelled";
 /**
  * A bookable service.
  *
- * `durationMinutes` is what makes booking correct: before it existed every
- * appointment was assumed to take exactly an hour, so a two-hour colour and a
- * fifteen-minute fringe trim blocked the same slot.
+ * `durationMinutes` is what makes booking correct. Without it every appointment
+ * is assumed to take an hour, so a two-hour colour and a fifteen-minute fringe
+ * trim block the same slot.
  *
  * The two buffers are time the calendar must hold but the caller never hears
  * about — cleaning a chair, writing notes, driving to the next job. They widen
@@ -215,10 +215,9 @@ export type TranscriptEntry = {
 
 /**
  * `callerPhone` is nullable everywhere below, because a withheld caller ID means
- * no identity rather than a placeholder one (PLAN.md 1.8.1). These interfaces
- * previously typed it as a plain `string` while all three columns were nullable
- * and the components already branched on null — the types were the only thing
- * claiming otherwise.
+ * no identity rather than a placeholder one (PLAN.md 1.8.1). The columns are
+ * nullable and the components branch on null, so a plain `string` here would be
+ * the one thing claiming otherwise.
  */
 export interface CallListItem {
   id: string;

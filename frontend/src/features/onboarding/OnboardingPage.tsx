@@ -1,66 +1,79 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useUser } from '@clerk/react'
 import { toast } from 'sonner'
-import type { AgentProfile } from '@receptionist/shared'
+import { useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/apiClient'
-import { StepIndicator } from './StepIndicator'
-import { BusinessStep, type BusinessStepData } from './BusinessStep'
-import { AgentStep } from './AgentStep'
-import { PhoneStep } from './PhoneStep'
+import { keys } from '@/lib/queries'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { IndustryPicker } from './IndustryPicker'
+import { NumberSearch } from './NumberSearch'
 
-const STEP_TITLES = {
-  1: {
-    heading: 'Tell us about your business',
-    sub: 'Your agent uses this to introduce you to callers.',
-  },
-  2: {
-    heading: 'Set what your agent says',
-    sub: 'The phrases it repeats on every call. You can change them later.',
-  },
-  3: {
-    heading: 'Pick a phone number',
-    sub: 'The number your customers call, answered by your agent.',
-  },
-} as const
+/** Every zone the platform knows. The backend validates against the same list. */
+const TIMEZONES: string[] = Intl.supportedValuesOf('timeZone')
 
+/**
+ * The shortest path to a phone number that answers.
+ *
+ * One page, because what is genuinely required to *answer* a call is a business
+ * name, a number and a timezone — and three fields plus a picker is not long
+ * enough to want a stepper, which makes the job look bigger than it is.
+ *
+ * Deliberately absent:
+ *
+ * - **Services, hours and the calendar.** None is needed to answer a phone; all
+ *   three are needed to book, and asking for some but not all of them produces
+ *   an agent that answers "no calendar is connected" on its first call however
+ *   carefully the form was filled in. They live on Home's setup checklist.
+ * - **A description box.** With no services or hours anywhere near it, an open
+ *   box collects exactly the things that must be structured — prices, opening
+ *   times — and prose saying "open till six" beside `business_hours` saying five
+ *   is a correctness hazard, not untidiness. Its label in Settings only works
+ *   because services and hours are visible around it.
+ * - **The agent's words.** Derived from the name below, editable in Settings.
+ *   A greeting naming the business beats a generic one, and it is one fewer
+ *   field to fill in before the phone is answered.
+ */
 export default function OnboardingPage() {
   const navigate = useNavigate()
-  const { user } = useUser()
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const qc = useQueryClient()
+
+  const [name, setName] = useState('')
+  const [industry, setIndustry] = useState('')
+  const [timezone, setTimezone] = useState(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+  )
+  const [phoneNumber, setPhoneNumber] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [selectedNumber, setSelectedNumber] = useState<string | null>(null)
 
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-
-  const [bizData, setBizData] = useState<BusinessStepData>({
-    name: '',
-    industry: '',
-    description: '',
-    services: [],
-  })
-
-  const [agentData, setAgentData] = useState<AgentProfile>({
-    name: 'My Agent',
-    greeting: 'Hello, thank you for calling! How can I help you today?',
-    farewell: 'Thanks for calling. Have a wonderful day!',
-    fallback: "I'm not sure about that, but someone from our team will follow up with you shortly.",
-  })
+  const ready = name.trim().length > 0 && industry.trim().length > 0 && !!phoneNumber
 
   async function finish() {
-    if (!selectedNumber) return
+    if (!ready || submitting) return
     setSubmitting(true)
     try {
       await apiClient.post('/onboarding', {
-        name: bizData.name,
-        industry: bizData.industry,
-        description: bizData.description,
-        services: bizData.services.filter((s) => s.name.trim()),
+        name: name.trim(),
+        industry: industry.trim(),
         timezone,
-        agentProfile: agentData,
-        phoneNumber: selectedNumber,
+        phoneNumber,
+        agentProfile: {
+          name: 'Your agent',
+          greeting: `Thanks for calling ${name.trim()}. How can I help?`,
+          farewell: 'Thanks for calling. Have a good day.',
+          fallback:
+            'I am not sure about that one, but I will pass it on and someone will get back to you.',
+        },
       })
-      await user?.reload()
+      // The gate caches its answer for the session, so it has to be told.
+      await qc.invalidateQueries({ queryKey: keys.session })
       navigate('/')
     } catch (err: unknown) {
       const message =
@@ -72,51 +85,87 @@ export default function OnboardingPage() {
     }
   }
 
-  const { heading, sub } = STEP_TITLES[step]
-
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-12">
-      <div className="flex w-full max-w-[600px] flex-col rounded-xl bg-card shadow-control">
-        <div className="flex-1 p-8">
-          <StepIndicator current={step} />
+    <div className="min-h-screen bg-background px-6 py-12">
+      <div className="mx-auto flex w-full max-w-narrow flex-col gap-9">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Set up your receptionist
+          </h1>
+          <p className="mt-1 text-md text-muted-foreground">
+            Two things, and your number starts being answered. Everything else can wait
+            until you have heard it work.
+          </p>
+        </div>
 
-          <div className="mb-6">
-            <h1 className="mb-1 text-xl font-semibold tracking-tight text-foreground">{heading}</h1>
-            <p className="text-muted-foreground">{sub}</p>
+        <section className="flex flex-col gap-6">
+          <h2 className="text-base font-semibold tracking-tight text-foreground">
+            Your business
+          </h2>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="biz-name" className="font-medium text-foreground">
+              Business name
+            </label>
+            <p className="text-muted-foreground">
+              Your agent says this out loud the moment it answers a call.
+            </p>
+            <Input
+              id="biz-name"
+              className="mt-1 w-field-lg"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
           </div>
 
-          {step === 1 && (
-            <BusinessStep
-              data={bizData}
-              onChange={setBizData}
-              onNext={() => setStep(2)}
-            />
-          )}
+          <div className="flex flex-col gap-1.5">
+            <span className="font-medium text-foreground">Kind of business</span>
+            <p className="text-muted-foreground">
+              Your agent only uses this if a caller asks what you do.
+            </p>
+            <IndustryPicker value={industry} onChange={setIndustry} />
+          </div>
 
-          {step === 2 && (
-            <AgentStep
-              data={agentData}
-              onChange={setAgentData}
-              onNext={() => setStep(3)}
-              onBack={() => setStep(1)}
-            />
-          )}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="tz" className="font-medium text-foreground">
+              Timezone
+            </label>
+            <p className="text-muted-foreground">
+              Your agent quotes every time in this zone. We guessed from your browser.
+            </p>
+            <Select value={timezone} onValueChange={(v) => v && setTimezone(v)}>
+              <SelectTrigger id="tz" className="mt-1 w-field-lg">
+                <SelectValue placeholder="Pick a timezone" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                {TIMEZONES.map((tz) => (
+                  <SelectItem key={tz} value={tz}>
+                    {tz}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </section>
 
-          {step === 3 && (
-            <PhoneStep
-              selectedNumber={selectedNumber}
-              onSelect={setSelectedNumber}
-              onBack={() => setStep(2)}
-              onFinish={finish}
-              submitting={submitting}
-            />
-          )}
+        <div className="h-px bg-border" />
+
+        <section className="flex flex-col gap-4">
+          <h2 className="text-base font-semibold tracking-tight text-foreground">
+            Your number
+          </h2>
+          <NumberSearch selected={phoneNumber} onSelect={setPhoneNumber} />
+        </section>
+
+        <div className="flex items-center gap-3 pb-6">
+          <Button size="lg" disabled={!ready || submitting} onClick={finish}>
+            {submitting ? 'Setting up…' : 'Finish setup'}
+          </Button>
+          <span className="text-muted-foreground">
+            Nothing is bought until you press this.
+          </span>
         </div>
       </div>
-
-      <p className="mt-6 text-muted-foreground">
-        Step {step} of 3. Everything here can be changed later in Settings.
-      </p>
     </div>
   )
 }

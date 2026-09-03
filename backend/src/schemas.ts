@@ -3,13 +3,12 @@ import { z } from "zod";
 /**
  * A real IANA timezone, checked against what this Node build actually knows.
  *
- * Previously a bare `z.string()`, with a free-text input in front of it. That is
- * not cosmetic: `buildSystemPrompt` formats every date through
+ * Not cosmetic: `buildSystemPrompt` formats every date through
  * `Intl.DateTimeFormat` with this value, and an unknown zone throws a
  * `RangeError`. The prompt is built inside the `ReceptionistAgent` constructor,
- * inside `session.start()` — so "America/New York" with a space did not produce
- * a wrong date, it took the agent off the air with nothing in the dashboard to
- * explain why.
+ * inside `session.start()`, so a bare `z.string()` accepting "America/New York"
+ * with a space does not produce a wrong date — it takes the agent off the air
+ * with nothing in the dashboard to explain why.
  */
 const ianaTimezone = z.string().refine(
   (tz) => {
@@ -136,6 +135,14 @@ export const updateSettingsSchema = z.object({
   agent: agentProfileSchema.partial().optional(),
 });
 
+/**
+ * What it takes to answer a phone: a name, a number and a timezone.
+ *
+ * `services` and `description` are optional and default empty: onboarding asks
+ * for neither, because neither is needed to *answer* a call. They belong to
+ * Home's setup checklist, alongside the calendar. The fields stay so an import
+ * or a future client that does send them is not rejected.
+ */
 export const onboardingCreateSchema = z.object({
   name: z.string().min(1),
   industry: z.string(),

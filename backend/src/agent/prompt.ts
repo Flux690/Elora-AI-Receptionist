@@ -132,9 +132,9 @@ export function buildSystemPrompt(deps: AgentDeps): string {
     })
     .join("\n");
 
-  // Inlined rather than fetched through a tool. A knowledge question used to
-  // cost two extra LLM round trips plus an embedding call and a vector query;
-  // a small business's whole knowledge base fits in the prompt (PLAN.md 1.5).
+  // Inlined rather than fetched through a tool. A small business's whole
+  // knowledge base fits in the prompt, and a tool costs two extra LLM round
+  // trips plus an embedding call and a vector query per question (PLAN.md 1.5).
   //
   // Stated as fact, not as instruction. What to do when the answer is missing is
   // the escalation tool's business, and it says so in its own description.

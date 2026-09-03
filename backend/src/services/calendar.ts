@@ -64,12 +64,10 @@ export async function listCalendars(accessToken: string): Promise<CalendarOption
 /**
  * What is already taken on the calendar, in a window.
  *
- * Deliberately only a fetch. This used to *generate* slots as well — fixed
- * 60-minute steps from an arbitrary start, returning whatever freeBusy did not
- * mark busy — which is how a caller could be offered 3 a.m. for a two-hour
- * appointment. Deciding which times exist belongs in `agent/scheduling.ts`,
- * which has the opening hours and the service duration to do it properly.
- * All Google can tell us is what is unavailable.
+ * Deliberately only a fetch. All Google can tell us is what is unavailable;
+ * deciding which times exist belongs in `agent/scheduling.ts`, which has the
+ * opening hours and the service duration to do it properly. Generating slots
+ * from freeBusy alone offers a caller 3 a.m. for a two-hour appointment.
  */
 export async function fetchBusyRanges(
   accessToken: string,

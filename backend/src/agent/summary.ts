@@ -14,10 +14,10 @@ const MIN_SUMMARY_ENTRIES = 3;
 /**
  * Post-call summary, through whichever gateway LLM_PROVIDER selects.
  *
- * Moved off OpenRouter along with the in-call model: that account has never
- * held credits, so this silently returned "" on every call. LiveKit Inference
- * reads LIVEKIT_API_KEY/SECRET from the environment and needs no job context,
- * so it works here in the session close handler.
+ * Through the same gateway as the in-call model, so the two cannot drift.
+ * LiveKit Inference reads LIVEKIT_API_KEY/SECRET from the environment and needs
+ * no job context, so it works here in the session close handler; OpenRouter
+ * without credits returns "" on every call and says nothing about why.
  *
  * Deliberately a small model with reasoning off — PLAN.md 1.3 notes that larger
  * models are measurably *worse* at this job, embellishing and inventing

@@ -24,9 +24,8 @@ import {
  * Calendar… Nothing else should be built on top of booking until this has
  * happened once."*
  *
- * Everything in 2.5 and the slot interface is unit-tested only. `fetchBusyRanges`,
- * padded-block events and the calendar picker had never touched Google, so the
- * one property the whole design rests on was unverified:
+ * Everything in 2.5 and the slot interface is unit-tested. This is the one
+ * property the whole design rests on that only a real calendar can confirm:
  *
  *   **A calendar event must span the padded BLOCK, not the appointment.**
  *
@@ -218,9 +217,9 @@ describe.skipIf(ctx === null)("Google Calendar, for real", () => {
         windowMax
       );
 
-      // THE CONTRACT. If the event had been written over start→end instead of
-      // blockStart→blockEnd, the busy range would begin 10 minutes late and end
-      // 15 minutes early, and this fails.
+      // THE CONTRACT. An event written over start→end rather than
+      // blockStart→blockEnd reports a busy range beginning 10 minutes late and
+      // ending 15 minutes early, and fails here.
       const covers = busyAfter.some(
         (b) =>
           b.start.getTime() <= slot.blockStart.getTime() &&

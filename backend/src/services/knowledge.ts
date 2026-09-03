@@ -205,10 +205,10 @@ export async function listKnowledge(tenantId: string) {
 /**
  * Deletes a knowledge item and reopens the escalation it came from.
  *
- * Without the reopen, deleting an item left its escalation `resolved` forever:
- * the agent could no longer answer that question, and the (call_id, question)
- * dedup index could stop it being re-escalated. The question became permanently
- * unanswerable, with nothing surfaced anywhere (PLAN.md 1.8.5).
+ * Without the reopen, a delete leaves its escalation `resolved` forever: the
+ * agent cannot answer that question and the (call_id, question) dedup index can
+ * stop it being re-escalated, so the question is permanently unanswerable with
+ * nothing surfaced anywhere (PLAN.md 1.8.5).
  *
  * Both statements run in one transaction — a delete that does not reopen is
  * exactly the broken state this exists to prevent.

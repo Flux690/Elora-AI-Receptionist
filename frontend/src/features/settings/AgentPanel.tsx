@@ -50,7 +50,8 @@ export function AgentPanel({ settings }: { settings: AppSettings }) {
   }, [form, settings.agent])
 
   /* A save re-seeds. A background refetch must not: the recording switch below
-     invalidates this very query, and that used to discard an unsaved phrase. */
+     invalidates this very query, and re-seeding on that discards an unsaved
+     phrase. */
   const expectReseed = useServerSeed(settings, changes.length > 0, () => {
     setForm(settings.agent)
     setRecordCalls(settings.business.recordCalls)

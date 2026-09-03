@@ -48,8 +48,13 @@ Run `pnpm typecheck` and `pnpm lint` before calling any change done.
 
 ## Frontend conventions
 
-- **Never state a width in pixels at a call site.** Use `w-field-xs/sm/md/lg` for
-  fields and `max-w-page` / `max-w-form` for pages.
+- **A call site names a width; it does not measure one.** Use
+  `w-field-xs/sm/md/lg` for fields and `max-w-page` / `max-w-form` /
+  `max-w-narrow` for pages. Pixels are not banned — `--container-page: 960px` is
+  itself pixels — they live once in `index.css` where they carry a name. A
+  component may own its own width in one place; the same number at three call
+  sites is the thing that goes wrong. `design-tokens.test.ts` fails on a pixel
+  width under `features/` or `layout/`.
 - **Nothing below 14px.** `src/tests/design-tokens.test.ts` fails the build on a
   smaller size, including arbitrary values like `text-[0.8rem]`.
 - **A duration or a count is a `NumberField`.** Digits only, with the unit
@@ -72,10 +77,10 @@ Run `pnpm typecheck` and `pnpm lint` before calling any change done.
 
 ## Never do these
 
-Each one cost real debugging. `CONTEXT.md` has the reasoning.
+Each one has a mechanism behind it. `CONTEXT.md` has the reasoning.
 
 - **Never let a turn both speak and call a tool.** `agent/speech-guard.ts` drops
-  the speech; a caller once heard the model's private deliberation.
+  the speech, so a caller does not hear the model's private deliberation.
 - **Never add a hold phrase or `ctx.filler`.** Speech is a queue, so it stands in
   front of the tool's answer and the real reply is discarded.
 - **Never enable `preemptiveTts`.** Preemptive generation is on and stays on;
@@ -86,18 +91,18 @@ Each one cost real debugging. `CONTEXT.md` has the reasoning.
   `ctx.session.shutdown({ drain: true })`.
 - **Never create per-tenant SIP dispatch rules.** One platform-wide rule with an
   empty routing filter; the tenant is resolved at runtime from
-  `sip.trunkPhoneNumber`. This was tried, and every new tenant collided.
+  `sip.trunkPhoneNumber`. A rule without `trunk_ids` matches every inbound trunk,
+  so the second tenant collides with the first.
 - **Never instantiate `new OpenAI(...)`.** Chat goes through `buildLLM()` in
   `agent/session-config.ts`; `src/llm.ts` is for embeddings only.
 
 ## Verify UI work against the running app
 
-Do not reason from the source about what the browser does. Two bugs in one day
-were misdiagnosed that way when a single `getComputedStyle` call had the answer.
+Do not reason from the source about what the browser does. A single
+`getComputedStyle` call settles what an afternoon of reading the CSS will not.
 Run the app and measure.
 
-One caveat learned the same day: a Chrome tab that is not the foreground tab
-**stops rendering**. Animations do not advance, `requestAnimationFrame` never
+One caveat: a Chrome tab that is not the foreground tab **stops rendering**. Animations do not advance, `requestAnimationFrame` never
 fires, and elements mid-transition stay in the DOM. Confirm
 `document.visibilityState === 'visible'` before trusting any timing measurement.
 

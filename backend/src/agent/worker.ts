@@ -299,10 +299,10 @@ export default defineAgent({
 
     // 10. Register close handler BEFORE any async work — prevents race conditions
     let egressId: string | null = null;
-    // Set only when egress actually starts. Previously computed unconditionally,
-    // so a failed startCallRecording still wrote a recording_url and the
-    // dashboard handed out a presigned URL to an object that was never uploaded
-    // (PLAN.md 1.8.2).
+    // Set only when egress actually starts. Computing it unconditionally lets a
+    // failed startCallRecording still write a recording_url, and the dashboard
+    // then hands out a presigned URL to an object nobody uploaded (PLAN.md
+    // 1.8.2).
     let callRecordingKey: string | null = null;
 
     session.on(voice.AgentSessionEventTypes.Close, async (ev: voice.CloseEvent) => {

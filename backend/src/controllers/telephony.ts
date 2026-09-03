@@ -4,12 +4,17 @@ import {
   searchPhoneNumbers,
   purchasePhoneNumber,
   releasePhoneNumber,
+  InvalidAreaCode,
 } from "../services/telephony.js";
 import { phoneProvisionSchema } from "../schemas.js";
 
 export async function search(c: AppContext) {
-  const areaCode = c.req.query("areaCode") ?? "";
-  return c.json(await searchPhoneNumbers(areaCode));
+  try {
+    return c.json(await searchPhoneNumbers(c.req.query("areaCode")));
+  } catch (err) {
+    if (err instanceof InvalidAreaCode) return c.json({ message: err.message }, 400);
+    throw err;
+  }
 }
 
 export async function provision(c: AppContext) {

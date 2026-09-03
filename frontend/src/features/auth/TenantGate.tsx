@@ -1,22 +1,40 @@
-import { useUser } from '@clerk/react'
+import { useQuery } from '@tanstack/react-query'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { RouteSkeleton } from '@/layout/RouteSkeleton'
+import { keys, fetchers } from '@/lib/queries'
 
-/** Sends a user to onboarding until they have finished it, and away after. */
+/**
+ * Sends a user to onboarding until they have a business, and away after.
+ *
+ * The answer comes from the API, which derives it from the tenant row.
+ *
+ * Deliberately not Clerk's `publicMetadata.onboarded`: being onboarded is a fact
+ * about the business, not the identity, and holding it in two places lets them
+ * disagree. Any tenant created outside this flow — a restored backup, a seeded
+ * database — would leave the flag false and send its owner into onboarding on top
+ * of a business that already exists, where the unique constraint on
+ * `clerk_user_id` rejects the insert. PLAN.md 2.1 takes the same view.
+ */
 export function TenantGate() {
-  const { isLoaded, user } = useUser()
   const location = useLocation()
+  const { data, isPending } = useQuery({
+    queryKey: keys.session,
+    queryFn: fetchers.session,
+    // The gate blocks every route, so a wrong answer is worse than a slow one:
+    // it is read once per session and not refetched behind the user.
+    staleTime: Infinity,
+  })
 
-  if (!isLoaded) {
+  if (isPending) {
     return <RouteSkeleton />
   }
 
-  const hasOnboarded = !!user?.publicMetadata?.onboarded
+  const onboarded = !!data?.onboarded
 
-  if (hasOnboarded && location.pathname === '/onboarding') {
+  if (onboarded && location.pathname === '/onboarding') {
     return <Navigate to="/" replace />
   }
-  if (!hasOnboarded && location.pathname !== '/onboarding') {
+  if (!onboarded && location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />
   }
 

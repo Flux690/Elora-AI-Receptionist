@@ -32,11 +32,12 @@ beforeEach(() => {
 
 describe("deleteKnowledge", () => {
   /**
-   * PLAN.md 1.8.5 — deleting a knowledge item orphaned its source escalation.
+   * PLAN.md 1.8.5 — deleting a knowledge item must not orphan its source
+   * escalation.
    *
-   * The escalation stayed `resolved` forever, so the agent could never answer
-   * that question again *and* the dedup index could stop it being re-escalated.
-   * The question became permanently unanswerable, silently.
+   * An escalation left `resolved` means the agent can never answer that question
+   * again *and* the dedup index can stop it being re-escalated, which makes the
+   * question permanently unanswerable with nothing to show for it.
    */
   it("reopens the source escalation so the question can be answered again", async () => {
     const tenant = await makeTenant();

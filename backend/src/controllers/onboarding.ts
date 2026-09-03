@@ -1,23 +1,44 @@
 import { getAuth } from "@clerk/hono";
-import { createClerkClient } from "@clerk/backend";
 import type { Context } from "hono";
-import { createTenant } from "../services/tenants.js";
+import { createTenant, resolveTenantByClerkUserId } from "../services/tenants.js";
 import { replaceServices } from "../services/services.js";
 import {
   searchPhoneNumbers,
   purchasePhoneNumber,
   releasePhoneNumber,
+  InvalidAreaCode,
 } from "../services/telephony.js";
-import { env } from "../env.js";
 import { onboardingCreateSchema } from "../schemas.js";
 
-const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
+/**
+ * Whether this account has finished onboarding.
+ *
+ * Derived from the existence of the tenant row, **not** from Clerk's
+ * `publicMetadata.onboarded`. Being onboarded is a fact about the business, not
+ * about the identity, and holding it in two places lets them disagree: a tenant
+ * created outside this flow leaves the flag false and its owner is sent into
+ * onboarding on top of a business that already exists.
+ *
+ * Sits outside `requireTenant`, which 404s precisely when the answer is "no".
+ * PLAN.md 2.1 takes the same view of the flag.
+ */
+export async function session(c: Context) {
+  const auth = getAuth(c);
+  if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
+  const tenant = await resolveTenantByClerkUserId(auth.userId);
+  return c.json({ onboarded: !!tenant });
+}
 
 export async function phoneSearch(c: Context) {
   const auth = getAuth(c);
   if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
-  const areaCode = c.req.query("areaCode");
-  return c.json(await searchPhoneNumbers(areaCode));
+  try {
+    return c.json(await searchPhoneNumbers(c.req.query("areaCode")));
+  } catch (err) {
+    // The one error here that is the caller's fault rather than the carrier's.
+    if (err instanceof InvalidAreaCode) return c.json({ message: err.message }, 400);
+    throw err;
+  }
 }
 
 export async function create(c: Context) {
@@ -29,7 +50,16 @@ export async function create(c: Context) {
 
   const { phoneNumber, services, ...tenantData } = parsed.data;
 
-  // 1. Purchase first — if this fails, nothing hits the DB
+  // 0. Refuse a second business for the same account BEFORE buying anything.
+  //    `tenants.clerk_user_id` is unique, so a duplicate throws; checking after
+  //    the purchase would make a double submit cost a phone number and a release
+  //    to undo it, on a release path that is itself unreliable (PLAN.md "Known
+  //    limits").
+  if (await resolveTenantByClerkUserId(auth.userId)) {
+    return c.json({ message: "This account already has a business set up." }, 409);
+  }
+
+  // 1. Purchase — if this fails, nothing hits the DB
   const purchased = await purchasePhoneNumber(phoneNumber);
 
   // 2. Create tenant atomically — if DB fails, release the number.
@@ -46,11 +76,6 @@ export async function create(c: Context) {
     await releasePhoneNumber(purchased.e164_format).catch((e) => console.error("[onboarding] rollback release failed:", e));
     throw dbErr;
   }
-
-  // 3. Mark onboarded in Clerk
-  await clerkClient.users.updateUserMetadata(auth.userId, {
-    publicMetadata: { onboarded: true },
-  });
 
   return c.json({ ok: true });
 }

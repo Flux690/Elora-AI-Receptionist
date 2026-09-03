@@ -141,7 +141,7 @@ export default function QueuePage() {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[660px] px-6 py-9">
+      <div className="mx-auto w-full max-w-narrow px-6 py-9">
         <p className="flex flex-wrap items-center gap-x-2 text-muted-foreground tabular-nums">
           <span>{formatDateTime(current.createdAt, zone)}</span>
           <span aria-hidden="true">·</span>

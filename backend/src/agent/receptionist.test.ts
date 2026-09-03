@@ -16,10 +16,10 @@ describe("ReceptionistAgent", () => {
   const toolNames = (deps = makeAgentDeps()) =>
     Object.keys(new ReceptionistAgent(deps).toolCtx.functionTools);
 
-  it("no longer exposes searchKnowledge — the knowledge base is in the prompt", () => {
-    // PLAN.md 1.5: a knowledge question used to cost two extra LLM round trips
-    // plus an embedding call and a vector query. If this tool comes back, that
-    // cost comes back with it.
+  it("exposes no searchKnowledge — the knowledge base is in the prompt", () => {
+    // PLAN.md 1.5: as a tool, a knowledge question costs two extra LLM round
+    // trips plus an embedding call and a vector query. If it comes back, so
+    // does that cost.
     expect(toolNames()).not.toContain("searchKnowledge");
   });
 

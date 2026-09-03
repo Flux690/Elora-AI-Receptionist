@@ -7,23 +7,16 @@ import { setClientName } from "../services/clients.js";
 /**
  * Every tool's `execute` must actually RETURN something to the model.
  *
- * This file exists because of a real outage I caused. Removing the hold phrase
- * left each tool body wrapped in `return await (async () => { ... })` — an arrow
- * function that is never invoked. `await` on a function object yields the
- * function, so every wrapped tool returned a closure instead of a result:
+ * A body wrapped in `return await (async () => { ... })` is valid TypeScript
+ * that never invokes the arrow: `await` on a function object yields the
+ * function, so the tool resolves to a closure rather than a result. LiveKit
+ * reports the call as finished with `isError: false` and no `output` field, the
+ * model retries, gives up and escalates, and the caller is told someone will
+ * follow up. Booking is dead and nothing says so.
  *
- *   Tool call execution finished
- *     args: "{\\"service\\":\\"Beard Trim\\", ...}"
- *     isError: false          ← no `output` field at all
- *   ...2ms later
- *
- * The model asked for availability, got nothing back, retried, got nothing
- * again, gave up and escalated — and the caller was told "someone from our team
- * will follow up". Booking was silently dead.
- *
- * Typecheck passed (the code is valid), and every existing test passed, because
- * nothing anywhere called a tool's `execute`. A tool that cannot be shown to
- * return a value is a tool nobody has tested.
+ * Typecheck cannot see it and neither can any test that does not call
+ * `execute`. A tool that cannot be shown to return a value is a tool nobody has
+ * tested, which is what these cases are for.
  */
 
 const okCalendar = () =>

@@ -9,11 +9,10 @@ import type {
 /**
  * Slot generation, as pure functions.
  *
- * This module exists because the old `checkAvailability` walked fixed 60-minute
- * steps from an arbitrary start and returned anything Google's freeBusy did not
- * mark busy. It had no idea when the business was open, how long a service took,
- * or how much notice was needed — so a caller asking about tomorrow could be
- * offered 3 a.m. for a two-hour appointment.
+ * Which times exist is decided here, from the opening hours, the service length
+ * and the booking policy. A generator that walks fixed steps and keeps whatever
+ * freeBusy leaves unmarked knows none of those, and offers a caller 3 a.m. for a
+ * two-hour appointment.
  *
  * Nothing here touches the database, the network, or the clock except through an
  * explicit `now`, so every rule below is testable without booting a worker.

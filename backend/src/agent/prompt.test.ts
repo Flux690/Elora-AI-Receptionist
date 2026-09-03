@@ -88,7 +88,7 @@ describe("buildSystemPrompt", () => {
      * Caching keys on an unchanging prefix. Everything stable (business,
      * services, knowledge, rules) has to come before anything per-call (caller
      * identity, current time), or the per-call block invalidates the cache for
-     * everything after it. The old prompt put the Caller block in the middle.
+     * everything after it — which is what a Caller block in the middle does.
      */
     it("puts all per-call content after all stable content", () => {
       const prompt = buildSystemPrompt(
@@ -219,10 +219,9 @@ describe("the prompt states facts; the tools state procedure", () => {
    * on that tool's own description and its parameter descriptions, where the
    * model reads it at the moment it matters.
    *
-   * This used to be mixed: the prompt carried "use checkAvailability before
-   * offering times" and "use rememberCallerName once. Never ask for it outright"
-   * — the second of which is why a caller was never asked their name and every
-   * booking landed in the diary as "caller ID withheld".
+   * Mixing the two is what puts "use rememberCallerName once, never ask for it
+   * outright" in front of the model on every turn, so a caller is never asked
+   * their name and every booking lands in the diary as "caller ID withheld".
    */
   const TOOL_NAMES = [
     "checkAvailability",

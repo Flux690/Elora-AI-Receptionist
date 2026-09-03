@@ -120,11 +120,11 @@ describe("escalation before the call row exists (PLAN.md 1.7.3)", () => {
    * with no blocking round trip. That leaves a window where the agent is live
    * but `calls` has no row — and escalations.call_id is a foreign key to it.
    *
-   * The old reasoning was that tools only fire after the caller speaks, so the
-   * window could never be hit. That is wrong on two counts: preemptive
-   * generation exists specifically to start work before the turn is confirmed,
-   * and allowInterruptions:false on the greeting blocks interruption of
-   * *speech*, not speech-to-text.
+   * Reasoning that tools only fire after the caller speaks, so the window is
+   * unreachable, is wrong on two counts: preemptive generation exists
+   * specifically to start work before the turn is confirmed, and
+   * allowInterruptions:false on the greeting blocks interruption of *speech*,
+   * not speech-to-text.
    */
   it("rejects an escalation naming a call row that does not exist", async () => {
     const tenant = await makeTenant();

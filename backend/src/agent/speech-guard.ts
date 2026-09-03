@@ -3,17 +3,16 @@ import type { llm } from "@livekit/agents";
 /**
  * A turn either calls a tool or it talks. Never both.
  *
- * ## Why this exists
+ * ## What it prevents
  *
- * A caller once heard the agent say, out loud:
+ * Without it a caller hears, out loud:
  *
  *   "_1} Wait, the user did not offer their name yet, so I will book it directly
  *    (I can't call rememberCallerName without a name, but bookAppointment only
  *    requires slotId). I should confirm the booking. Let's call bookAppointment."
  *
  * `_1}` is the tail of `{"slotId": "slot_1"}` — tool-call JSON — followed by the
- * model's private deliberation. It arrived in the same turn as the
- * `bookAppointment` call.
+ * model's private deliberation, in the same turn as the `bookAppointment` call.
  *
  * ## Why this is a structural rule and not a filter
  *

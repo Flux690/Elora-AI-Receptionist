@@ -56,36 +56,22 @@ export function createAgentTools(deps: AgentDeps) {
   }
 
   /**
-   * NO HOLD PHRASE. This is deliberate, and it was removed after it ate three
-   * answers in three test calls.
+   * NO HOLD PHRASE.
    *
-   * The idea was benign: a tool is slow, so say "one moment" to cover the gap.
-   * The reality is that speech is a QUEUE and a hold phrase is a second speech
-   * handle. It does not fill silence beside the answer — it stands in front of
-   * it. Measured on 2026-08-28:
+   * Speech is a QUEUE. A phrase spoken to cover a slow tool is a second speech
+   * handle, and it does not sit beside that tool's answer — it stands in front
+   * of it, so the answer is discarded when the phrase finally stops and the
+   * caller hears nothing at all. `RunContext.filler` speaks through
+   * `AgentSession.say` and creates the same competing handle.
    *
-   *   40.463  hold phrase starts
-   *   42.770  bookAppointment returns booked:true
-   *   44.358  the model finishes writing "Yes, I've booked your haircut..."
-   *   45.465  hold phrase finally stops
-   *   45.467  the confirmation is DISCARDED, never spoken
+   * The gap it would cover is 400ms to 3.2s. Two seconds of quiet is a
+   * receptionist thinking; a lost confirmation is a customer who does not know
+   * whether they have an appointment.
    *
-   * The caller then sat in silence until they asked "Did you do it?".
-   *
-   * Switching to LiveKit's own `RunContext.filler` did not help, because it
-   * speaks through `AgentSession.say` and so creates the same competing handle.
-   * The problem is not which API says it; it is that anything said during a tool
-   * call is in the way of that tool's answer.
-   *
-   * And the gap being covered is small: these tools measure 400ms to 3.2s. Two
-   * seconds of quiet is a receptionist thinking. A lost confirmation is a
-   * customer who does not know whether they have an appointment.
-   *
-   * `agentProfile.holdPhrase` was removed from the type, the API and the
-   * dashboard too — a setting that changes nothing is worse than no setting. If
-   * genuinely slow work arrives later the mechanism is `RunContext.update()`,
-   * which marks the tool NON-BLOCKING so the conversation continues rather than
-   * queueing behind it. That needs no editable phrase.
+   * For genuinely slow work the mechanism is `RunContext.update()`, which marks
+   * the tool NON-BLOCKING so the conversation continues rather than queueing
+   * behind it. That needs no editable phrase, which is why `agentProfile` has
+   * none — a setting that changes nothing is worse than no setting.
    */
 
   return {

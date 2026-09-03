@@ -43,11 +43,10 @@ export type SessionConfig = {
  * Defaults to LiveKit Inference: it shares the gateway with STT and TTS, so the
  * LLM loses a network hop on the live-call path and gains server-side failover.
  *
- * OpenRouter stays a one-line switch rather than a code change, because it
- * offers models LiveKit Inference does not and PLAN.md explicitly wanted that
- * flexibility. It needs credits on the account — without them every request is
- * a 402 and the agent silently never speaks, which is exactly how this ended up
- * being configurable.
+ * OpenRouter is a one-line switch rather than a code change, because it offers
+ * models LiveKit Inference does not. It needs credits on the account: without
+ * them every request is a 402 and the agent never speaks, with nothing in the
+ * log to say so.
  */
 export function buildLLM(model: string): llm.LLM {
   if (env.LLM_PROVIDER === "openrouter") {
@@ -91,7 +90,7 @@ export function buildSessionConfig({
       // `inference.TurnDetector` (the audio model — semantics and intonation,
       // no transcript needed) and, because that is a streaming detector, drop
       // the endpointing floor from 500/3000ms to 300/2500ms. Setting anything
-      // here — including the old MultilingualModel — forfeits both.
+      // here — `MultilingualModel` included — forfeits both.
       turnDetection: undefined,
       // Preemptive generation stays ON: the LLM starts before end-of-turn is
       // confirmed, which is where most of the latency win is, and a discarded

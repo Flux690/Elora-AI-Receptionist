@@ -399,11 +399,19 @@
   --text-2xl: 32px;
   --text-2xl--line-height: calc(36 / 32);
 
-  /* Measures. A page names one of the first three, a field one of the rest, and
-     nothing states a width in pixels. A field's width is a claim about the
-     answer: a number, a time, a name, a line. */
+  /* Measures. Pixel values live here, once, where they carry a name — the rule
+     is that a CALL SITE names rather than measures, not that pixels are banned;
+     `--container-page: 960px` is itself a pixel value. So a page says
+     `max-w-page` rather than `max-w-[960px]`, and a field's width is a claim
+     about the answer: a number, a time, a name, a line. A component may own its
+     own width in one place; what is forbidden is the same number pasted at three
+     call sites, which is how a width drifts out of agreement with itself. */
   --container-page: 960px;
   --container-form: 840px;
+  /* One column of form, read once and never returned to: onboarding, and the
+     escalation queue. Narrower than `form`, which is a settings surface you
+     scan. */
+  --container-narrow: 640px;
   --container-sidebar: 244px;
   --container-field-2xs: 64px;  /* minutes, a count */
   --container-field-xs: 88px;   /* a price */

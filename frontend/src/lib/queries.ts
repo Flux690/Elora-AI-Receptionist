@@ -24,6 +24,7 @@ export const keys = {
   calls: () => ['calls'] as const,
   call: (id: string) => ['calls', id] as const,
   callRecording: (id: string) => ['calls', id, 'recording'] as const,
+  session: ['session'] as const,
   settings: ['settings'] as const,
   appointments: ['appointments'] as const,
   calendarList: ['calendar', 'list'] as const,
@@ -48,6 +49,8 @@ export const fetchers = {
   callRecording: (id: string) =>
     apiClient.get<{ url: string }>(`/admin/calls/${id}/recording`).then((r) => r.data),
 
+  session: () =>
+    apiClient.get<{ onboarded: boolean }>('/onboarding/session').then((r) => r.data),
   settings: () =>
     apiClient.get<AppSettings>('/admin/settings').then((r) => r.data),
 

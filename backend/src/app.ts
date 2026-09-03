@@ -36,8 +36,8 @@ export function isAllowedOrigin(origin: string, allowedOrigins: string[]): boole
 export function createApp({ allowedOrigins }: AppOptions) {
   const app = new Hono();
 
-  // Previously `cors()` with no options, which answers every origin with `*` on
-  // every route, including /api/admin/*. Scoped to the dashboard instead.
+  // Scoped to the dashboard. `cors()` with no options answers every origin with
+  // `*` on every route, /api/admin/* included.
   app.use(
     "*",
     cors({

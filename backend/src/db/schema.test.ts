@@ -3,16 +3,14 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 /**
  * PLAN.md 1.6.2 — the vector column width must not depend on the environment.
  *
- * `schema.ts` currently builds the column type from `env.EMBEDDING_DIMENSIONS`,
- * so the same schema file emits different DDL depending on which environment
- * runs the migration. That already caused real data loss: migration 0003 created
- * `vector(2048)`, migration 0008 dropped the column and recreated it as
- * `vector(1536)`, silently destroying every stored embedding. Because
- * `searchKnowledge` filters on `embedding IS NOT NULL`, the knowledge base would
- * have gone quiet with no error surfaced anywhere.
+ * Building the column type from `env.EMBEDDING_DIMENSIONS` makes the same schema
+ * file emit different DDL depending on which environment runs the migration. A
+ * generated migration then drops the column and recreates it at the other width,
+ * destroying every stored embedding — and since `searchKnowledge` filters on
+ * `embedding IS NOT NULL`, the knowledge base goes quiet with no error anywhere.
  *
- * The dimension belongs in the schema. The env var stays only as the runtime
- * assertion in services/knowledge.ts, which checks the model's actual output.
+ * The dimension belongs in the schema. The env var is only the runtime assertion
+ * in services/knowledge.ts, which checks the model's actual output.
  */
 describe("knowledge_items.embedding", () => {
   afterEach(() => {

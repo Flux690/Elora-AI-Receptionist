@@ -39,15 +39,14 @@ export type { CallOutcome } from "@receptionist/shared";
 
 /**
  * Fixed at 1536 (the output width of text-embedding-3-small). Deliberately NOT
- * read from env.EMBEDDING_DIMENSIONS: deriving DDL from the environment means
- * the same schema file emits different columns in different environments, which
- * is how migration 0008 came to drop and recreate this column and silently
- * destroy every stored embedding.
+ * read from env.EMBEDDING_DIMENSIONS: deriving DDL from the environment makes
+ * the same schema file emit different columns in different environments, and a
+ * generated migration then drops and recreates this column, destroying every
+ * stored embedding without saying so.
  *
- * EMBEDDING_DIMENSIONS survives as the runtime assertion in
- * services/knowledge.ts, which checks what the model actually returned. Changing
- * this width is an explicit, written migration that re-embeds — never a config
- * side effect.
+ * EMBEDDING_DIMENSIONS is the runtime assertion in services/knowledge.ts, which
+ * checks what the model actually returned. Changing this width is an explicit,
+ * written migration that re-embeds — never a config side effect.
  */
 const EMBEDDING_DIMENSIONS = 1536;
 
@@ -135,12 +134,12 @@ export const tenants = pgTable("tenants", {
   phoneNumber: text("phone_number").unique(),
   clerkUserId: text("clerk_user_id").unique(),
   /**
-   * Scheduling adapter (PLAN.md 2.5), replacing `google_calendar_id`.
+   * Scheduling adapter (PLAN.md 2.5).
    *
-   * The old column named one vendor in the schema, which was the single place
-   * the design foreclosed ever supporting anything else. These three are the
-   * generic shape: who provides the calendar, its id in their system, and
-   * whatever else we need to show it back to the user.
+   * Three generic columns — who provides the calendar, its id in their system,
+   * and whatever is needed to show it back to the user — rather than one named
+   * after a vendor, which is the single place a schema forecloses ever
+   * supporting anything else.
    *
    * `calendarPayload` holds display data only — the calendar's name and its own
    * timezone — so Settings can render "Bookings" instead of a raw id without a

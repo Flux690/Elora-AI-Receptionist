@@ -15,13 +15,11 @@ import { env } from "../env.js";
  *   2. TCP + TLS handshake — paid whenever the pool holds no live socket. This
  *      is the part pool config actually fixes.
  *
- * History worth not repeating: commit 0c3cd4f set `min:1, idleTimeoutMillis:0,
- * keepAlive:true` for exactly this reason. Commit 78b7ccb then reverted all
- * three — almost certainly reacting to "connection terminated unexpectedly",
- * which was caused by holding sockets open forever *without* TCP keepalive
- * probes, so the network reaped them and `pg` handed out dead clients. Removing
- * `keepAlive` made that worse, not better. The fix is keepalive plus a bounded
- * idle timeout, not a short one.
+ * The two settings go together. Holding sockets open without TCP keepalive
+ * probes lets the network reap them silently, and `pg` then hands out a dead
+ * client — which surfaces as "connection terminated unexpectedly" and tempts
+ * exactly the wrong fix. Keepalive plus a bounded idle timeout, never a short
+ * one.
  */
 const pool = new Pool({
   connectionString: env.DATABASE_URL,
