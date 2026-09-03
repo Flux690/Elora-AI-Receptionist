@@ -218,15 +218,80 @@ describe("generateCandidateSlots", () => {
     expect(at(long.at(-1)!.start)).toBe("15:00");
   });
 
-  it("keeps padding inside opening hours, so setup does not start before you open", () => {
+  it("drops setup time at the open, rather than moving it before you open", () => {
+    // Setup protects the appointment before this one. The first of the day has
+    // nothing behind it, so the shop that opens at 09:00 can be booked at 09:00
+    // — and nothing is held at 08:50.
     const padded = generate({
       service: service({ bufferBeforeMinutes: 10, bufferAfterMinutes: 15 }),
     });
 
-    // Opens 09:00, 10 minutes of setup — the earliest anyone can be seen is 09:10.
-    expect(at(padded[0]!.start)).toBe("09:10");
+    expect(at(padded[0]!.start)).toBe("09:00");
     expect(at(padded[0]!.blockStart)).toBe("09:00");
-    expect(at(padded[0]!.blockEnd)).toBe("09:55");
+    expect(at(padded[0]!.blockEnd)).toBe("09:45");
+  });
+
+  it("drops cleanup time at the close, so the last appointment reaches closing", () => {
+    // Closes 17:00, a 30-minute service with 15 minutes of cleanup. The
+    // appointment fits to 16:30, and the clearing up is not held on a calendar
+    // the business has shut. Requiring all 45 inside the day stops at 16:15.
+    const padded = generate({
+      service: service({ bufferAfterMinutes: 15 }),
+    });
+
+    const last = padded.filter((s) => s.dateIso === "2026-08-19").at(-1)!;
+    expect(at(last.start)).toBe("16:30");
+    expect(at(last.end)).toBe("17:00");
+    expect(at(last.blockEnd)).toBe("17:00");
+  });
+
+  it("keeps both paddings on a slot in the middle of the day", () => {
+    const padded = generate({
+      service: service({ bufferBeforeMinutes: 10, bufferAfterMinutes: 15 }),
+    });
+
+    const noon = padded.find((s) => at(s.start) === "12:00")!;
+    expect(at(noon.blockStart)).toBe("11:50");
+    expect(at(noon.blockEnd)).toBe("12:45");
+  });
+
+  it("treats each interval's own edges, not just the first and last of the day", () => {
+    // A lunch split has four edges, not two. Reopening at 14:00 is as much an
+    // open as 09:00 is, and 13:00 is as much a close as 18:00.
+    const withLunch = hours({
+      weekly: {
+        ...hours().weekly,
+        wed: [
+          { start: "09:00", end: "13:00" },
+          { start: "14:00", end: "18:00" },
+        ],
+      },
+    });
+
+    const padded = generate({
+      hours: withLunch,
+      service: service({ bufferBeforeMinutes: 10, bufferAfterMinutes: 15 }),
+    }).filter((s) => s.dateIso === "2026-08-19");
+
+    const reopen = padded.find((s) => at(s.start) === "14:00")!;
+    expect(at(reopen.blockStart)).toBe("14:00");
+
+    const beforeLunch = padded.filter((s) => at(s.start) < "13:00").at(-1)!;
+    expect(at(beforeLunch.start)).toBe("12:30");
+    expect(at(beforeLunch.blockEnd)).toBe("13:00");
+  });
+
+  it("offers appointment times on the grid, not wherever the padding pushed them", () => {
+    // The loop walks appointment starts. Walking block starts instead offers
+    // 09:10, 09:25, 09:40 — quarter past the wrong hour, every time.
+    const padded = generate({
+      service: service({ bufferBeforeMinutes: 10 }),
+    })
+      .filter((s) => s.dateIso === "2026-08-19")
+      .slice(0, 3)
+      .map((s) => at(s.start));
+
+    expect(padded).toEqual(["09:00", "09:15", "09:30"]);
   });
 
   it("honours the minimum notice", () => {

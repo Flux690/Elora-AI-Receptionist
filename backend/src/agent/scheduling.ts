@@ -180,11 +180,22 @@ export type GenerateSlotsInput = {
 /**
  * Every slot the business could offer, before the calendar is consulted.
  *
- * The padded block — setup, appointment, cleanup — must fit entirely inside an
- * opening period. So a 30-minute service with 10 minutes of setup cannot start
- * at 9:00 in a shop that opens at 9:00; the earliest is 9:10. That is the
- * conservative reading, and the right one: offering 9:00 promises a start
- * nobody can keep.
+ * The grid walks **appointment** starts, not block starts, so the times a caller
+ * hears land on the quarter hour rather than wherever the padding happened to
+ * push them — a service with 10 minutes of setup offers 9:00 and 9:15, not 9:10
+ * and 9:25.
+ *
+ * Extra time is held only where it fits inside the opening period, and is
+ * **dropped rather than moved** at the edges. Before-time protects the
+ * appointment that came before this one; at the moment the business opens there
+ * is nothing behind it to protect, so a 45-minute service with 15 minutes of
+ * setup is offered 9:00 in a shop that opens at 9:00, with the calendar holding
+ * from 9:00. It is not offered 9:00 with a hold from 8:45: nobody is there at
+ * 8:45. Closing is the mirror — the appointment may end exactly at close, and
+ * the clearing up afterwards is not held on a calendar the business has shut.
+ *
+ * Requiring the whole padded block to fit inside the opening period instead
+ * costs a 9-to-5 shop both its 9:00 and its 4:50, which is why it does not.
  */
 export function generateCandidateSlots({
   hours,
@@ -196,9 +207,8 @@ export function generateCandidateSlots({
   days,
   partOfDay,
 }: GenerateSlotsInput): Slot[] {
-  const blockMinutes =
-    service.bufferBeforeMinutes + service.durationMinutes + service.bufferAfterMinutes;
-  if (blockMinutes <= 0) return [];
+  const durationMs = service.durationMinutes * MINUTE_MS;
+  if (durationMs <= 0) return [];
 
   const today = localDateIso(now, timeZone);
   const start = fromDate && fromDate > today ? fromDate : today;
@@ -219,13 +229,12 @@ export function generateCandidateSlots({
       const closes = zonedWallClockToUtc(dateIso, interval.end, timeZone);
 
       for (
-        let blockStart = opens.getTime();
-        blockStart + blockMinutes * MINUTE_MS <= closes.getTime();
-        blockStart += GRID_MINUTES * MINUTE_MS
+        let startMs = opens.getTime();
+        startMs + durationMs <= closes.getTime();
+        startMs += GRID_MINUTES * MINUTE_MS
       ) {
-        const appointmentStart = new Date(
-          blockStart + service.bufferBeforeMinutes * MINUTE_MS
-        );
+        const appointmentStart = new Date(startMs);
+        const endMs = startMs + durationMs;
 
         // Too soon: not because the calendar is busy, but because a person needs
         // warning. See BookingPolicy.
@@ -237,11 +246,22 @@ export function generateCandidateSlots({
           if (hour < from || hour >= to) continue;
         }
 
+        // Clamped to the interval, which is what drops the padding at an edge
+        // rather than spilling it outside the hours the business keeps.
+        const blockStart = Math.max(
+          opens.getTime(),
+          startMs - service.bufferBeforeMinutes * MINUTE_MS
+        );
+        const blockEnd = Math.min(
+          closes.getTime(),
+          endMs + service.bufferAfterMinutes * MINUTE_MS
+        );
+
         slots.push({
           start: appointmentStart,
-          end: new Date(appointmentStart.getTime() + service.durationMinutes * MINUTE_MS),
+          end: new Date(endMs),
           blockStart: new Date(blockStart),
-          blockEnd: new Date(blockStart + blockMinutes * MINUTE_MS),
+          blockEnd: new Date(blockEnd),
           dateIso,
         });
       }
