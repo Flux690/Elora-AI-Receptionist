@@ -1,14 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { AppointmentItem } from '@receptionist/shared'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { PageContainer } from '@/layout/PageContainer'
 import { PageHeader } from '@/layout/PageHeader'
-import { EmptyState } from '@/layout/EmptyState'
 import { keys, fetchers } from '@/lib/queries'
 import { useTenantZone } from '@/hooks/useTenantZone'
 import { formatPhone, formatTime, dayKey, relativeDay } from '@/lib/formatters'
@@ -67,28 +65,6 @@ export default function AppointmentsPage() {
     (sum, a) => sum + (minutesBetween(a.startTime, a.endTime) ?? 0),
     0,
   )
-
-  if (!isLoading && appointments.length === 0) {
-    return (
-      <PageContainer className="flex flex-1 flex-col">
-        <PageHeader
-          title="Appointments"
-          description="Everything your agent books into your calendar."
-        />
-        <EmptyState
-          icon={Calendar}
-          title="No appointments yet"
-          description="Once your agent books someone, they show up here."
-          action={
-            <Button render={<Link to="/settings?tab=connections" />} nativeButton={false}>
-              <Calendar />
-              Connect a calendar
-            </Button>
-          }
-        />
-      </PageContainer>
-    )
-  }
 
   return (
     <PageContainer>

@@ -5,6 +5,7 @@ import type {
   AgentProfile,
   CalendarProvider,
   CalendarPayload,
+  TenantSetup,
 } from '@receptionist/shared'
 
 /**
@@ -30,4 +31,6 @@ export interface AppSettings {
     calendarPayload: CalendarPayload | null
   }
   agent: AgentProfile
+  /** What the owner has been through, for the checklist on Home. */
+  setup: TenantSetup
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "tenants" ADD COLUMN "setup" jsonb DEFAULT '{"checklistDismissed":false,"hoursSeen":false}'::jsonb NOT NULL;

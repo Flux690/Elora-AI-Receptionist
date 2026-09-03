@@ -1,7 +1,11 @@
 import type { AgentDeps } from "../agent/types.js";
 import type { WorkerTenant } from "../services/tenants.js";
 import { AGENT_PROFILE, SERVICES } from "./factories.js";
-import { DEFAULT_BUSINESS_HOURS, DEFAULT_BOOKING_POLICY } from "@receptionist/shared";
+import {
+  DEFAULT_BUSINESS_HOURS,
+  DEFAULT_BOOKING_POLICY,
+  DEFAULT_TENANT_SETUP,
+} from "@receptionist/shared";
 
 /**
  * Pure fixtures for agent-level unit tests. Deliberately touches no database —
@@ -21,6 +25,7 @@ export function makeWorkerTenant(overrides: Partial<WorkerTenant> = {}): WorkerT
     agentProfile: AGENT_PROFILE,
     // Matches the column default: recording on unless a tenant turns it off.
     recordCalls: true,
+    setup: DEFAULT_TENANT_SETUP,
     phoneNumber: "+15550000000",
     clerkUserId: "user_test",
     calendarProvider: null,

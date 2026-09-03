@@ -381,13 +381,17 @@
   --radius-xl: 10px;
   --radius-2xl: 12px;
 
-  /* Five sizes, and the default scale is cleared so there is no sixth beneath
+  /* Six sizes, and the default scale is cleared so there is no seventh beneath
      them. 14px is the floor: this is read by owners on laptops. */
   --text-*: initial;
   --text-sm: 14px;
   --text-sm--line-height: calc(20 / 14);
   --text-base: 16px;
   --text-base--line-height: calc(24 / 16);
+  /* The handover note on Home. A sentence read at a glance wants to sit above
+     body text without becoming a heading, and `lg` at 20px reads as one. */
+  --text-md: 18px;
+  --text-md--line-height: calc(26 / 18);
   --text-lg: 20px;
   --text-lg--line-height: calc(28 / 20);
   --text-xl: 24px;

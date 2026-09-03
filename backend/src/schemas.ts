@@ -125,6 +125,14 @@ export const updateSettingsSchema = z.object({
       recordCalls: z.boolean().optional(),
     })
     .optional(),
+  /* The two things the Home checklist has to remember. Separate from `business`
+     because it is about the owner's progress, not the business itself. */
+  setup: z
+    .object({
+      checklistDismissed: z.boolean().optional(),
+      hoursSeen: z.boolean().optional(),
+    })
+    .optional(),
   agent: agentProfileSchema.partial().optional(),
 });
 

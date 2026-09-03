@@ -27,6 +27,7 @@ export async function getSettings(c: AppContext) {
       calendarPayload: tenant.calendarPayload ?? null,
     },
     agent: tenant.agentProfile,
+    setup: tenant.setup,
   });
 }
 
@@ -48,10 +49,13 @@ export async function updateSettings(c: AppContext) {
     if (body.business.recordCalls !== undefined) patch.recordCalls = body.business.recordCalls;
   }
 
-  if (body.agent) {
+  // Both jsonb columns are merged rather than replaced, so a partial patch does
+  // not silently clear the field it did not mention.
+  if (body.agent || body.setup) {
     const tenant = await getTenantById(tenantId);
     if (!tenant) return c.json({ error: "Tenant not found" }, 404);
-    patch.agentProfile = { ...tenant.agentProfile, ...body.agent };
+    if (body.agent) patch.agentProfile = { ...tenant.agentProfile, ...body.agent };
+    if (body.setup) patch.setup = { ...tenant.setup, ...body.setup };
   }
 
   await updateTenant(tenantId, patch);

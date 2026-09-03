@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Inbox, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import type { EscalationItem, EscalationStatus } from '@receptionist/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,7 +10,6 @@ import { FilterPills } from '@/components/ui/filter-pills'
 import { DataList, type Column } from '@/components/ui/data-list'
 import { PageContainer } from '@/layout/PageContainer'
 import { PageHeader } from '@/layout/PageHeader'
-import { EmptyState } from '@/layout/EmptyState'
 import { keys, fetchers } from '@/lib/queries'
 import { useTenantZone } from '@/hooks/useTenantZone'
 import { formatCaller, formatTime } from '@/lib/formatters'
@@ -140,11 +139,9 @@ export default function EscalationsPage() {
           ))}
         </div>
       ) : total === 0 ? (
-        <EmptyState
-          icon={Inbox}
-          title="Nothing waiting on you"
-          description="A question your agent cannot answer lands here."
-        />
+        <p className="py-2 text-muted-foreground">
+          Nothing waiting on you. A question your agent cannot answer lands here.
+        </p>
       ) : rows.length === 0 ? (
         <p className="py-2 text-muted-foreground">Nothing matches that.</p>
       ) : (

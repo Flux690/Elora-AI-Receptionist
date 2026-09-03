@@ -1,8 +1,9 @@
-import { useQueries } from '@tanstack/react-query'
+import { useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { PageContainer } from '@/layout/PageContainer'
 import { PageHeader } from '@/layout/PageHeader'
 import { Skeleton } from '@/components/ui/skeleton'
+import { apiClient } from '@/lib/apiClient'
 import { keys, fetchers } from '@/lib/queries'
 import { usePageReady } from '@/hooks/usePageData'
 import { formatPhone } from '@/lib/formatters'
@@ -10,6 +11,8 @@ import type { Period } from '@/lib/types'
 import { CallStats } from './CallStats'
 import { CallsTable } from './CallsTable'
 import { TestAgentControl } from './TestAgentControl'
+import { SetupChecklist, SetupBanner } from './SetupChecklist'
+import { setupItems } from './setup-items'
 
 function isPeriod(v: string | null): v is Period {
   return v === 'today' || v === '7d' || v === '30d'
@@ -31,11 +34,23 @@ function HomeSkeleton() {
 }
 
 /**
- * The call log. Settings and metrics are fetched here rather than inside the
- * pieces, so the page paints once instead of in three stages.
+ * What happened while you were out, and what still needs you.
+ *
+ * Three shapes, depending on where the tenant is:
+ *
+ *   no calls yet   the checklist *is* the page, with the log's own line beneath
+ *                  saying what will appear there. No period pills — there is
+ *                  nothing to filter.
+ *   calls, unfinished setup   the handover note, then the checklist demoted to
+ *                  one dismissible line above the log.
+ *   settled        the handover note and the log.
+ *
+ * Settings and metrics are fetched here rather than inside the pieces, so the
+ * page paints once instead of in three stages.
  */
 export default function HomePage() {
   const [params] = useSearchParams()
+  const qc = useQueryClient()
   const raw = params.get('period')
   const period: Period = isPeriod(raw) ? raw : '30d'
 
@@ -46,36 +61,58 @@ export default function HomePage() {
     ],
   })
 
+  const dismiss = useMutation({
+    mutationFn: () => apiClient.patch('/admin/settings', { setup: { checklistDismissed: true } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.settings }),
+  })
+
   const { ready, showSkeleton } = usePageReady(settings.isPending || metrics.isPending)
+
+  if (!ready) {
+    return <PageContainer>{showSkeleton ? <HomeSkeleton /> : null}</PageContainer>
+  }
+
+  const s = settings.data!
+  const m = metrics.data!
+  const items = setupItems(s)
+  const outstanding = items.some((i) => !i.done)
+  // A tenant with no calls at all, ever — not a filtered view that happens to be
+  // empty, which the period pills can produce on any day.
+  const neverCalled = m.totalCalls === 0 && period === '30d'
 
   return (
     <PageContainer>
-      {!ready ? (
-        showSkeleton ? <HomeSkeleton /> : null
+      <PageHeader
+        title={s.business.name}
+        actions={<TestAgentControl />}
+        description={
+          <>
+            {s.business.industry}
+            {s.business.phoneNumber && (
+              <>
+                {' · '}
+                {s.agent.name || 'Your agent'} is answering{' '}
+                <span className="text-secondary-foreground tabular-nums">
+                  {formatPhone(s.business.phoneNumber)}
+                </span>
+              </>
+            )}
+          </>
+        }
+      />
+
+      {neverCalled ? (
+        outstanding && <SetupChecklist items={items} />
       ) : (
         <>
-          <PageHeader
-            title={settings.data!.business.name}
-            actions={<TestAgentControl />}
-            description={
-              <>
-                {settings.data!.business.industry}
-                {settings.data!.business.phoneNumber && (
-                  <>
-                    {' · '}
-                    {settings.data!.agent.name || 'Your agent'} is answering{' '}
-                    <span className="text-secondary-foreground tabular-nums">
-                      {formatPhone(settings.data!.business.phoneNumber)}
-                    </span>
-                  </>
-                )}
-              </>
-            }
-          />
-          <CallStats period={period} metrics={metrics.data!} />
-          <CallsTable />
+          <CallStats period={period} metrics={m} agentName={s.agent.name} />
+          {outstanding && !s.setup.checklistDismissed && (
+            <SetupBanner items={items} onDismiss={() => dismiss.mutate()} />
+          )}
         </>
       )}
+
+      <CallsTable />
     </PageContainer>
   )
 }

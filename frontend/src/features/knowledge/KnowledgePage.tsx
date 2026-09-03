@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { BookOpen, Search, Trash2 } from 'lucide-react'
+import { Search, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { KnowledgeItem } from '@receptionist/shared'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PageContainer } from '@/layout/PageContainer'
 import { PageHeader } from '@/layout/PageHeader'
-import { EmptyState } from '@/layout/EmptyState'
 import { keys, fetchers } from '@/lib/queries'
 import { apiClient } from '@/lib/apiClient'
 import { useTenantZone } from '@/hooks/useTenantZone'
@@ -74,11 +73,10 @@ export default function KnowledgePage() {
           ))}
         </div>
       ) : (data?.length ?? 0) === 0 ? (
-        <EmptyState
-          icon={BookOpen}
-          title="No answers yet"
-          description="Answer a question in Escalations and it is saved here."
-        />
+        <p className="py-2 text-muted-foreground">
+          Nothing in the knowledge base yet. Answer a question in Escalations and it is
+          saved here.
+        </p>
       ) : items.length === 0 ? (
         <p className="py-2 text-muted-foreground">Nothing matches that.</p>
       ) : (

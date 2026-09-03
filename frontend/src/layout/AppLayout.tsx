@@ -8,6 +8,7 @@ import {
   Calendar,
   BookOpen,
   Settings as SettingsIcon,
+  CircleCheck,
   LogOut,
 } from 'lucide-react'
 import { keys, fetchers } from '@/lib/queries'
@@ -28,6 +29,7 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar'
 import { RouteSkeleton } from './RouteSkeleton'
+import { setupItems } from '@/features/home/setup-items'
 
 interface NavItem {
   to: string
@@ -56,6 +58,15 @@ export default function AppLayout() {
   })
   const { user } = useUser()
   const { signOut } = useClerk()
+
+  // The setup checklist is dismissible on Home, which is only safe if there is
+  // somewhere to get back to it. This entry exists exactly while something is
+  // outstanding, and goes when nothing is.
+  const { data: settings } = useQuery({
+    queryKey: keys.settings,
+    queryFn: fetchers.settings,
+  })
+  const setupLeft = settings ? setupItems(settings).filter((i) => !i.done).length : 0
 
   const pendingCount = pendingEscalations?.length ?? 0
   const firstName = user?.firstName || 'User'
@@ -108,6 +119,21 @@ export default function AppLayout() {
 
         <SidebarFooter>
           <SidebarMenu>
+            {setupLeft > 0 && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  render={<Link to="/" />}
+                  tooltip="Finish setup"
+                  className="text-sm text-accent-ink"
+                >
+                  <CircleCheck className="size-4" />
+                  <span>Finish setup</span>
+                </SidebarMenuButton>
+                <SidebarMenuBadge className="text-sm font-semibold text-accent-ink">
+                  {setupLeft}
+                </SidebarMenuBadge>
+              </SidebarMenuItem>
+            )}
             <SidebarMenuItem>
               <SidebarMenuButton
                 render={<Link to="/settings" />}

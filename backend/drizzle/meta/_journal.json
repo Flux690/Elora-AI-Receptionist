@@ -57,6 +57,13 @@
       "when": 1788396226264,
       "tag": "0007_heavy_meteorite",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788396815814,
+      "tag": "0008_chunky_martin_li",
+      "breakpoints": true
     }
   ]
 }

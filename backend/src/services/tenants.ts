@@ -16,6 +16,10 @@ const tenantFields = {
   // Read on the call path: it selects which disclosure plays and whether egress
   // starts at all, so the worker needs it on every call.
   recordCalls: tenants.recordCalls,
+  // Dashboard only — the worker never reads it. Here because the settings
+  // endpoint goes through the same lookup, and a second query for two booleans
+  // would be worse than carrying them.
+  setup: tenants.setup,
   phoneNumber: tenants.phoneNumber,
   clerkUserId: tenants.clerkUserId,
   calendarProvider: tenants.calendarProvider,
@@ -89,7 +93,7 @@ export async function updateTenant(
   id: string,
   patch: Partial<Pick<TenantRow,
     | "name" | "industry" | "description" | "agentProfile"
-    | "businessHours" | "bookingPolicy" | "recordCalls"
+    | "businessHours" | "bookingPolicy" | "recordCalls" | "setup"
     | "timezone" | "phoneNumber"
     | "calendarProvider" | "calendarExternalId" | "calendarPayload"
   >>

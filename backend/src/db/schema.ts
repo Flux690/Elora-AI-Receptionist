@@ -22,6 +22,7 @@ import {
   type CalendarPayload,
   type BusinessHours,
   type BookingPolicy,
+  type TenantSetup,
 } from "@receptionist/shared";
 export type {
   Service,
@@ -32,6 +33,7 @@ export type {
   CalendarPayload,
   BusinessHours,
   BookingPolicy,
+  TenantSetup,
 } from "@receptionist/shared";
 export type { CallOutcome } from "@receptionist/shared";
 
@@ -117,6 +119,19 @@ export const tenants = pgTable("tenants", {
    * wrong. See `agent/disclosure.ts`.
    */
   recordCalls: boolean("record_calls").notNull().default(true),
+  /**
+   * What the owner has been through, for the checklist on Home.
+   *
+   * Two flags rather than a derived value. `checklistDismissed` has to be
+   * remembered or hiding it is pointless; `hoursSeen` exists because opening
+   * hours are valid from the moment a tenant is created — DEFAULT_BUSINESS_HOURS
+   * is Mon-Fri 9-5 — so that item can never tick itself off by looking at the
+   * data. Services and the calendar can, and so are not stored here.
+   */
+  setup: jsonb("setup").$type<TenantSetup>().notNull().default({
+    checklistDismissed: false,
+    hoursSeen: false,
+  }),
   phoneNumber: text("phone_number").unique(),
   clerkUserId: text("clerk_user_id").unique(),
   /**

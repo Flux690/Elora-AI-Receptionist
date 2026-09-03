@@ -62,6 +62,10 @@ Run `pnpm typecheck` and `pnpm lint` before calling any change done.
   `tenants.timezone`, so the dashboard has to agree.
 - **A settings row's description is one line.** If it needs two, the setting needs
   a better name.
+- **No centred empty states on a list page.** A page with a heading, filters and
+  a table header already explains itself; only the rows are missing, so say so in
+  one muted line where they would be. `layout/EmptyState.tsx` survives for pages
+  that are genuinely blank — the escalation queue and 404.
 - Registry components arrive with `dark:`, `data-horizontal:` and `data-vertical:`
   utilities that are inert here. Retokenise anything `shadcn add` writes; a
   contract test scans for them.

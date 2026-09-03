@@ -281,9 +281,35 @@ export interface AvailableNumber {
   region: string;
 }
 
+/**
+ * What the owner has already been through, for the setup checklist on Home.
+ *
+ * Only what cannot be derived. Whether services exist and whether a calendar is
+ * connected are both readable from the data; whether the hours have been *looked
+ * at* is not, because they are valid from the moment a tenant exists.
+ */
+export interface TenantSetup {
+  checklistDismissed: boolean;
+  hoursSeen: boolean;
+}
+
+export const DEFAULT_TENANT_SETUP: TenantSetup = {
+  checklistDismissed: false,
+  hoursSeen: false,
+};
+
 export interface DashboardMetrics {
   totalCalls: number;
+  /**
+   * Calls that arrived while the business was shut.
+   *
+   * The figure the product exists to produce: every one of these is a customer
+   * who would otherwise have reached a voicemail or rung somebody else. Scoped
+   * by the same period as the rest, unlike `pendingEscalations`.
+   */
+  afterHoursCalls: number;
   confirmedBookings: number;
+  /** Every unanswered question, ignoring the period. See controllers/metrics.ts. */
   pendingEscalations: number;
   abandonedCalls: number;
 }
