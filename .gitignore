@@ -65,3 +65,6 @@ temp/
 #Agent files
 PLAN.md
 .claude
+
+# Local seed data, not part of the product
+/seed.mjs
