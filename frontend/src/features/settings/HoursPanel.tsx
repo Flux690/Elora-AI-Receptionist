@@ -286,7 +286,7 @@ export function HoursPanel({ settings }: { settings: AppSettings }) {
               className="w-field-md"
             />
           </SubRow>
-          <SubRow title="Reason" description="For your own reference. Callers never hear it." htmlFor="hol-reason">
+          <SubRow title="Reason" description="For your own reference. Your agent never says it." htmlFor="hol-reason">
             <Input
               id="hol-reason"
               className="w-field-md"
@@ -327,7 +327,7 @@ export function HoursPanel({ settings }: { settings: AppSettings }) {
       <Section title="Booking window" lede="How near and how far ahead a caller may book.">
         <Row
           title="Earliest a caller can book"
-          description="Your agent will not offer a time sooner than this."
+          description="Your agent will not offer a time sooner than this, so you get some warning."
           htmlFor="min-notice"
         >
           <NumberField

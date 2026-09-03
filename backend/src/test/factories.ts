@@ -12,7 +12,7 @@ const uniq = () => `${Date.now()}-${++seq}`;
 
 export const AGENT_PROFILE: AgentProfile = {
   name: "Riley",
-  greeting: "Thanks for calling Test Salon, this is Riley.",
+  greeting: "Thanks for calling Test Business, this is Riley.",
   farewell: "Thanks for calling, goodbye.",
   fallback: "Let me check with the team and get back to you.",
 };
@@ -48,10 +48,10 @@ export async function makeTenant(overrides: Partial<typeof tenants.$inferInsert>
   const rows = await db
     .insert(tenants)
     .values({
-      name: "Test Salon",
-      industry: "salon",
+      name: "Test Business",
+      industry: "Pet services",
       timezone: "America/New_York",
-      description: "A test salon.",
+      description: "A test business.",
       agentProfile: AGENT_PROFILE,
       phoneNumber: `+1555${uniq().slice(-7)}`,
       clerkUserId: `user_${uniq()}`,

@@ -3,9 +3,10 @@ import { cn } from '@/lib/utils'
 /**
  * One reading measure for every explanatory line. It lived as three different
  * hardcoded widths, so the same sentence wrapped differently depending on which
- * slot it sat in. A line that needs more than this needs fewer words.
+ * slot it sat in. A line that needs more than this needs fewer words. Exported
+ * so a row built outside this file measures the same.
  */
-const MEASURE = 'max-w-[62ch]'
+export const MEASURE = 'max-w-[62ch]'
 
 interface SectionProps {
   title: string

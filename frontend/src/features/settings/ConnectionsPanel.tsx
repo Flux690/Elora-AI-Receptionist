@@ -26,7 +26,8 @@ import { apiClient } from '@/lib/apiClient'
 import { keys, fetchers } from '@/lib/queries'
 import { formatPhone } from '@/lib/formatters'
 import type { AppSettings } from '@/lib/settings-types'
-import { Section, SubRow } from './SettingsList'
+import { cn } from '@/lib/utils'
+import { Section, SubRow, MEASURE } from './SettingsList'
 
 type Open = 'phone' | 'calendar' | null
 
@@ -53,7 +54,7 @@ function ConnectionRow({
         </span>
         <div className="min-w-0">
           <p className="font-medium text-foreground">{title}</p>
-          <p className="max-w-[58ch] text-muted-foreground">{description}</p>
+          <p className={cn(MEASURE, 'text-muted-foreground')}>{description}</p>
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-3.5">

@@ -94,11 +94,11 @@ describe("buildSessionConfig", () => {
       const { sessionOptions } = buildSessionConfig({
         isTestSession: false,
         vad,
-        keyterms: ["Test Salon", "Haircut", "Colour"],
+        keyterms: ["Test Business", "Haircut", "Colour"],
       });
 
       expect(sessionOptions.keytermsOptions?.keyterms).toEqual(
-        expect.arrayContaining(["Test Salon", "Haircut", "Colour"])
+        expect.arrayContaining(["Test Business", "Haircut", "Colour"])
       );
     });
 

@@ -21,6 +21,7 @@ import type { AppSettings } from '@/lib/settings-types'
 import { Section, Row, SubRow } from './SettingsList'
 import { NumberField } from '@/components/ui/number-field'
 import { ExtraTime } from './ExtraTime'
+import { IndustryField } from './IndustryField'
 import { RecordDrawer } from './RecordDrawer'
 import { useRecordDraft } from './useRecordDraft'
 import { useServerSeed } from './useServerSeed'
@@ -176,7 +177,7 @@ export function BusinessPanel({ settings }: { settings: AppSettings }) {
       <Section title="Business">
         <Row
           title="Business name"
-          description="Your agent says this out loud when it answers."
+          description="Your agent says this out loud the moment it answers a call."
           htmlFor="biz-name"
         >
           <Input
@@ -187,15 +188,14 @@ export function BusinessPanel({ settings }: { settings: AppSettings }) {
           />
         </Row>
         <Row
-          title="Industry"
-          description="Helps your agent describe what you do if a caller asks."
+          title="Kind of business"
+          description="Your agent only uses this if a caller asks what you do."
           htmlFor="industry"
         >
-          <Input
+          <IndustryField
             id="industry"
-            className="w-field-md"
             value={form.industry}
-            onChange={(e) => setForm((f) => ({ ...f, industry: e.target.value }))}
+            onChange={(industry) => setForm((f) => ({ ...f, industry }))}
           />
         </Row>
         <Row

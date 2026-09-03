@@ -89,8 +89,8 @@ export function AgentPanel({ settings }: { settings: AppSettings }) {
   return (
     <div>
       <Section
-        title="What every caller hears first"
-        lede="Required by law, so we write it and it cannot be turned off."
+        title="Before your greeting"
+        lede="Your agent says this on every call, and the law does not let you edit it or turn it off."
       >
         <li className="p-4">
           <p className="leading-relaxed text-foreground">&ldquo;{disclosure}&rdquo;</p>
@@ -99,8 +99,8 @@ export function AgentPanel({ settings }: { settings: AppSettings }) {
 
       <Section title="Your agent">
         <Row
-          title="Name"
-          description="What your agent calls itself when it answers."
+          title="Agent name"
+          description="What your agent calls itself when a caller asks who it is."
           htmlFor="agent-name"
         >
           <Input
@@ -112,7 +112,7 @@ export function AgentPanel({ settings }: { settings: AppSettings }) {
         </Row>
         <Row
           title="Record calls"
-          description="Keeps the audio, and tells callers the call is recorded."
+          description="Keeps the audio, and changes what your agent says at the start of a call."
         >
           <Switch
             checked={recordCalls}
