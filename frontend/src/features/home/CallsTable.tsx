@@ -5,7 +5,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { DataList, type Column } from '@/components/ui/data-list'
 import { useCallsQuery } from '@/hooks/useCallsQuery'
 import { useTenantZone } from '@/hooks/useTenantZone'
-import { formatPhone, formatTime, formatDuration } from '@/lib/formatters'
+import { formatCaller, formatTime, formatDuration } from '@/lib/formatters'
 import { groupByDay } from '@/lib/group-by-day'
 import { callOutcomeConfig } from '@/lib/status-config'
 
@@ -33,12 +33,12 @@ function columns(zone: string | undefined): Column<CallListItem>[] {
     },
     {
       key: 'caller',
-      header: 'Caller ID',
-      width: '148px',
+      header: 'Caller',
+      width: '188px',
       hideUnder: 'sm',
       cell: (c) => (
-        <span className="text-muted-foreground tabular-nums">
-          {c.callerPhone ? formatPhone(c.callerPhone) : 'No caller ID'}
+        <span className="truncate text-muted-foreground tabular-nums">
+          {formatCaller(c.callerName, c.callerPhone)}
         </span>
       ),
     },

@@ -224,6 +224,8 @@ export interface CallListItem {
   id: string;
   clientId: string | null;
   callerPhone: string | null;
+  /** From `clients.name`. Null for a caller we have never been given a name for. */
+  callerName: string | null;
   startedAt: string;
   endedAt: string | null;
   outcome: CallOutcome | null;
@@ -241,6 +243,11 @@ export interface EscalationItem {
   /** The call it came from, so the dashboard can link to the recording. */
   callId: string | null;
   callerPhone: string | null;
+  /**
+   * Who to ring back. The name given when the question was escalated, falling
+   * back to the one already on the client row.
+   */
+  callerName: string | null;
   question: string;
   status: EscalationStatus;
   answer: string | null;

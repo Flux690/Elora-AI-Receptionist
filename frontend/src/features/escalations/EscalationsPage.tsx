@@ -13,7 +13,7 @@ import { PageHeader } from '@/layout/PageHeader'
 import { EmptyState } from '@/layout/EmptyState'
 import { keys, fetchers } from '@/lib/queries'
 import { useTenantZone } from '@/hooks/useTenantZone'
-import { formatPhone, formatTime } from '@/lib/formatters'
+import { formatCaller, formatTime } from '@/lib/formatters'
 import { groupByDay } from '@/lib/group-by-day'
 
 type Filter = 'all' | EscalationStatus
@@ -44,12 +44,12 @@ function columns(zone: string | undefined): Column<EscalationItem>[] {
     },
     {
       key: 'caller',
-      header: 'Caller ID',
-      width: '148px',
+      header: 'Caller',
+      width: '188px',
       hideUnder: 'sm',
       cell: (e) => (
-        <span className="text-muted-foreground tabular-nums">
-          {e.callerPhone ? formatPhone(e.callerPhone) : 'No caller ID'}
+        <span className="truncate text-muted-foreground tabular-nums">
+          {formatCaller(e.callerName, e.callerPhone)}
         </span>
       ),
     },

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createAgentTools } from "./tools.js";
 import { makeAgentDeps } from "../test/agent-fixtures.js";
+import { createEscalation } from "../services/escalations.js";
+import { setClientName } from "../services/clients.js";
 
 /**
  * Every tool's `execute` must actually RETURN something to the model.
@@ -32,6 +34,10 @@ const okCalendar = () =>
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  // `restoreAllMocks` only undoes spies. The module mocks below are plain
+  // `vi.fn()`s, so their call history survives into the next test unless it is
+  // cleared — which quietly makes `mock.calls[0]` the *first* test's call.
+  vi.clearAllMocks();
 });
 
 vi.mock("../services/calendar.js", () => ({
@@ -56,6 +62,10 @@ vi.mock("../services/clients.js", () => ({
 
 /** The RunContext the SDK passes; only `session` is touched by these tools. */
 const runCtx = () => ({ ctx: { session: { say: vi.fn(), shutdown: vi.fn() } } }) as never;
+
+/** Escalation also reaches for `speechHandle`, to stop being interrupted. */
+const escalationCtx = () =>
+  ({ ctx: { speechHandle: {}, session: { say: vi.fn() } } }) as never;
 
 describe("every tool returns a result to the model", () => {
   it("checkAvailability returns slots, not a function", async () => {
@@ -129,11 +139,81 @@ describe("every tool returns a result to the model", () => {
   it("createEscalation returns a result", async () => {
     const tools = createAgentTools(makeAgentDeps());
     const result = await tools.createEscalation.execute(
-      { question: "Do you have parking?", transcriptExcerpt: null },
-      { ctx: { speechHandle: {}, session: { say: vi.fn() } } } as never
+      { question: "Do you have parking?", callerName: null, transcriptExcerpt: null },
+      escalationCtx()
     );
 
     expect(typeof result).not.toBe("function");
     expect(result).toEqual({ escalated: true });
+  });
+});
+
+/**
+ * An escalation is a promise to ring somebody back, so it has to record who.
+ *
+ * Asking is enforced by the schema rather than requested in prose, the same way
+ * booking does it — the model cannot escalate without confronting the field.
+ */
+describe("the caller's name", () => {
+  it("is recorded on the escalation when the caller gives one", async () => {
+    const tools = createAgentTools(makeAgentDeps());
+    await tools.createEscalation.execute(
+      { question: "Do you take cats?", callerName: "Dana", transcriptExcerpt: null },
+      escalationCtx()
+    );
+
+    expect(vi.mocked(createEscalation).mock.calls[0]?.[0]).toMatchObject({
+      callerName: "Dana",
+    });
+  });
+
+  it("is null when they were asked and declined", async () => {
+    const tools = createAgentTools(makeAgentDeps());
+    await tools.createEscalation.execute(
+      { question: "Do you take cats?", callerName: null, transcriptExcerpt: null },
+      escalationCtx()
+    );
+
+    expect(vi.mocked(createEscalation).mock.calls[0]?.[0]).toMatchObject({
+      callerName: null,
+    });
+  });
+
+  it("falls back to the name already on the client row", async () => {
+    // A returning caller who does not say their name again is still known.
+    const tools = createAgentTools(
+      makeAgentDeps({ client: { id: "cli-1", name: "Marcus" } as never })
+    );
+    await tools.createEscalation.execute(
+      { question: "Do you take cats?", callerName: null, transcriptExcerpt: null },
+      escalationCtx()
+    );
+
+    expect(vi.mocked(createEscalation).mock.calls[0]?.[0]).toMatchObject({
+      callerName: "Marcus",
+    });
+  });
+
+  it("is remembered for the next call, through the same helper booking uses", async () => {
+    // The point of extracting `resolveCallerName`: escalation persists the name
+    // exactly as booking does, rather than carrying a second copy that drifts.
+    vi.mocked(setClientName).mockResolvedValueOnce({
+      id: "cli-1",
+      name: "Dana",
+    } as never);
+
+    const tools = createAgentTools(
+      makeAgentDeps({ client: { id: "cli-1", name: null } as never })
+    );
+    await tools.createEscalation.execute(
+      { question: "Do you take cats?", callerName: "  Dana  ", transcriptExcerpt: null },
+      escalationCtx()
+    );
+
+    expect(vi.mocked(setClientName)).toHaveBeenCalledWith(
+      "11111111-1111-1111-1111-111111111111",
+      "cli-1",
+      "Dana",
+    );
   });
 });

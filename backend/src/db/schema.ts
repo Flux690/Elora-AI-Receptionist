@@ -196,6 +196,15 @@ export const escalations = pgTable(
     callId: uuid("call_id").references(() => calls.id, { onDelete: "set null" }),
     clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
     callerPhone: text("caller_phone"),
+    /**
+     * The name the caller gave when the question was escalated.
+     *
+     * An escalation is a promise to ring somebody back, so the dashboard needs
+     * to say who. Same reasoning as `appointments.caller_name`: an anonymous
+     * caller has no client row, so there is nowhere else to put it. Nullable
+     * because a caller may decline and the agent does not press.
+     */
+    callerName: text("caller_name"),
     question: text("question").notNull(),
     transcriptExcerpt: text("transcript_excerpt"),
     status: escalationStatusEnum("status").notNull().default("pending"),

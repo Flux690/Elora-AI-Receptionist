@@ -1,6 +1,6 @@
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { db } from "../db/client.js";
-import { calls } from "../db/schema.js";
+import { calls, clients } from "../db/schema.js";
 import type { TranscriptEntry, CallOutcome } from "../db/schema.js";
 
 export type CallRow = typeof calls.$inferSelect;
@@ -64,12 +64,16 @@ export async function listCalls(
       id: calls.id,
       clientId: calls.clientId,
       callerPhone: calls.callerPhone,
+      // `clientId` was selected and never read. A caller with a name on file
+      // should be shown by it, not by a number the owner has to recognise.
+      callerName: clients.name,
       startedAt: calls.startedAt,
       endedAt: calls.endedAt,
       outcome: calls.outcome,
       summary: calls.summary,
     })
     .from(calls)
+    .leftJoin(clients, eq(calls.clientId, clients.id))
     .where(eq(calls.tenantId, tenantId))
     .orderBy(desc(calls.startedAt))
     .limit(limit)
@@ -82,6 +86,7 @@ export async function getCallById(callId: string, tenantId: string) {
       id: calls.id,
       clientId: calls.clientId,
       callerPhone: calls.callerPhone,
+      callerName: clients.name,
       livekitRoomName: calls.livekitRoomName,
       startedAt: calls.startedAt,
       endedAt: calls.endedAt,
@@ -91,6 +96,7 @@ export async function getCallById(callId: string, tenantId: string) {
       recordingUrl: calls.recordingUrl,
     })
     .from(calls)
+    .leftJoin(clients, eq(calls.clientId, clients.id))
     .where(and(eq(calls.id, callId), eq(calls.tenantId, tenantId)))
     .limit(1);
 

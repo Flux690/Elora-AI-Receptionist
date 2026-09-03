@@ -12,7 +12,7 @@ import { EmptyState } from '@/layout/EmptyState'
 import { apiClient } from '@/lib/apiClient'
 import { keys, fetchers } from '@/lib/queries'
 import { useTenantZone } from '@/hooks/useTenantZone'
-import { formatPhone, formatDateTime } from '@/lib/formatters'
+import { formatCaller, formatDateTime } from '@/lib/formatters'
 
 /**
  * One question at a time, with a way through the ones still waiting. A resolved
@@ -145,7 +145,7 @@ export default function QueuePage() {
         <p className="flex flex-wrap items-center gap-x-2 text-muted-foreground tabular-nums">
           <span>{formatDateTime(current.createdAt, zone)}</span>
           <span aria-hidden="true">·</span>
-          <span>{current.callerPhone ? formatPhone(current.callerPhone) : 'No caller ID'}</span>
+          <span>{formatCaller(current.callerName, current.callerPhone)}</span>
           {current.callId && (
             <>
               <span aria-hidden="true">·</span>

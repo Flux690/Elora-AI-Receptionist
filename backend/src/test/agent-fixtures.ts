@@ -12,10 +12,10 @@ import { DEFAULT_BUSINESS_HOURS, DEFAULT_BOOKING_POLICY } from "@receptionist/sh
 export function makeWorkerTenant(overrides: Partial<WorkerTenant> = {}): WorkerTenant {
   return {
     id: "11111111-1111-1111-1111-111111111111",
-    name: "Test Salon",
-    industry: "salon",
+    name: "Test Business",
+    industry: "Pet services",
     timezone: "America/New_York",
-    description: "A test salon.",
+    description: "A test business.",
     businessHours: DEFAULT_BUSINESS_HOURS,
     bookingPolicy: DEFAULT_BOOKING_POLICY,
     agentProfile: AGENT_PROFILE,

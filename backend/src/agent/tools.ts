@@ -34,6 +34,28 @@ export function createAgentTools(deps: AgentDeps) {
   const timeZone = deps.tenant.timezone;
 
   /**
+   * Settles on the name to record, and remembers it for next time.
+   *
+   * A name given now beats one we already had — people correct themselves, and
+   * this is the name they just said. Persisting needs a client row, which needs
+   * a phone number; an anonymous caller's name still reaches whatever is being
+   * written, it just cannot be remembered for a future call.
+   *
+   * Shared by booking and escalation rather than written twice. Two copies would
+   * drift the first time one of them learned something the other did not.
+   */
+  async function resolveCallerName(spoken: string | null): Promise<string | null> {
+    const given = spoken?.trim() || null;
+
+    if (given && deps.client) {
+      const updated = await setClientName(tenantId, deps.client.id, given);
+      if (updated) deps.client = updated;
+    }
+
+    return given ?? deps.client?.name ?? null;
+  }
+
+  /**
    * NO HOLD PHRASE. This is deliberate, and it was removed after it ate three
    * answers in three test calls.
    *
@@ -73,15 +95,22 @@ export function createAgentTools(deps: AgentDeps) {
         "Use this only after checking everything you were given — the services, hours and knowledge in your instructions. " +
         "Also use it when the caller wants something you have no way to do, such as booking when no calendar is connected. " +
         "Say the fallback line to the caller first; this tool records the question, it does not reply to anyone. " +
+        "Before calling this, ask for the caller's name — 'Can I take your name?' — because somebody has to ring them back. " +
         "At most once per question per call.",
       parameters: z.object({
         question: z.string().describe("The caller's question, as asked."),
+        callerName: z
+          .string()
+          .nullable()
+          .describe(
+            "The name of the person to ring back. Ask for it before recording the question if you do not already know it. Pass null only if they were asked and declined.",
+          ),
         transcriptExcerpt: z
           .string()
           .nullable()
           .describe("A short excerpt of recent conversation for context."),
       }),
-      execute: async ({ question, transcriptExcerpt }, { ctx }) => {
+      execute: async ({ question, callerName, transcriptExcerpt }, { ctx }) => {
         ctx.speechHandle.allowInterruptions = false;
         // DB writes are deferred until after the greeting, so the calls row may
         // not exist yet — and escalations.call_id is a foreign key to it. Wait
@@ -95,6 +124,7 @@ export function createAgentTools(deps: AgentDeps) {
           callId: callRowExists ? deps.callId : null,
           clientId: deps.client?.id ?? null,
           callerPhone: deps.callerPhone,
+          callerName: await resolveCallerName(callerName),
           question,
           transcriptExcerpt,
         });
@@ -280,22 +310,7 @@ export function createAgentTools(deps: AgentDeps) {
 
         const { slot, service } = held;
         const token = await deps.getGoogleToken();
-
-        // A name given at booking beats one we already had — people correct
-        // themselves, and this is the name they just said for this booking.
-        const bookedName = callerName?.trim() || deps.client?.name || null;
-
-        // Persist it so the next call recognises them. Only possible when a
-        // client row exists, which needs a phone number; an anonymous caller's
-        // name still reaches the diary and the appointment below.
-        if (callerName?.trim() && deps.client) {
-          const updated = await setClientName(
-            tenantId,
-            deps.client.id,
-            callerName,
-          );
-          if (updated) deps.client = updated;
-        }
+        const bookedName = await resolveCallerName(callerName);
 
         const appointmentBase = {
           tenantId,

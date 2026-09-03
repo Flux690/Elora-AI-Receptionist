@@ -71,3 +71,23 @@ export function formatMinutes(minutes: number): string {
   const m = minutes % 60
   return m === 0 ? `${h} hr` : `${h} hr ${m} min`
 }
+
+/**
+ * Who called, in one string.
+ *
+ * A name is what an owner ringing somebody back actually needs; the number is
+ * the fallback, and "Unknown caller" is the honest answer when there is neither.
+ * "No caller ID" is deliberately *not* used here — it means only the number is
+ * missing, which is a different fact and gets said where the number is shown on
+ * its own.
+ */
+export function formatCaller(
+  name: string | null | undefined,
+  phone: string | null | undefined,
+): string {
+  const n = name?.trim()
+  if (n && phone) return `${n} · ${formatPhone(phone)}`
+  if (n) return n
+  if (phone) return formatPhone(phone)
+  return 'Unknown caller'
+}

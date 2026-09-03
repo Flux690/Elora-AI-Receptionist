@@ -50,6 +50,13 @@
       "when": 1787909606501,
       "tag": "0006_uneven_monster_badoon",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788396226264,
+      "tag": "0007_heavy_meteorite",
+      "breakpoints": true
     }
   ]
 }
