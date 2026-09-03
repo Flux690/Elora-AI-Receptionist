@@ -52,6 +52,9 @@ Run `pnpm typecheck` and `pnpm lint` before calling any change done.
   fields and `max-w-page` / `max-w-form` for pages.
 - **Nothing below 14px.** `src/tests/design-tokens.test.ts` fails the build on a
   smaller size, including arbitrary values like `text-[0.8rem]`.
+- **A duration or a count is a `NumberField`.** Digits only, with the unit
+  painted inside the box rather than sitting beside it or hiding in a dropdown.
+  Minutes is the unit you edit in; `formatMinutes` is the unit you read in.
 - **Colours come from the tokens in `index.css`**, never a hardcoded value. The
   same test enforces the four rules the system is built on.
 - **Dates render in the tenant's timezone** via `useTenantZone()` and the

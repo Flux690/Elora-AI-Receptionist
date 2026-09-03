@@ -12,6 +12,7 @@ import {
 } from '@receptionist/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberField } from '@/components/ui/number-field'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Switch } from '@/components/ui/switch'
 import { apiClient } from '@/lib/apiClient'
@@ -329,42 +330,26 @@ export function HoursPanel({ settings }: { settings: AppSettings }) {
           description="Your agent will not offer a time sooner than this."
           htmlFor="min-notice"
         >
-          <div className="flex items-center gap-2">
-            <Input
-              id="min-notice"
-              value={String(policy.minNoticeMinutes)}
-              onChange={(e) =>
-                setPolicy((p) => ({
-                  ...p,
-                  minNoticeMinutes: Number(e.target.value.replace(/\D/g, '')) || 0,
-                }))
-              }
-              inputMode="numeric"
-              className="w-field-2xs text-right tabular-nums"
-            />
-            <span className="text-muted-foreground">minutes</span>
-          </div>
+          <NumberField
+            id="min-notice"
+            label="Minimum notice in minutes"
+            unit="minutes"
+            value={policy.minNoticeMinutes}
+            onChange={(minNoticeMinutes) => setPolicy((p) => ({ ...p, minNoticeMinutes }))}
+          />
         </Row>
         <Row
           title="Furthest a caller can book"
           description="Your agent will not offer a date beyond this."
           htmlFor="max-advance"
         >
-          <div className="flex items-center gap-2">
-            <Input
-              id="max-advance"
-              value={String(policy.maxAdvanceDays)}
-              onChange={(e) =>
-                setPolicy((p) => ({
-                  ...p,
-                  maxAdvanceDays: Number(e.target.value.replace(/\D/g, '')) || 1,
-                }))
-              }
-              inputMode="numeric"
-              className="w-field-2xs text-right tabular-nums"
-            />
-            <span className="text-muted-foreground">days</span>
-          </div>
+          <NumberField
+            id="max-advance"
+            label="Furthest ahead in days"
+            unit="days"
+            value={policy.maxAdvanceDays}
+            onChange={(maxAdvanceDays) => setPolicy((p) => ({ ...p, maxAdvanceDays }))}
+          />
         </Row>
       </Section>
 

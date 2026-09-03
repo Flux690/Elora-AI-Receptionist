@@ -19,6 +19,8 @@ import { formatMinutes } from '@/lib/formatters'
 import { emptyService } from '@/lib/service-defaults'
 import type { AppSettings } from '@/lib/settings-types'
 import { Section, Row, SubRow } from './SettingsList'
+import { NumberField } from '@/components/ui/number-field'
+import { ExtraTime } from './ExtraTime'
 import { RecordDrawer } from './RecordDrawer'
 import { useRecordDraft } from './useRecordDraft'
 import { useServerSeed } from './useServerSeed'
@@ -42,36 +44,10 @@ function serviceChanged(row: Row_, original: Service): boolean {
 }
 
 function summarise(s: Row_): string {
-  const parts = [`${formatMinutes(s.durationMinutes)} appointment`]
-  if (s.bufferBeforeMinutes > 0) parts.push(`${s.bufferBeforeMinutes} min blocked before`)
-  if (s.bufferAfterMinutes > 0) parts.push(`${s.bufferAfterMinutes} min blocked after`)
-  return parts.join(', ')
-}
-
-function Minutes({
-  value,
-  onChange,
-  label,
-  id,
-}: {
-  value: number
-  onChange: (n: number) => void
-  label: string
-  id: string
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <Input
-        id={id}
-        value={String(value)}
-        onChange={(e) => onChange(Number(e.target.value.replace(/\D/g, '')) || 0)}
-        inputMode="numeric"
-        aria-label={label}
-        className="w-field-2xs text-right tabular-nums"
-      />
-      <span className="text-muted-foreground">minutes</span>
-    </div>
-  )
+  const parts = [formatMinutes(s.durationMinutes)]
+  if (s.bufferBeforeMinutes > 0) parts.push(`${formatMinutes(s.bufferBeforeMinutes)} held before`)
+  if (s.bufferAfterMinutes > 0) parts.push(`${formatMinutes(s.bufferAfterMinutes)} held after`)
+  return parts.join(' · ')
 }
 
 export function BusinessPanel({ settings }: { settings: AppSettings }) {
@@ -310,30 +286,40 @@ export function BusinessPanel({ settings }: { settings: AppSettings }) {
               onChange={(e) => patch({ price: e.target.value })}
             />
           </SubRow>
-          <SubRow title="Appointment length" description="The time a caller is quoted." htmlFor="svc-length">
-            <Minutes
+          <SubRow
+            title="Appointment length"
+            description="How long the customer is with you. This is what your agent quotes."
+            htmlFor="svc-length"
+          >
+            <NumberField
               id="svc-length"
               label="Appointment length in minutes"
+              unit="minutes"
               value={draft.value.durationMinutes}
               onChange={(durationMinutes) => patch({ durationMinutes })}
             />
           </SubRow>
-          <SubRow title="Blocked before" description="Held on your calendar to set up. Callers never hear it." htmlFor="svc-before">
-            <Minutes
-              id="svc-before"
-              label="Minutes blocked before"
-              value={draft.value.bufferBeforeMinutes}
-              onChange={(bufferBeforeMinutes) => patch({ bufferBeforeMinutes })}
+          <SubRow
+            title="Anything else callers ask about it"
+            description="Your agent reads from this. It never quotes it word for word."
+            htmlFor="svc-desc"
+          >
+            <Textarea
+              id="svc-desc"
+              rows={2}
+              className="w-field-lg resize-none"
+              placeholder="Small and medium dogs only"
+              value={draft.value.description}
+              onChange={(e) => patch({ description: e.target.value })}
             />
           </SubRow>
-          <SubRow title="Blocked after" description="Held on your calendar to clear down. Callers never hear it." htmlFor="svc-after">
-            <Minutes
-              id="svc-after"
-              label="Minutes blocked after"
-              value={draft.value.bufferAfterMinutes}
-              onChange={(bufferAfterMinutes) => patch({ bufferAfterMinutes })}
-            />
-          </SubRow>
+          <ExtraTime
+            before={draft.value.bufferBeforeMinutes}
+            after={draft.value.bufferAfterMinutes}
+            onChange={(bufferBeforeMinutes, bufferAfterMinutes) =>
+              patch({ bufferBeforeMinutes, bufferAfterMinutes })
+            }
+          />
         </RecordDrawer>
       )}
 

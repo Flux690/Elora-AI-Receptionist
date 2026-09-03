@@ -91,3 +91,20 @@ export function formatCaller(
   if (phone) return formatPhone(phone)
   return 'Unknown caller'
 }
+
+/**
+ * What a number field accepts: digits, and nothing else.
+ *
+ * Kept out of the component so it can be tested without a DOM — the frontend
+ * runner is node, because the only other suite reads `index.css` off disk.
+ *
+ * Never returns NaN. An empty box, a pasted "abc", a stray minus sign and a
+ * decimal point all land on 0 rather than poisoning the arithmetic downstream,
+ * where the value becomes an appointment length.
+ */
+export function digitsToNumber(raw: string): number {
+  const digits = raw.replace(/\D/g, '')
+  if (!digits) return 0
+  const n = Number(digits)
+  return Number.isFinite(n) ? n : 0
+}
