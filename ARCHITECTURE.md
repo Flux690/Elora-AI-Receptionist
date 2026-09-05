@@ -232,6 +232,12 @@ Test environment lives in `vitest.config.ts` rather than a `.env.test`, which `.
 
 `packages/core/tests/factories.ts` builds database fixtures for integration tests. `apps/voice/src/receptionist/fixtures.ts` builds pure fixtures for unit tests and touches no database.
 
+## Licence obligations
+
+AGPL-3.0. Section 13 requires that anyone interacting with a modified version over a network can obtain its source, so `AppLayout.tsx` carries a Source link in the sidebar footer. A fork that changes the code repoints that link at itself.
+
+AGPL asks for no `NOTICE` file; that is an Apache-2.0 convention. Per-file copyright headers are the FSF's recommendation rather than a term of the licence, and a whole-project `LICENSE` plus the README notice satisfies it.
+
 ## Local tooling
 
 `seed.mjs` at the repository root, untracked and absent from `package.json`.

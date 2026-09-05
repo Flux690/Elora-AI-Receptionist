@@ -10,6 +10,7 @@ import {
   Settings as SettingsIcon,
   CircleCheck,
   LogOut,
+  Code,
 } from 'lucide-react'
 import { keys, fetchers } from '@/lib/queries'
 import {
@@ -142,6 +143,26 @@ export default function AppLayout() {
               >
                 <SettingsIcon className="size-4" />
                 <span>Settings</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            {/* AGPL section 13: a network-interactive UI offers its users the
+                source of the version they are talking to. */}
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                render={
+                  <a
+                    href="https://github.com/PrabhatMattoo/DeskRoute"
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Source code"
+                  />
+                }
+                tooltip="Source code"
+                className="text-sm"
+              >
+                <Code className="size-4" />
+                <span>Source</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
 

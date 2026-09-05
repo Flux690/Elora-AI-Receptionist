@@ -4,6 +4,8 @@ An AI receptionist for appointment-based local businesses. Customers call a real
 
 Self-hosted and open source. One deployment runs one or more agents.
 
+**[ARCHITECTURE.md](ARCHITECTURE.md)** describes the whole system: layout, the call path, the schema, the design system, and the reasoning behind every rule.
+
 ## Features
 
 - **Real phone calls** - LiveKit Phone Numbers, no SIP trunk setup required
@@ -26,7 +28,7 @@ Self-hosted and open source. One deployment runs one or more agents.
 
 1. Customer calls the business's US phone number
 2. LiveKit routes the call to the AI agent worker via SIP
-3. The dialled number is matched against `phone_numbers` to pick which agent answers, builds a system prompt with business context, and answers - the AI disclosure first (mentioning recording only if recording is on), then the business's own greeting
+3. The dialled number is matched against `phone_numbers` to pick which agent answers. That agent builds a system prompt from its business context and speaks - the AI disclosure first, mentioning recording only when recording is on, then the business's own greeting
 4. STT → LLM → TTS pipeline handles the conversation; the audio turn detector decides when the caller has finished
 5. Pricing, opening hours and knowledge-base answers come straight from the system prompt - no tool calls needed
 6. Genuinely unknown questions are flagged for admin review
@@ -36,7 +38,7 @@ Self-hosted and open source. One deployment runs one or more agents.
 
 ## Versioning
 
-`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.17**.
+`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.18**.
 
 ## Screenshots
 
@@ -103,7 +105,7 @@ cd DeskRoute
 pnpm install
 ```
 
-A pnpm workspace. `apps/api`, `apps/voice` and `apps/web` are the three processes; `packages/core` holds the database, repositories, providers and domain logic they share; `packages/shared` holds the types the browser needs too. `ARCHITECTURE.md` describes the whole system.
+A pnpm workspace. `apps/api`, `apps/voice` and `apps/web` are the three processes; `packages/core` holds the database, repositories, providers and domain logic they share; `packages/shared` holds the types the browser needs too.
 
 ### Environment
 
@@ -159,7 +161,7 @@ pnpm db:generate   # generate a migration from schema changes
 pnpm db:migrate    # apply to the database in DATABASE_URL
 ```
 
-The chain runs against any empty Postgres, and `db/migrations.int.test.ts` proves it on a throwaway database.
+The chain runs against any empty Postgres, and `packages/core/tests/migrations.int.test.ts` proves it on a throwaway database.
 
 ### Tests
 
@@ -232,4 +234,4 @@ Admin - `Authorization: Bearer <clerk_jwt>` required:
 
 [AGPL-3.0](LICENSE) © 2026 Prabhat Mattoo
 
-Self-host it freely. If you run a modified version as a network service, the source of your changes has to be available to its users.
+Self-host it freely. If you run a modified version as a network service, section 13 requires that its users can obtain the source of your changes. The dashboard carries a Source link in its sidebar for exactly that; point it at your own fork if you modify it.
