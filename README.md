@@ -13,7 +13,7 @@ Built as a multi-tenant B2B SaaS.
 - **Services with real durations** - each one has its own length, plus optional setup and cleanup time that blocks your calendar without the caller ever hearing about it
 - **Appointment booking that respects both** - the agent only offers times you're actually open, long enough for the service booked, and free on your calendar. It re-checks the moment before it books, so a slot taken mid-conversation doesn't become a double booking
 - **AI disclosure on every call** - callers are told they're speaking to an AI before anything else is said. Required by law in several US states, and not editable by the business
-- **Recording is the business's choice** - turn it off and nothing is stored, and the disclosure stops claiming otherwise. Two wordings, and each call records which one it played
+- **Recording is the business's choice** - turn it off, or leave the `R2_*` variables unset, and nothing is stored. The disclosure stops claiming otherwise either way, and each call records which wording it played
 - **Bookings have a name on them** - the agent asks who is coming *when it books*, never while you're just asking a question. The name lands on the calendar entry, the appointment, and the caller's record for next time
 - **Escalation loop** - unanswerable questions flagged for admin review; resolved answers auto-populate the knowledge base
 - **Call recordings** - recorded calls get audio alongside the full transcript and AI-generated summary; transcript and summary are kept either way
@@ -36,7 +36,7 @@ Built as a multi-tenant B2B SaaS.
 
 ## Versioning
 
-`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.13**.
+`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.14**.
 
 ## Screenshots
 
@@ -91,7 +91,7 @@ Built as a multi-tenant B2B SaaS.
 - Node.js 22+
 - [LiveKit Cloud](https://cloud.livekit.io) project with a US phone number purchased and a SIP dispatch rule configured
 - [Clerk](https://clerk.com) application with Google OAuth enabled
-- [Cloudflare R2](https://developers.cloudflare.com/r2/) bucket for call recordings
+- [Cloudflare R2](https://developers.cloudflare.com/r2/) bucket, only if you want call recordings
 - [OpenRouter](https://openrouter.ai) API key, only when `LLM_PROVIDER=openrouter`
 - [Docker](https://www.docker.com) for the development and test databases
 
@@ -126,6 +126,7 @@ SUMMARY_LLM_MODEL=             # model for post-call summaries (can match LLM_MO
 OPENROUTER_API_KEY=            # required only when LLM_PROVIDER=openrouter
 OPENROUTER_BASE_URL=           # https://openrouter.ai/api/v1
 
+# Recording storage. Set all four, or none to run without recording.
 R2_ACCOUNT_ID=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=

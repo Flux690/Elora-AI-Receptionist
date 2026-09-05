@@ -42,15 +42,25 @@ const envSchema = z.object({
   LLM_MODEL: z.string().min(1),
   /** LiveKit Inference model id for post-call summaries. */
   SUMMARY_LLM_MODEL: z.string().min(1),
-  R2_ACCOUNT_ID: z.string().min(1),
-  R2_ACCESS_KEY_ID: z.string().min(1),
-  R2_SECRET_ACCESS_KEY: z.string().min(1),
-  R2_BUCKET_NAME: z.string().min(1),
+  /** All four or none. A partial set looks configured and fails per call. */
+  R2_ACCOUNT_ID: z.string().min(1).optional(),
+  R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+  R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  R2_BUCKET_NAME: z.string().min(1).optional(),
 }).superRefine((cfg, ctx) => {
-  if (cfg.LLM_PROVIDER !== "openrouter") return;
-  for (const key of ["OPENROUTER_API_KEY", "OPENROUTER_BASE_URL"] as const) {
-    if (!cfg[key]) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: "Required when LLM_PROVIDER is openrouter" });
+  if (cfg.LLM_PROVIDER === "openrouter") {
+    for (const key of ["OPENROUTER_API_KEY", "OPENROUTER_BASE_URL"] as const) {
+      if (!cfg[key]) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: "Required when LLM_PROVIDER is openrouter" });
+      }
+    }
+  }
+
+  const r2 = ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"] as const;
+  const set = r2.filter((key) => cfg[key]);
+  if (set.length > 0 && set.length < r2.length) {
+    for (const key of r2.filter((k) => !cfg[k])) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: "Set all four R2_* variables, or none to disable recording" });
     }
   }
 });

@@ -83,9 +83,10 @@ export function AgentPanel({ settings }: { settings: AppSettings }) {
     },
   })
 
-  /* Derived from the same function the agent uses, so the dashboard cannot show
-     a wording a caller never hears. */
-  const disclosure = disclosureFor(recordCalls).text
+  /* The same value the agent derives, so the dashboard cannot preview a wording
+     a caller never hears. */
+  const recording = recordCalls && settings.business.storageConfigured
+  const disclosure = disclosureFor(recording).text
 
   return (
     <div>
@@ -113,7 +114,11 @@ export function AgentPanel({ settings }: { settings: AppSettings }) {
         </Row>
         <Row
           title="Record calls"
-          description="Keeps the audio, and changes what your agent says at the start of a call."
+          description={
+            settings.business.storageConfigured
+              ? 'Keeps the audio, and changes what your agent says at the start of a call.'
+              : 'Set the R2_* variables to store audio. Until then nothing is recorded.'
+          }
         >
           <Switch
             checked={recordCalls}

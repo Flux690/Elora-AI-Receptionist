@@ -17,7 +17,7 @@ import { createCall, finishCall } from "../services/calls.js";
 import { getTenantById, getTenantByPhoneNumber } from "../services/tenants.js";
 import { listKnowledgeForPrompt } from "../services/knowledge.js";
 import { listServices } from "../services/services.js";
-import { startCallRecording, stopCallRecording } from "../services/storage.js";
+import { recordingEnabled, startCallRecording, stopCallRecording } from "../services/storage.js";
 import { getGoogleOAuthToken } from "../services/googleAuth.js";
 import type { AgentDeps, CallState, SlotStore } from "./types.js";
 import type { KnowledgeEntry } from "./prompt.js";
@@ -352,25 +352,20 @@ export default defineAgent({
     });
 
     // 9. ── GREETING ──────────────────────────────────────────────────────────
-    // The platform disclosure always leads, including in browser test sessions:
-    // the owner should hear exactly what their callers hear, and the part they
-    // cannot edit is the part most worth them knowing about.
-    //
-    // Which wording plays follows the tenant's recording setting, and the
-    // version comes back with it so the row below cannot claim a sentence the
-    // caller never heard.
-    const greeting = buildGreeting(tenant.agentProfile.greeting, tenant.recordCalls);
+    // The disclosure leads on test sessions too, so the owner hears what their
+    // callers hear. `recording` is false when storage is unconfigured, so the
+    // wording never claims a recording that cannot happen.
+    const recording = recordingEnabled(tenant);
+    const greeting = buildGreeting(tenant.agentProfile.greeting, recording);
     session.say(greeting.text, {
       allowInterruptions: false,
     });
 
     // 10. Recording + DB writes — skipped for test sessions
     if (!isTestSession) {
-      // Recording is the tenant's call. With it off nothing starts, so egressId
-      // and callRecordingKey stay null and finishCall writes no recording_url —
-      // which the dashboard already reads as "no audio for this call".
-      if (tenant.recordCalls) {
-        // Start recording simultaneously with greeting
+      // With recording off, egressId and callRecordingKey stay null and
+      // finishCall writes no recording_url, which the dashboard reads as no audio.
+      if (recording) {
         startCallRecording(roomName, callId)
           .then((result) => {
             egressId = result.egressId;
@@ -382,7 +377,7 @@ export default defineAgent({
             console.error("[worker] failed to start recording:", err);
           });
       } else {
-        console.log(`[worker] recording disabled for tenant ${tenant.id}`);
+        console.log(`[worker] recording off for tenant ${tenant.id}`);
       }
 
       // upsertClient + createCall run concurrently WHILE greeting plays

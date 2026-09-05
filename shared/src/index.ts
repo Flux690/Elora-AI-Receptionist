@@ -322,11 +322,10 @@ export interface BusinessSettings {
   businessHours: BusinessHours;
   bookingPolicy: BookingPolicy;
   agentProfile: AgentProfile;
-  /**
-   * Whether calls are recorded. Changes what the disclosure says, so it is not
-   * only a storage decision — see `disclosureFor`.
-   */
+  /** The owner's preference. What actually happens is this AND storageConfigured. */
   recordCalls: boolean;
+  /** False when the R2_* variables are unset, which makes recording impossible. */
+  storageConfigured: boolean;
   phoneNumber: string | null;
   calendarProvider: CalendarProvider | null;
   calendarExternalId: string | null;

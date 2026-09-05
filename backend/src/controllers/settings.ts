@@ -2,6 +2,7 @@ import type { AppContext } from "../types.js";
 import { getTenantById, updateTenant } from "../services/tenants.js";
 import { listServices } from "../services/services.js";
 import { updateSettingsSchema } from "../schemas.js";
+import { storageConfigured } from "../services/storage.js";
 
 export async function getSettings(c: AppContext) {
   const tenantId = c.get("tenantId");
@@ -21,6 +22,7 @@ export async function getSettings(c: AppContext) {
       businessHours: tenant.businessHours,
       bookingPolicy: tenant.bookingPolicy,
       recordCalls: tenant.recordCalls,
+      storageConfigured,
       phoneNumber: tenant.phoneNumber ?? null,
       calendarProvider: tenant.calendarProvider ?? null,
       calendarExternalId: tenant.calendarExternalId ?? null,
