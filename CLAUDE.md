@@ -15,36 +15,71 @@ Read the relevant section before working in one of those areas.
 ## Commands
 
 ```bash
-pnpm dev             # api + agent + ui together
-pnpm dev:backend     # API server  → http://localhost:8080
-pnpm dev:agent       # LiveKit agent worker (separate process, keep alongside API)
-pnpm dev:frontend    # Admin dashboard → http://localhost:5173
+pnpm dev             # api + voice + web together
+pnpm dev:api         # API server  → http://localhost:8080
+pnpm dev:voice       # LiveKit worker (separate process, keep alongside the API)
+pnpm dev:web         # Admin dashboard → http://localhost:5173
 
-pnpm typecheck       # tsc --noEmit across shared, backend, frontend
-pnpm lint            # eslint, frontend
-pnpm build           # build frontend
+pnpm typecheck       # tsc --noEmit across every package
+pnpm lint            # eslint, apps/web
+pnpm build           # build apps/web
 
-pnpm -F backend db:generate   # migration from schema changes
-pnpm -F backend db:migrate    # apply to Neon Postgres
+pnpm db:generate     # migration from schema changes
+pnpm db:migrate      # apply to DATABASE_URL
 
-docker compose up -d          # throwaway Postgres for tests, host port 5433
-pnpm -F backend test          # unit + agent tests (no DB, no network)
-pnpm -F backend test:int      # service tests against the Docker Postgres
-pnpm -F backend test:live     # real-LLM tests; costs tokens, excluded from CI
+docker compose up -d # dev Postgres on 5432, throwaway test Postgres on 5433
+pnpm test            # unit + agent tests (no DB, no network)
+pnpm test:int        # repository tests against the test Postgres
+pnpm test:live       # real-credential tests; costs tokens, excluded from CI
+pnpm test:web        # the design-token contract
 ```
+
+## Layout
+
+```
+apps/api         Hono server: one module per resource under src/modules
+apps/voice       LiveKit worker: the agent, its prompt, tools and session config
+apps/web         Admin dashboard
+packages/core    db, repositories, providers, domain, env
+packages/shared  Domain types and constants, also consumed by the browser
+```
+
+`repositories/` wrap Drizzle, `providers/` reach external services (Google,
+LiveKit, R2), `domain/` is pure logic with no I/O. Cross-package imports use the
+package name with a `.js` specifier: `@receptionist/core/repositories/calls.js`.
+
+**Handlers live with their routes.** Hono cannot infer path params across a
+split, and `hc<AppType>()` needs chained definitions, so a module exports one
+chained `Hono` instance and `routes.ts` mounts it with `app.route()`.
+
+## Environment
+
+Each package owns the variables it reads: `packages/core` takes `DATABASE_URL`,
+`LIVEKIT_*`, `CLERK_SECRET_KEY` and `R2_*`; `apps/api` adds `PORT`,
+`DASHBOARD_ORIGINS` and `CLERK_PUBLISHABLE_KEY`; `apps/voice` adds `LLM_*` and
+`OPENROUTER_*`. Every schema reads `process.env` and nothing else. `.env` files
+are a development convenience loaded by each app's dev script with
+`--env-file-if-exists`, and by `env_file:` in Compose. A blank value counts as
+unset.
+
+## Comments
+
+Zero or one line, almost always. Two only when getting the thing wrong has a
+severe consequence. Nothing trivial gets a comment. Long-form reasoning belongs
+in `CONTEXT.md`.
 
 Run `pnpm typecheck` and `pnpm lint` before calling any change done.
 
 ## Backend layering
 
-- **Routes** — path, method and a handler reference. No logic.
-- **Controllers** — parse input, call a service, return a response. No try/catch;
-  errors bubble to the global `onError` in `index.ts`. The one exception is
-  phone-number provisioning, which releases the purchased number then re-throws.
-- **Services** — all DB access. The one exception is `controllers/metrics.ts`,
-  which queries `db` directly for aggregates.
-- Use `AppEnv` / `AppContext` from `src/types.ts` on admin routes and controllers
-  so `c.get('tenantId')` is typed.
+- **Modules** — one folder per resource under `apps/api/src/modules`, each
+  exporting a chained `Hono` instance. Parse input, call a repository, return a
+  response. No try/catch; errors bubble to the global `onError` in `app.ts`. The
+  one exception is phone-number provisioning, which releases the purchased
+  number then re-throws.
+- **Repositories** — all DB access, in `packages/core/src/repositories`.
+- Use `AppEnv` from `apps/api/src/types.ts` on admin modules so `c.get('tenantId')`
+  is typed.
 
 ## Frontend conventions
 
@@ -94,7 +129,10 @@ Each one has a mechanism behind it. `CONTEXT.md` has the reasoning.
   `sip.trunkPhoneNumber`. A rule without `trunk_ids` matches every inbound trunk,
   so the second tenant collides with the first.
 - **Never instantiate `new OpenAI(...)`.** Chat goes through `buildLLM()` in
-  `agent/session-config.ts`; `src/llm.ts` is for embeddings only.
+  `apps/voice/src/session-config.ts`, the only place a model client is built.
+- **Never read `recordCalls` to decide anything.** `recordingEnabled()` in
+  `packages/core/src/providers/storage.ts` is the one value the disclosure and
+  the egress call both read.
 
 ## Verify UI work against the running app
 

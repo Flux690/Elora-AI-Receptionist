@@ -1,0 +1,31 @@
+{
+  "name": "@receptionist/core",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*.js": "./src/*.ts",
+    "./tests/*.js": "./tests/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1063.0",
+    "@aws-sdk/s3-request-presigner": "3.1063.0",
+    "@clerk/backend": "3.5.0",
+    "@receptionist/shared": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "livekit-server-sdk": "2.17.0",
+    "pg": "8.21.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.1",
+    "@types/pg": "8.20.0",
+    "drizzle-kit": "0.31.10",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}

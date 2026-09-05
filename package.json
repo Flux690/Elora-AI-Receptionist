@@ -1,19 +1,31 @@
 {
   "name": "deskroute",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "private": true,
   "type": "module",
+  "engines": { "node": ">=22" },
   "scripts": {
-    "dev": "concurrently --names \"api,agent,ui\" --prefix-colors \"cyan,yellow,magenta\" --kill-others \"pnpm --dir backend exec tsx watch src/index.ts\" \"pnpm --dir backend exec tsx src/agent/worker.ts dev\" \"pnpm -F frontend dev\"",
-    "dev:backend": "pnpm -F backend dev",
-    "dev:agent": "pnpm -F backend agent",
-    "dev:frontend": "pnpm -F frontend dev",
-    "build": "pnpm -F frontend build",
+    "dev": "concurrently --names \"api,voice,web\" --prefix-colors \"cyan,yellow,magenta\" --kill-others \"pnpm -F api dev\" \"pnpm -F voice dev\" \"pnpm -F web dev\"",
+    "dev:api": "pnpm -F api dev",
+    "dev:voice": "pnpm -F voice dev",
+    "dev:web": "pnpm -F web dev",
+    "build": "pnpm -F web build",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -F frontend lint",
-    "test": "pnpm -F backend test"
+    "lint": "pnpm -F web lint",
+    "test": "vitest run --project unit",
+    "test:int": "DATABASE_URL=postgresql://deskroute:deskroute@localhost:5433/deskroute_test pnpm -F @receptionist/core exec drizzle-kit migrate && vitest run --project int",
+    "test:live": "vitest run --project live",
+    "test:web": "pnpm -F web test",
+    "db:generate": "pnpm -F @receptionist/core exec dotenv -e .env -- drizzle-kit generate",
+    "db:migrate": "pnpm -F @receptionist/core exec dotenv -e .env -- drizzle-kit migrate"
   },
   "devDependencies": {
-    "concurrently": "9.2.1"
+    "@livekit/agents": "1.6.4",
+    "@receptionist/core": "workspace:*",
+    "concurrently": "9.2.1",
+    "dotenv-cli": "10.0.0",
+    "drizzle-orm": "0.45.2",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
   }
 }

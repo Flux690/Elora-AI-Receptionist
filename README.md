@@ -36,7 +36,7 @@ Built as a multi-tenant B2B SaaS.
 
 ## Versioning
 
-`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.14**.
+`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.15**.
 
 ## Screenshots
 
@@ -103,28 +103,24 @@ cd DeskRoute
 pnpm install
 ```
 
+A pnpm workspace. `apps/api`, `apps/voice` and `apps/web` are the three
+processes; `packages/core` holds the database, repositories, providers and
+domain logic they share; `packages/shared` holds the types the browser needs
+too.
+
 ### Environment
 
-**`backend/.env`**
-```env
-PORT=8080
-DATABASE_URL=                  # postgresql://deskroute:deskroute@localhost:5432/deskroute
+Each package owns the variables it reads, and every one ships an `.env.example`
+beside it. Copy each to `.env` and fill it in.
 
+**`apps/api/.env`** and **`apps/voice/.env`** share the first block:
+
+```env
+DATABASE_URL=                  # postgresql://deskroute:deskroute@localhost:5432/deskroute
 LIVEKIT_URL=                   # wss://your-project.livekit.cloud
 LIVEKIT_API_KEY=
 LIVEKIT_API_SECRET=
-
 CLERK_SECRET_KEY=
-
-DASHBOARD_ORIGINS=             # optional, comma-separated; defaults to http://localhost:5173
-                               # any localhost port is accepted when a localhost origin is listed
-
-LLM_PROVIDER=                  # "livekit" (default) or "openrouter"
-LLM_MODEL=                     # id in the selected provider's format, e.g. google/gemini-3.5-flash
-SUMMARY_LLM_MODEL=             # model for post-call summaries (can match LLM_MODEL)
-
-OPENROUTER_API_KEY=            # required only when LLM_PROVIDER=openrouter
-OPENROUTER_BASE_URL=           # https://openrouter.ai/api/v1
 
 # Recording storage. Set all four, or none to run without recording.
 R2_ACCOUNT_ID=
@@ -133,7 +129,28 @@ R2_SECRET_ACCESS_KEY=
 R2_BUCKET_NAME=
 ```
 
-**`frontend/.env`**
+**`apps/api/.env`** adds:
+
+```env
+PORT=8080
+CLERK_PUBLISHABLE_KEY=
+DASHBOARD_ORIGINS=             # comma-separated; defaults to http://localhost:5173
+                               # any localhost port is accepted when a localhost origin is listed
+```
+
+**`apps/voice/.env`** adds:
+
+```env
+LLM_PROVIDER=                  # "livekit" (default) or "openrouter"
+LLM_MODEL=                     # id in the selected provider's format, e.g. google/gemini-3.5-flash
+SUMMARY_LLM_MODEL=             # model for post-call summaries (can match LLM_MODEL)
+OPENROUTER_API_KEY=            # required when LLM_PROVIDER=openrouter
+OPENROUTER_BASE_URL=           # https://openrouter.ai/api/v1
+```
+
+**`packages/core/.env`** holds `DATABASE_URL` alone, for `drizzle-kit`.
+
+**`apps/web/.env`**
 ```env
 VITE_CLERK_PUBLISHABLE_KEY=
 VITE_API_URL=http://localhost:8080/api
@@ -142,8 +159,8 @@ VITE_API_URL=http://localhost:8080/api
 ### Database
 
 ```bash
-pnpm -F backend db:generate   # generate a migration from schema changes
-pnpm -F backend db:migrate    # apply to the database in DATABASE_URL
+pnpm db:generate   # generate a migration from schema changes
+pnpm db:migrate    # apply to the database in DATABASE_URL
 ```
 
 The chain runs against any empty Postgres, and `db/migrations.int.test.ts`
@@ -152,12 +169,12 @@ proves it on a throwaway database.
 ### Tests
 
 ```bash
-docker compose up -d          # dev Postgres on 5432, throwaway test Postgres on 5433
-pnpm -F backend test          # unit + agent tests (no DB, no network)
-pnpm -F backend test:int      # service tests against the Docker Postgres
-pnpm -F backend test:live     # real Google Calendar; needs backend/.env
-pnpm -F frontend test         # the design-token contract
-pnpm typecheck                # tsc --noEmit across all workspaces
+docker compose up -d   # dev Postgres on 5432, throwaway test Postgres on 5433
+pnpm test              # unit + agent tests (no DB, no network)
+pnpm test:int          # repository tests against the test Postgres
+pnpm test:live         # real Google Calendar; needs apps/voice/.env
+pnpm test:web          # the design-token contract
+pnpm typecheck         # tsc --noEmit across every package
 ```
 
 `test:live` is the only suite that runs against real credentials. It reads the
@@ -169,7 +186,7 @@ the setup and cleanup free and the next caller is offered them. It writes
 nothing to the database, and skips with a reason if no calendar is connected.
 Point it at a specific tenant with `LIVE_TENANT_ID`.
 
-The frontend suite is the colour contract rather than component tests. One
+The web suite is the colour contract rather than component tests. One
 surface is given, the stage, and every other colour is a departure from it, so
 the suite asserts *relationships* rather than values: the anchor holds still as
 contrast moves, surfaces and controls travel in opposite directions, ink mixes
@@ -186,9 +203,9 @@ Break a law in `index.css` and the suite goes red. That is the point of it.
 pnpm dev            # runs all three below at once via concurrently
 
 # …or run them in separate terminals:
-pnpm dev:backend    # API server → http://localhost:8080
-pnpm dev:agent      # LiveKit agent worker - keep running alongside the API
-pnpm dev:frontend   # Admin dashboard → http://localhost:5173
+pnpm dev:api        # API server → http://localhost:8080
+pnpm dev:voice      # LiveKit worker - keep running alongside the API
+pnpm dev:web        # Admin dashboard → http://localhost:5173
 ```
 
 

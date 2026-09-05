@@ -1,0 +1,30 @@
+{
+  "name": "voice",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx --env-file-if-exists=.env src/worker.ts dev",
+    "start": "tsx src/worker.ts start",
+    "download-files": "tsx src/worker.ts download-files",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@livekit/agents": "1.6.4",
+    "@livekit/agents-plugin-openai": "1.6.4",
+    "@livekit/agents-plugin-silero": "1.6.4",
+    "@livekit/noise-cancellation-node": "0.2.0",
+    "@livekit/protocol": "1.50.4",
+    "@livekit/rtc-node": "0.13.33",
+    "@receptionist/core": "workspace:*",
+    "@receptionist/shared": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "livekit-server-sdk": "2.17.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.1",
+    "tsx": "4.22.4",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}

@@ -1,7 +1,6 @@
 packages:
-  - shared
-  - backend
-  - frontend
+  - apps/*
+  - packages/*
 
 overrides:
   vite: "npm:rolldown-vite@7.1.14"
