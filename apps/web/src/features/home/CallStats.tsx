@@ -24,19 +24,8 @@ function N({ children }: { children: React.ReactNode }) {
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many)
 
 /**
- * What the receptionist did while you were out, said the way a receptionist
- * would say it.
- *
- * A row of dot-separated figures reads as a status bar — furniture rather than
- * information. The product *is* a receptionist, so it hands over in sentences,
- * which is the one thing a wall of tiles cannot do.
- *
- * Two lines, because they measure different things. The first is scoped by the
- * period pills. The second is not: `controllers/metrics.ts` counts every pending
- * escalation regardless of date, deliberately — an unanswered question from six
- * weeks ago is still unanswered — so folding it into a sentence that opens "Last
- * 30 days" would quietly lie. It carries the accent because it is the only thing
- * on the page that needs the owner, and it disappears at zero.
+ * A handover in sentences, which a wall of tiles cannot do. Two lines because
+ * the period pills scope the first and not the second.
  */
 export function CallStats({
   period,

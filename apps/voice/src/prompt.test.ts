@@ -4,12 +4,8 @@ import { DEFAULT_BUSINESS_HOURS } from "@receptionist/shared";
 import { makeAgentDeps, makeAgentConfig } from "../tests/fixtures.js";
 
 /**
- * PLAN.md 1.5 + 1.7.1 — the system prompt.
- *
- * Time is frozen and the agent pinned to America/New_York so every date
- * assertion is stable. The chosen instant is deliberately awkward: 2026-08-19
- * 02:30 UTC is still *Tuesday the 18th* in New York, so any implementation that
- * formats in UTC instead of the business timezone fails these tests.
+ * Time frozen at an awkward instant: 2026-08-19 02:30 UTC is still Tuesday the
+ * 18th in New York, so anything formatting in UTC fails here.
  */
 const FROZEN_UTC = new Date("2026-08-19T02:30:00Z");
 
@@ -84,12 +80,8 @@ describe("buildSystemPrompt", () => {
   });
 
   describe("prompt caching", () => {
-    /**
-     * Caching keys on an unchanging prefix. Everything stable (business,
-     * services, knowledge, rules) has to come before anything per-call (caller
-     * identity, current time), or the per-call block invalidates the cache for
-     * everything after it — which is what a Caller block in the middle does.
-     */
+    /** Everything stable comes before anything per-call, or the per-call block
+     *  invalidates the cache for everything after it. */
     it("puts all per-call content after all stable content", () => {
       const prompt = buildSystemPrompt(
         makeAgentDeps({
@@ -214,14 +206,8 @@ describe("buildSystemPrompt", () => {
 
 describe("the prompt states facts; the tools state procedure", () => {
   /**
-   * The system prompt is tool-agnostic on purpose. It says who the agent is,
-   * what the business is, and how to behave. *How and when to use a tool* lives
-   * on that tool's own description and its parameter descriptions, where the
+   * The prompt states facts; a tool's own description states procedure, where the
    * model reads it at the moment it matters.
-   *
-   * Mixing the two is what puts "use rememberCallerName once, never ask for it
-   * outright" in front of the model on every turn, so a caller is never asked
-   * their name and every booking lands in the diary as "caller ID withheld".
    */
   const TOOL_NAMES = [
     "checkAvailability",

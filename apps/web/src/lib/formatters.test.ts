@@ -1,11 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { digitsToNumber, formatCaller } from './formatters'
 
-/**
- * The two pure pieces behind the number field and the caller column. Both are
- * here rather than in a component test because the frontend runner is node —
- * see `vitest.config.ts`.
- */
+/** The two pure pieces behind the number field and the caller column. */
 describe('digitsToNumber', () => {
   it('keeps a plain number', () => {
     expect(digitsToNumber('45')).toBe(45)

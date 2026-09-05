@@ -114,12 +114,8 @@ export function ConnectionsPanel({ settings }: { settings: AppSettings }) {
     onError: () => toast.error('Could not disconnect. Try again.'),
   })
 
-  /**
-   * Asks Clerk for the calendar scope, then sends the browser to Google.
-   * `createExternalAccount` and `reauthorize` return an account whose
-   * `externalVerificationRedirectURL` is the consent screen; navigating there is
-   * the caller's job.
-   */
+  /** Both calls return an account whose `externalVerificationRedirectURL` is the
+   *  consent screen; navigating there is this function's job. */
   async function grantAccess() {
     if (!user) return
     setGranting(true)
@@ -268,9 +264,8 @@ export function ConnectionsPanel({ settings }: { settings: AppSettings }) {
                 >
                   <Select value={choice ?? calendarId ?? ''} onValueChange={(v) => setChoice(v ?? null)}>
                     <SelectTrigger className="w-field-md">
-                      {/* Base UI renders the value, not the chosen item's label,
-                          unless given this children function. A calendar id is
-                          not a name. */}
+                      {/* Base UI renders the value rather than the label without
+                          this. A calendar id is not a name. */}
                       <SelectValue placeholder="Pick a calendar">
                         {(value) =>
                           calendars.find((c) => c.id === value)?.summary ?? 'Pick a calendar'

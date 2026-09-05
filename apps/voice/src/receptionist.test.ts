@@ -3,11 +3,7 @@ import { ReceptionistAgent } from "./receptionist.js";
 import { makeAgentDeps } from "../tests/fixtures.js";
 
 /**
- * Agent-level assertions using the bare class — no LiveKit worker, no network.
- * This is why `ReceptionistAgent` lives in its own module: `worker.ts` calls
- * `cli.runApp()` at the top level, so importing it here would boot a worker.
- *
- * These are deterministic and free. Tests that need a real model to *choose*
+ * The bare class, no worker and no network. Tests needing a real model to choose
  * a tool live in `*.live.test.ts`.
  */
 describe("ReceptionistAgent", () => {
@@ -17,9 +13,7 @@ describe("ReceptionistAgent", () => {
     Object.keys(new ReceptionistAgent(deps).toolCtx.functionTools);
 
   it("exposes no searchKnowledge — the knowledge base is in the prompt", () => {
-    // PLAN.md 1.5: as a tool, a knowledge question costs two extra LLM round
-    // trips plus an embedding call and a vector query. If it comes back, so
-    // does that cost.
+    // As a tool, a knowledge question costs two extra round trips per question.
     expect(toolNames()).not.toContain("searchKnowledge");
   });
 

@@ -12,16 +12,8 @@ Keep it factual and concise. Do not use bullet points.`;
 const MIN_SUMMARY_ENTRIES = 3;
 
 /**
- * Post-call summary, through whichever gateway LLM_PROVIDER selects.
- *
- * Through the same gateway as the in-call model, so the two cannot drift.
- * LiveKit Inference reads LIVEKIT_API_KEY/SECRET from the environment and needs
- * no job context, so it works here in the session close handler; OpenRouter
- * without credits returns "" on every call and says nothing about why.
- *
- * Deliberately a small model with reasoning off — PLAN.md 1.3 notes that larger
- * models are measurably *worse* at this job, embellishing and inventing
- * follow-ups that were never discussed.
+ * The same gateway as the in-call model, so the two cannot drift. A small model
+ * with reasoning off: larger ones embellish and invent follow-ups.
  */
 export async function generateCallSummary(transcript: TranscriptEntry[]): Promise<string> {
   if (transcript.length < MIN_SUMMARY_ENTRIES) return "";
@@ -45,9 +37,8 @@ export async function generateCallSummary(transcript: TranscriptEntry[]): Promis
     }
     const summary = text.trim();
     if (!summary) {
-      // The model streamed nothing at all. Providers do not always throw on
-      // failure — an OpenRouter 402 yields an empty stream and no exception —
-      // so silence here is a signal, not a normal outcome.
+      // Providers do not always throw: a 402 yields an empty stream and no
+      // exception, so silence is a signal.
       console.warn(
         `[summary] model ${env.SUMMARY_LLM_MODEL} via ${env.LLM_PROVIDER} returned nothing; ` +
           `check provider credits or quota`

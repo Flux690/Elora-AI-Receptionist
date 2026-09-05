@@ -6,14 +6,7 @@ export type KnowledgeEntry = { question: string; answer: string };
 
 const DAYS_AHEAD = 7;
 
-/**
- * Formats a date's parts in a specific IANA timezone.
- *
- * Everything here goes through `Intl` with an explicit `timeZone`. Formatting in
- * the server's local zone is the entire class of bug this is avoiding: the
- * worker runs in UTC, the business is in New York, and "tomorrow" is not the
- * same day in both.
- */
+/** Always an explicit `timeZone`: the worker runs in UTC and the business does not. */
 function partsIn(date: Date, timeZone: string) {
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -37,13 +30,7 @@ function partsIn(date: Date, timeZone: string) {
   };
 }
 
-/**
- * Today plus the next seven days, each as "Weekday YYYY-MM-DD".
- *
- * Models are unreliable at date arithmetic, and every booking path depends on
- * getting it right. Handing over the answers costs a few dozen tokens and
- * removes the entire error class (PLAN.md 1.7.1).
- */
+/** Handed over rather than derived: models are unreliable at date arithmetic. */
 function buildDateAnchors(now: Date, timeZone: string): string {
   const lines: string[] = [];
 
@@ -80,14 +67,7 @@ function speakIntervals(intervals: TimeInterval[]): string {
   return intervals.map((i) => `${speakTime(i.start)} to ${speakTime(i.end)}`).join(", and ");
 }
 
-/**
- * The weekly pattern, plus any exception falling inside the window the date
- * anchors already cover.
- *
- * "Are you open Saturday?" is plausibly the most common question an appointment
- * business receives, and until hours existed it was an escalation every time —
- * the agent had nothing to answer from.
- */
+/** The weekly pattern plus any exception inside the window the date anchors cover. */
 function buildHoursBlock(hours: BusinessHours, now: Date, timeZone: string): string {
   const weekly = WEEKDAYS.map(
     (day) => `- ${WEEKDAY_LABELS[day]}: ${speakIntervals(hours.weekly[day] ?? [])}`
@@ -118,9 +98,8 @@ export function buildSystemPrompt(deps: AgentDeps): string {
   const { agent, caller, knowledge, services } = deps;
   const timeZone = agent.timezone;
 
-  // Duration is stated so the agent can answer "how long does that take?"
-  // without a tool call. It does NOT do the slot arithmetic — that is the
-  // backend's job, and the model is never asked to add minutes to a time.
+  // Stated so the agent can answer "how long does that take?" without a tool.
+  // The model is never asked to add minutes to a time.
   const now = new Date();
   const today = partsIn(now, timeZone);
 
@@ -131,12 +110,8 @@ export function buildSystemPrompt(deps: AgentDeps): string {
     })
     .join("\n");
 
-  // Inlined rather than fetched through a tool. A small business's whole
-  // knowledge base fits in the prompt, and a tool costs two extra LLM round
-  // trips plus an embedding call and a vector query per question (PLAN.md 1.5).
-  //
-  // Stated as fact, not as instruction. What to do when the answer is missing is
-  // the escalation tool's business, and it says so in its own description.
+  // Inlined, because a small business's whole knowledge base fits in the prompt
+  // and a tool would cost two extra round trips per question.
   const knowledgeBlock = knowledge.length
     ? `\n## Knowledge\n${knowledge
         .map((k) => `Q: ${k.question}\nA: ${k.answer}`)
@@ -157,11 +132,8 @@ export function buildSystemPrompt(deps: AgentDeps): string {
         // it cannot look this caller up (PLAN.md 1.8.1).
         "Caller ID withheld — there is no number for this caller.";
 
-  // ── Ordering matters ───────────────────────────────────────────────────────
-  // Everything above the "Caller" heading is identical for every call to this
-  // agent, so it forms a cacheable prefix. Everything below changes per call.
-  // The previous version put the caller block in the middle, which invalidated
-  // the cache for everything after it (PLAN.md 1.3).
+  // Everything above the Caller heading is identical across calls, so it forms a
+  // cacheable prefix. Everything below it changes per call.
   return `You are ${agent.personaName}, the receptionist for ${agent.businessName}.
 
 ## Business

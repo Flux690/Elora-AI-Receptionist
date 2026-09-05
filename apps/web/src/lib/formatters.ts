@@ -1,9 +1,4 @@
-/**
- * Human-readable formatting, in the business's timezone rather than the
- * viewer's. The agent quotes every time in `agents.timezone`, so the dashboard
- * has to agree or an owner reading from another zone sees different times than
- * their callers were given.
- */
+/** In the business's timezone, because the agent quotes callers in `agents.timezone`. */
 
 /** US/CA E.164. Numbers from other regions fall through to their raw string. */
 export function formatPhone(e164: string): string {
@@ -72,15 +67,8 @@ export function formatMinutes(minutes: number): string {
   return m === 0 ? `${h} hr` : `${h} hr ${m} min`
 }
 
-/**
- * Who called, in one string.
- *
- * A name is what an owner ringing somebody back actually needs; the number is
- * the fallback, and "Unknown caller" is the honest answer when there is neither.
- * "No caller ID" is deliberately *not* used here — it means only the number is
- * missing, which is a different fact and gets said where the number is shown on
- * its own.
- */
+/** Name, then number, then "Unknown caller". "No caller ID" is a different fact
+ *  and is said where the number stands alone. */
 export function formatCaller(
   name: string | null | undefined,
   phone: string | null | undefined,
@@ -92,16 +80,7 @@ export function formatCaller(
   return 'Unknown caller'
 }
 
-/**
- * What a number field accepts: digits, and nothing else.
- *
- * Kept out of the component so it can be tested without a DOM — the frontend
- * runner is node, because the only other suite reads `index.css` off disk.
- *
- * Never returns NaN. An empty box, a pasted "abc", a stray minus sign and a
- * decimal point all land on 0 rather than poisoning the arithmetic downstream,
- * where the value becomes an appointment length.
- */
+/** Digits only, never NaN: the value becomes an appointment length downstream. */
 export function digitsToNumber(raw: string): number {
   const digits = raw.replace(/\D/g, '')
   if (!digits) return 0

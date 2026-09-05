@@ -219,9 +219,8 @@ describe("generateCandidateSlots", () => {
   });
 
   it("drops setup time at the open, rather than moving it before you open", () => {
-    // Setup protects the appointment before this one. The first of the day has
-    // nothing behind it, so the shop that opens at 09:00 can be booked at 09:00
-    // — and nothing is held at 08:50.
+    // Setup protects the appointment before this one, and the first of the day
+    // has nothing behind it.
     const padded = generate({
       service: service({ bufferBeforeMinutes: 10, bufferAfterMinutes: 15 }),
     });
@@ -232,9 +231,8 @@ describe("generateCandidateSlots", () => {
   });
 
   it("drops cleanup time at the close, so the last appointment reaches closing", () => {
-    // Closes 17:00, a 30-minute service with 15 minutes of cleanup. The
-    // appointment fits to 16:30, and the clearing up is not held on a calendar
-    // the business has shut. Requiring all 45 inside the day stops at 16:15.
+    // The appointment may end at close; the clearing up is not held on a calendar
+    // the business has shut.
     const padded = generate({
       service: service({ bufferAfterMinutes: 15 }),
     });

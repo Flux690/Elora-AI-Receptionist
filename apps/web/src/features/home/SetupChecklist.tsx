@@ -4,15 +4,8 @@ import { Button } from '@/components/ui/button'
 import type { SetupItem } from './setup-items'
 
 /**
- * The checklist as the page, for an agent with no calls yet.
- *
- * The empty screen is the onboarding surface rather than a dead end: it says
- * what is missing and gives one obvious thing to do. Only the next unfinished
- * item carries the accent — the accent means "waiting on you", and three of them
- * at once means none of them is.
- *
- * Done is stated in ink and a strike, never in green. Colour means one thing
- * here and `design-tokens.test.ts` enforces it.
+ * The checklist as the page, for an agent with no calls yet. Only the next
+ * unfinished item carries the accent, and done is ink and a strike, never green.
  */
 export function SetupChecklist({ items }: { items: SetupItem[] }) {
   const next = items.find((i) => !i.done)
@@ -80,13 +73,7 @@ export function SetupChecklist({ items }: { items: SetupItem[] }) {
   )
 }
 
-/**
- * The same checklist once there is a call log worth reading.
- *
- * It demotes rather than vanishing: one line naming what is missing, a way
- * through, and a cross. Dismissing is safe because the rail keeps a "Finish
- * setup" entry with a count until nothing is outstanding.
- */
+/** Demoted to one line once calls arrive. The rail keeps a way back to it. */
 export function SetupBanner({
   items,
   onDismiss,

@@ -49,9 +49,8 @@ export function AgentPanel({ settings }: { settings: AppSettings }) {
     return out
   }, [form, settings.agent])
 
-  /* A save re-seeds. A background refetch must not: the recording switch below
-     invalidates this very query, and re-seeding on that discards an unsaved
-     phrase. */
+  /* The recording switch invalidates this query, so a background refetch must
+     not re-seed and discard an unsaved phrase. */
   const expectReseed = useServerSeed(settings, changes.length > 0, () => {
     setForm(settings.agent)
     setRecordCalls(settings.business.recordCalls)
@@ -67,9 +66,7 @@ export function AgentPanel({ settings }: { settings: AppSettings }) {
     onError: () => toast.error('Could not save. Try again.'),
   })
 
-  /* A switch reads as taking effect when it moves, and this one is a single
-     boolean that is valid on its own, so it commits immediately rather than
-     waiting for the bar. */
+  /* A single boolean, valid on its own, so it commits when it moves. */
   const saveRecording = useMutation({
     mutationFn: (next: boolean) =>
       apiClient.patch('/admin/settings', { business: { recordCalls: next } }),

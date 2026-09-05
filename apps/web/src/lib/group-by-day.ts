@@ -1,13 +1,7 @@
 import type { Group } from '@/components/ui/data-list'
 import { dayKey, relativeDay } from './formatters'
 
-/**
- * Consecutive rows sharing a day, labelled in the agent's zone.
- *
- * The rows arrive sorted, so this only has to compare against the group it is
- * building. Calls and escalations each had their own copy of this, identical
- * but for the field the timestamp lives on.
- */
+/** Rows arrive sorted, so this only compares against the group it is building. */
 export function groupByDay<T>(
   rows: T[],
   zone: string | undefined,

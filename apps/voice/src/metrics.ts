@@ -1,18 +1,8 @@
 import type { metrics as agentMetrics } from "@livekit/agents";
 
 /**
- * Per-turn latency accounting (PLAN.md 1.9).
- *
- * There was no MetricsCollected handler anywhere in the codebase, so every
- * latency change was guesswork. These three numbers are what actually add up to
- * the pause a caller hears after they stop speaking:
- *
- *   EOU  — how long after the caller stopped talking the turn was closed
- *   LLM  — time to first token
- *   TTS  — time to first byte
- *
- * LiveKit's own docs warn that preemptive generation does not always reduce
- * latency and that the metrics are how you find out. This is that.
+ * The three numbers that add up to the pause a caller hears: end of utterance,
+ * LLM time to first token, and TTS time to first byte.
  */
 export type TurnLatency = {
   eouDelayMs?: number;
@@ -32,11 +22,7 @@ export type LatencyReport = {
   responseMs: Percentiles;
 };
 
-/**
- * Nearest-rank percentile. Deliberately not interpolated — at the call volumes
- * involved, an interpolated p95 over nine samples implies a precision that is
- * not there.
- */
+/** Nearest-rank: interpolating over nine samples implies precision that is not there. */
 function percentile(sorted: number[], fraction: number): number {
   if (sorted.length === 0) return 0;
   const rank = Math.ceil(fraction * sorted.length);
@@ -52,24 +38,14 @@ function summarise(values: number[]): Percentiles {
   };
 }
 
-/**
- * Accumulates metrics events for one call and reports percentiles at the end.
- *
- * Per call rather than per process: a worker handles many concurrent calls for
- * many agents, and mixing them produces a number that describes nobody.
- */
+/** Per call, because one worker handles concurrent calls for different agents. */
 export class CallMetrics {
   private readonly eou: number[] = [];
   private readonly transcription: number[] = [];
   private readonly llmTtft: number[] = [];
   private readonly ttsTtfb: number[] = [];
 
-  /**
-   * Feed one `MetricsCollected` event.
-   *
-   * Cancelled LLM requests are skipped: a barge-in cancels generation, and its
-   * truncated time-to-first-token is not a latency the caller experienced.
-   */
+  /** Cancelled requests are skipped: a barge-in truncates a latency nobody heard. */
   record(metric: agentMetrics.AgentMetrics): void {
     switch (metric.type) {
       case "eou_metrics":

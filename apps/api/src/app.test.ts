@@ -2,13 +2,8 @@ import { describe, it, expect } from "vitest";
 import { createApp } from "./app.js";
 
 /**
- * PLAN.md 1.8.5 — CORS was `app.use("*", cors())` with no options, which sends
- * `access-control-allow-origin: *` to any origin that asks, on every route
- * including `/api/admin/*`.
- *
- * Bearer-token auth means a wildcard origin is not the credential-leak it would
- * be with cookies, but it does let any page on the internet drive the admin API
- * with a token it has obtained, and there is no reason to allow it.
+ * CORS is an allowlist. A wildcard origin lets any page on the internet drive
+ * `/api/admin/*` with a token it has obtained.
  */
 describe("CORS", () => {
   const DASHBOARD = "http://localhost:5173";
@@ -31,9 +26,8 @@ describe("CORS", () => {
   });
 
   it("allows whatever port Vite actually grabbed", async () => {
-    // Regression: the allowlist was pinned to 5173, so when 5173 was busy and
-    // Vite fell back to 5174 the whole dashboard failed to load with an opaque
-    // CORS error.
+    // Vite takes the next free port when 5173 is busy, so any localhost port is
+    // accepted once a localhost origin is listed.
     for (const port of [5174, 5175, 4173]) {
       const res = await app.request("/api/health", {
         headers: { Origin: `http://localhost:${port}` },

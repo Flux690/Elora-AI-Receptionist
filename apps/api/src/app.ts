@@ -13,15 +13,8 @@ export type AppOptions = {
 const LOCALHOST = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 /**
- * Exact match, with one deliberate exception for local development.
- *
- * Vite takes the next free port when its default is busy — 5173 becomes 5174,
- * then 5175 — so pinning one localhost port means `pnpm dev` breaks at random
- * with an opaque CORS failure and a blank dashboard.
- *
- * The exception only applies when a localhost origin was configured in the
- * first place. A production `DASHBOARD_ORIGINS` of real hostnames stays an
- * exact allowlist, and never accepts localhost.
+ * Exact match, except that any localhost port passes once a localhost origin is
+ * listed: Vite takes the next free port when its default is busy.
  */
 export function isAllowedOrigin(origin: string, allowedOrigins: string[]): boolean {
   if (allowedOrigins.includes(origin)) return true;

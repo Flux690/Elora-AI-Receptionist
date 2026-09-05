@@ -3,13 +3,8 @@ import { Switch as SwitchPrimitive } from "@base-ui/react/switch"
 import { cn } from "@/lib/utils"
 
 /**
- * A setting that is on or off, and takes effect the moment it moves.
- *
- * A switch is a labelled state (`role="switch"`, `aria-checked`) rather than a
- * pressed button, and a screen reader announces it accordingly.
- *
- * 30x20, fully rounded. The accent appears only in the on state: an off switch
- * is a neutral track, and its edge is what makes it visible at rest.
+ * A labelled state rather than a pressed button, so a screen reader announces it
+ * as one. The accent appears only when on; off is a neutral track with an edge.
  */
 function Switch({ className, ...props }: SwitchPrimitive.Root.Props) {
   return (

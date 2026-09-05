@@ -77,11 +77,8 @@ export async function listKnowledge(agentId: string) {
     .limit(100);
 }
 
-/**
- * Reopens the source escalation in the same transaction. Without it the question
- * is permanently unanswerable: resolved forever, and the dedup index can block a
- * re-escalation.
- */
+/** Reopens the source escalation in the same transaction, or its question
+ *  becomes permanently unanswerable. */
 export async function deleteKnowledge(id: string, agentId: string): Promise<void> {
   await db.transaction(async (tx) => {
     const deleted = await tx

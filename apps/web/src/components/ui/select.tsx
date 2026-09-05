@@ -65,13 +65,8 @@ function SelectContent({
   sideOffset = 4,
   align = "center",
   alignOffset = 0,
-  /**
-   * Off. On, the popup overlaps the trigger so the chosen row sits over the
-   * trigger's own text, which is pleasant for a five-item picker and unusable
-   * for the 418-entry timezone list. Off, a select opens below its trigger like
-   * every other menu, which also agrees with how these are drawn: a hairline and
-   * a floating shadow say the panel sits above the page.
-   */
+  /** Off: overlapping the trigger suits a five-item picker and breaks the
+   *  418-entry timezone list. */
   alignItemWithTrigger = false,
   ...props
 }: SelectPrimitive.Popup.Props &

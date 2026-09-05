@@ -2,15 +2,8 @@ import { describe, it, expect } from "vitest";
 import type { llm } from "@livekit/agents";
 import { suppressSpeechOnToolTurns } from "./speech-guard.js";
 
-/**
- * The rule: a turn either calls a tool or it talks. Never both.
- *
- * These are cheap tests standing guard over an expensive failure — a caller
- * hearing the agent read its own tool-call JSON and private deliberation aloud:
- *
- *   "_1} Wait, the user did not offer their name yet, so I will book it
- *    directly (I can't call rememberCallerName without a name...)"
- */
+/** Cheap tests over an expensive failure: a caller hearing the agent read its
+ *  own tool-call JSON and deliberation aloud. */
 
 const FLUSH = Symbol("flush");
 

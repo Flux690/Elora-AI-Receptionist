@@ -1,19 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { searchPhoneNumbers, InvalidAreaCode } from "./telephony.js";
 
-/**
- * The area code rule, measured against the live API on 2026-09-03:
- *
- *   omitted / ""   200, ten numbers
- *   "484"          200, ten numbers
- *    484           400 malformed — the field is a string, not an int
- *   "4" / "50"     400 invalid_argument, "Failed to search phone numbers"
- *   "999"          200, zero items
- *
- * A partial code is therefore a caller mistake that LiveKit reports as an opaque
- * carrier failure, which is why the length is checked here rather than left to
- * surface as an unhandled 500 with nothing on screen.
- */
+/** A partial area code is a caller mistake LiveKit reports as an opaque carrier
+ *  failure, so the length is checked before the request. */
 const fetchMock = vi.fn();
 
 beforeEach(() => {

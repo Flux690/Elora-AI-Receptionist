@@ -13,14 +13,8 @@ import {
 import { getEscalationById } from "../src/repositories/escalations.js";
 
 describe("deleteKnowledge", () => {
-  /**
-   * PLAN.md 1.8.5 — deleting a knowledge item must not orphan its source
-   * escalation.
-   *
-   * An escalation left `resolved` means the agent can never answer that question
-   * again *and* the dedup index can stop it being re-escalated, which makes the
-   * question permanently unanswerable with nothing to show for it.
-   */
+  /** An escalation left resolved makes its question permanently unanswerable:
+   *  the agent cannot answer it and the dedup index blocks a re-escalation. */
   it("reopens the source escalation so the question can be answered again", async () => {
     const agent = await makeAgent();
     const escalation = await makeEscalation(agent.id, {

@@ -7,16 +7,8 @@ import { eq, sql } from "drizzle-orm";
 const RACE_WIDTH = 8;
 
 /**
- * Force the pool to open RACE_WIDTH connections before any race test runs.
- *
- * Without this the bug hides: on a cold pool, TCP/TLS establishment completes at
- * different times, which staggers the SELECTs enough that the first INSERT lands
- * before the others look. Measured — cold pool: 8 fulfilled, 0 rejected; warm
- * pool: 1 fulfilled, 7 rejected.
- *
- * A warm pool is now the normal case in production: db/client.ts sets
- * keepAlive with a 30s idle timeout precisely so sockets stay open (PLAN.md
- * 1.6.4). That change makes this race MORE likely, not less.
+ * A cold pool staggers the SELECTs behind connection latency and hides the race.
+ * A warm pool, which is the normal case, exposes it.
  */
 beforeAll(async () => {
   await Promise.all(
@@ -25,16 +17,7 @@ beforeAll(async () => {
 });
 import { makeAgent, makeCall } from "./factories.js";
 
-/**
- * PLAN.md 1.7.4 — escalation deduplication throws instead of returning.
- *
- * `createEscalation` does a SELECT then an INSERT. That handles the *sequential*
- * case, but two tool calls inside one turn race: both SELECTs miss, both INSERT,
- * and the partial unique index on (call_id, lower(question)) makes the second
- * one throw — out of the tool, mid-call.
- *
- * The test has to be concurrent to be red. A sequential version passes today.
- */
+/** Concurrent by necessity: a sequential version of this passes either way. */
 describe("createEscalation", () => {
   it("returns the existing row instead of throwing when two land at once", async () => {
     const agent = await makeAgent();
@@ -116,15 +99,8 @@ describe("createEscalation", () => {
 
 describe("escalation before the call row exists (PLAN.md 1.7.3)", () => {
   /**
-   * DB writes are deferred until after the greeting so the caller hears audio
-   * with no blocking round trip. That leaves a window where the agent is live
-   * but `calls` has no row — and escalations.call_id is a foreign key to it.
-   *
-   * Reasoning that tools only fire after the caller speaks, so the window is
-   * unreachable, is wrong on two counts: preemptive generation exists
-   * specifically to start work before the turn is confirmed, and
-   * allowInterruptions:false on the greeting blocks interruption of *speech*,
-   * not speech-to-text.
+   * The agent is live before the `calls` row exists, and preemptive generation
+   * starts work before the turn is confirmed, so the window is reachable.
    */
   it("rejects an escalation naming a call row that does not exist", async () => {
     const agent = await makeAgent();

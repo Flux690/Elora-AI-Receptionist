@@ -1,15 +1,8 @@
 import { useEffect, useState } from 'react'
 
 /**
- * One loading boundary per page.
- *
- * A page whose queries land independently paints in pieces, which reads as
- * jitter rather than progress, and a cold database makes the gaps long enough to
- * watch. This holds the skeleton until everything the page needs has settled,
- * then renders once.
- *
- * The skeleton itself waits 200ms before appearing, so a warm load goes straight
- * to content instead of flashing one.
+ * One loading boundary per page, so queries landing separately do not paint in
+ * pieces. The skeleton waits 200ms, so a warm load never flashes one.
  */
 export function usePageReady(pending: boolean, delay = 200): {
   ready: boolean

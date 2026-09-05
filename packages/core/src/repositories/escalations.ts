@@ -15,20 +15,8 @@ type CreateEscalationInput = {
 };
 
 /**
- * Escalate a question, at most once per (call, question) pair.
- *
- * Insert-first rather than check-then-act. SELECT-then-INSERT is a race: two
- * tool calls in one turn both miss the SELECT, both INSERT, and the partial
- * unique index on (call_id, lower(question)) makes the second one throw — out of
- * the tool, mid-call (PLAN.md 1.7.4).
- *
- * The race is not theoretical, and the warm pool in db/client.ts makes it more
- * likely rather than less: a cold pool staggers the SELECTs behind connection
- * latency and hides it (8 concurrent calls, 0 failures), while a warm one turns
- * the same 8 calls into 7 unique-violation failures.
- *
- * `onConflictDoNothing` returns an empty result when the row already existed, so
- * the SELECT below is the fallback that fetches the winner's row — not a guard.
+ * At most once per (call, question). Insert-first, because SELECT-then-INSERT is
+ * a race two tool calls in one turn both lose, throwing out of the tool mid-call.
  */
 export async function createEscalation(
   input: CreateEscalationInput
@@ -50,9 +38,8 @@ export async function createEscalation(
 
   if (rows[0]) return rows[0];
 
-  // Lost the race (or a duplicate within the same call). Fetch the row that won.
-  // Only reachable when callId is set — the unique index is partial on
-  // call_id IS NOT NULL, so a null callId can never conflict.
+  // Fetches the row that won. Reachable only with a callId, since the unique
+  // index is partial on call_id IS NOT NULL.
   const existing = await db
     .select()
     .from(escalations)
@@ -97,9 +84,8 @@ export async function getEscalationById(
   id: string,
   agentId: string
 ): Promise<EscalationRow | null> {
-  // Full row, not a projection. A narrower select cast to `EscalationRow` leaves
-  // the missing fields undefined at runtime while the type claims otherwise, and
-  // there is no wide column here to save anything by omitting.
+  // Full row: a narrower select cast to `EscalationRow` would claim fields it
+  // leaves undefined at runtime.
   const rows = await db
     .select()
     .from(escalations)

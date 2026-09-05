@@ -8,11 +8,7 @@ type CreateAppointmentInput = {
   agentId: string;
   callerId: string | null;
   callerPhone: string | null;
-  /**
-   * The name the caller gave when booking. Independent of `callers.name`: an
-   * anonymous caller has no client row to hang a name on, but the business still
-   * needs to know who is turning up.
-   */
+  /** Independent of `callers.name`: an anonymous caller has no row to hang it on. */
   callerName?: string | null;
   /** The service record this was booked against; null if it is since deleted. */
   serviceId?: string | null;
@@ -61,13 +57,8 @@ export async function listAppointments(agentId: string) {
     .limit(100);
 }
 
-/**
- * Upcoming appointments for a caller, by their phone number.
- *
- * Takes a non-null `callerPhone` by design. An anonymous caller has no identity
- * to look up, and querying with a placeholder is exactly the bug in PLAN.md
- * 1.8.1 — callers must handle null before reaching here.
- */
+/** Non-null by design: querying with a placeholder reads one caller's
+ *  appointments to another. */
 export async function getUpcomingByPhone(agentId: string, callerPhone: string) {
   return db
     .select({

@@ -19,27 +19,8 @@ import {
   type Slot,
 } from "../src/domain/scheduling.js";
 
-/**
- * PLAN.md's first gate: *"Exercise the booking path against a real Google
- * Calendar… Nothing else should be built on top of booking until this has
- * happened once."*
- *
- * Everything in 2.5 and the slot interface is unit-tested. This is the one
- * property the whole design rests on that only a real calendar can confirm:
- *
- *   **A calendar event must span the padded BLOCK, not the appointment.**
- *
- * If it spans only `start`→`end`, freeBusy reports the setup and cleanup free and
- * the next booking lands on top of the previous job's cleanup. That failure is
- * invisible in unit tests — they assert what our own code computes — and shows up
- * as two customers arriving at once.
- *
- * This runs against the real database and the real Google account, through the
- * exact chain a live call uses: agent row → `clerkUserId` → Clerk-issued Google
- * token → Google. Nothing is written to the database. The one external side
- * effect is a calendar event created and deleted inside test 2, with a second
- * cleanup pass in `afterAll` so a mid-test failure cannot strand it.
- */
+/** The one property only a real calendar confirms: an event spans the padded
+ *  block, so freeBusy does not report the setup and cleanup free. */
 
 /** Buffers on BOTH sides, so padding is exercised whatever the agent configured. */
 const PROBE_SERVICE = {
@@ -156,9 +137,8 @@ describe.skipIf(ctx === null)("Google Calendar, for real", () => {
   const live = ctx as LiveContext;
 
   it("still lists the calendar the agent chose, as writable", async () => {
-    // `listCalendars` filters to minAccessRole=writer, so this also catches a
-    // calendar that was deleted or un-shared after being chosen — which would
-    // otherwise surface at the first booking, the worst possible moment.
+    // Filtered to writers, so a calendar deleted or un-shared after being chosen
+    // fails here rather than at the first booking.
     const calendars = await listCalendars(live.token);
 
     expect(calendars.map((c) => c.id)).toContain(live.calendarId);
@@ -218,9 +198,8 @@ describe.skipIf(ctx === null)("Google Calendar, for real", () => {
         windowMax
       );
 
-      // THE CONTRACT. An event written over start→end rather than
-      // blockStart→blockEnd reports a busy range beginning 10 minutes late and
-      // ending 15 minutes early, and fails here.
+      // An event written over start-end rather than the block reports a busy
+      // range 10 minutes late and 15 minutes short, and fails here.
       const covers = busyAfter.some(
         (b) =>
           b.start.getTime() <= slot.blockStart.getTime() &&

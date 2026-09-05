@@ -7,11 +7,7 @@ import {
   DEFAULT_AGENT_SETUP,
 } from "@receptionist/shared";
 
-/**
- * Pure fixtures for agent-level unit tests. Deliberately touches no database —
- * `factories.ts` is for integration tests; this is for `buildSystemPrompt` and
- * friends, which are pure functions.
- */
+/** Pure fixtures, no database. `factories.ts` is the integration equivalent. */
 
 export function makeAgentConfig(overrides: Partial<AgentConfig> = {}): AgentConfig {
   return {

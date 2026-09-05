@@ -5,18 +5,8 @@ import { Input } from '@/components/ui/input'
 import { INDUSTRIES, OTHER, isCustomIndustry } from '@/lib/industries'
 
 /**
- * The six buckets as a row, with "Something else" turning into the box itself.
- *
- * The input takes the pill's own place in the row rather than opening a nested
- * block beneath it — same slot, same height, a cross to go back to the list.
- *
- * What gets stored is what was typed, never the sentinel: `agents.industry` is
- * free text and goes into the system prompt verbatim, so saving the word "Other"
- * told the agent the business was in the Other industry.
- *
- * Settings uses a select for the same list, because a settings row's control
- * column is too narrow for seven pills. Same list, two shapes, each matching
- * what surrounds it.
+ * "Something else" becomes the box in the pill's own slot. What is stored is what
+ * was typed: `agents.industry` reaches the system prompt verbatim.
  */
 export function IndustryPicker({
   value,
@@ -25,24 +15,12 @@ export function IndustryPicker({
   value: string
   onChange: (value: string) => void
 }) {
-  /**
-   * Whether the box is open, held separately from the value.
-   *
-   * An empty value cannot tell "nothing chosen yet" from "Something else, still
-   * typing", and those want opposite things on screen. Seeded from the value so
-   * the picker is right when it mounts against a business already describing
-   * itself in its own words.
-   */
+  /** Separate from the value: an empty value cannot tell "nothing chosen" from
+   *  "still typing". */
   const [typing, setTyping] = useState(() => isCustomIndustry(value))
 
-  /**
-   * Move focus into the box when it replaces the pill.
-   *
-   * Not `autoFocus`, which fires on mount and would steal focus from the top of
-   * the form on a page that already has one. The pill the user just pressed is
-   * removed from the document, so without this their focus is dropped onto the
-   * body and a keyboard user has to tab back in from the beginning.
-   */
+  /** The pressed pill leaves the document, so focus needs somewhere to go.
+   *  Not `autoFocus`, which would fire on mount and steal it from the form. */
   const box = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (typing) box.current?.focus()

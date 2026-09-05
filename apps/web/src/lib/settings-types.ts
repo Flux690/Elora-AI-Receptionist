@@ -8,11 +8,8 @@ import type {
   AgentSetup,
 } from '@receptionist/shared'
 
-/**
- * The Settings response as the forms consume it: business config under
- * `business`, the agent under `agent`. `BusinessSettings` in the shared package
- * models the same data flat.
- */
+/** The Settings response as the forms consume it, nested where the flat
+ *  `BusinessSettings` is not. */
 export interface AppSettings {
   business: {
     name: string

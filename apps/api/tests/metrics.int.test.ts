@@ -20,14 +20,8 @@ const NINE_TO_FIVE = {
 
 const SINCE = new Date("2026-08-01T00:00:00Z");
 
-/**
- * The figure the product exists to produce: calls that arrived while the
- * business was shut, and would otherwise have reached a voicemail.
- *
- * It is counted against the agent's own hours in the agent's own zone, which
- * is the whole reason it cannot be a `WHERE extract(hour ...)` on the raw
- * timestamp.
- */
+/** Counted against the agent's own hours in its own zone, which a
+ *  `WHERE extract(hour ...)` on the raw timestamp cannot do. */
 describe("countAfterHoursCalls", () => {
   it("does not count a call inside opening hours", async () => {
     const t = await makeAgent({ timezone: NY, businessHours: NINE_TO_FIVE });

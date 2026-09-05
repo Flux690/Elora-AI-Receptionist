@@ -1,14 +1,8 @@
 import { z } from "zod";
 
 /**
- * A real IANA timezone, checked against what this Node build actually knows.
- *
- * Not cosmetic: `buildSystemPrompt` formats every date through
- * `Intl.DateTimeFormat` with this value, and an unknown zone throws a
- * `RangeError`. The prompt is built inside the `ReceptionistAgent` constructor,
- * inside `session.start()`, so a bare `z.string()` accepting "America/New York"
- * with a space does not produce a wrong date — it takes the agent off the air
- * with nothing in the dashboard to explain why.
+ * Checked against what this Node build knows: `buildSystemPrompt` formats every
+ * date with it, and an unknown zone throws inside `session.start()`.
  */
 const ianaTimezone = z.string().refine(
   (tz) => {
@@ -45,27 +39,15 @@ const toMinutes = (hhmm: string) => {
   return h! * 60 + m!;
 };
 
-/**
- * One open period.
- *
- * `end` must be after `start`, which means a period crossing midnight cannot be
- * expressed. That is a deliberate limit: appointment businesses do not book
- * across midnight, and allowing it would make every slot calculation ambiguous
- * about which day a booking belongs to.
- */
+/** `end` after `start`, so no period crosses midnight and no slot is ambiguous
+ *  about which day it belongs to. */
 const timeIntervalSchema = z
   .object({ start: timeString, end: timeString })
   .refine((i) => toMinutes(i.end) > toMinutes(i.start), {
     message: "Closing time must be after opening time",
   });
 
-/**
- * Intervals for a single day: in order, and never overlapping.
- *
- * Overlaps are rejected rather than merged. Two overlapping periods mean the
- * owner made a mistake, and quietly merging them hides it until a caller is
- * offered a time nobody meant to open.
- */
+/** Overlaps are rejected rather than merged, because merging hides the mistake. */
 const dayIntervalsSchema = z.array(timeIntervalSchema).superRefine((intervals, ctx) => {
   const sorted = [...intervals].sort((a, b) => toMinutes(a.start) - toMinutes(b.start));
   for (let i = 1; i < sorted.length; i++) {
@@ -135,14 +117,8 @@ export const updateSettingsSchema = z.object({
   agent: agentProfileSchema.partial().optional(),
 });
 
-/**
- * What it takes to answer a phone: a name, a number and a timezone.
- *
- * `services` and `description` are optional and default empty: onboarding asks
- * for neither, because neither is needed to *answer* a call. They belong to
- * Home's setup checklist, alongside the calendar. The fields stay so an import
- * or a future client that does send them is not rejected.
- */
+/** What it takes to answer a phone. Services and description belong to the
+ *  setup checklist, and are accepted here for an import that sends them. */
 export const onboardingCreateSchema = z.object({
   name: z.string().min(1),
   industry: z.string(),

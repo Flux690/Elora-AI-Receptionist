@@ -9,20 +9,8 @@ import { formatPhone } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 
 /**
- * Pick the number the agent answers.
- *
- * **Area code only, on purpose.** `searchPhoneNumbers` sends a country code and
- * an optional area code to LiveKit and nothing else, so a city field would be a
- * promise the API cannot keep. Twilio's `InLocality` / `InPostalCode` /
- * `NearLatLong` make a real search possible later — see PLAN.md 2.2 — and this
- * screen is rebuilt with the carrier anyway.
- *
- * For the same reason there are no "area codes near you" suggestions: there is
- * no geolocation in the product, and deriving one from the browser timezone
- * gives a region rather than an area code.
- *
- * Nothing is purchased here. `POST /onboarding` buys the number, so a number
- * shown in this list is available, not reserved.
+ * Area code only, because that is all `searchPhoneNumbers` accepts. Nothing is
+ * purchased here, so a number in this list is available rather than reserved.
  */
 export function NumberSearch({
   selected,

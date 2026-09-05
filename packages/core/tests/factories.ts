@@ -25,11 +25,7 @@ export const AGENT_PROFILE: AgentProfile = {
   fallback: "Let me check with the team and get back to you.",
 };
 
-/**
- * Two services with deliberately different shapes: a short one with no padding,
- * and a long one with cleanup either side. Slot generation behaves differently
- * for each, so a fixture where both were 60 minutes would hide most bugs.
- */
+/** Deliberately different shapes: slot generation behaves differently for each. */
 export const SERVICES: Service[] = [
   {
     id: "33333333-3333-3333-3333-333333333331",

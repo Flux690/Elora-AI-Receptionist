@@ -13,16 +13,8 @@ export class CalendarScopeMissingError extends Error {
 }
 
 /**
- * The calendars the connected Google account can write to.
- *
- * Exists because nothing ever wrote `agents.google_calendar_id`: the dashboard
- * granted calendar scopes and then stopped, so the agent always saw "calendar
- * not connected" and the entire booking path was unreachable. Granting access
- * and choosing a calendar are two different acts, and only the first was built.
- *
- * Filtered to calendars the account can actually create events on — a read-only
- * subscription like "Holidays in the United States" is offerable but would fail
- * at the first booking, which is the worst moment to find out.
+ * Filtered to calendars the account can create events on, so a read-only
+ * subscription cannot be chosen and then fail at the first booking.
  */
 export async function listCalendars(accessToken: string): Promise<CalendarOption[]> {
   const res = await fetch(
@@ -30,11 +22,8 @@ export async function listCalendars(accessToken: string): Promise<CalendarOption
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
 
-  // Signing in with Google mints a token with `email profile openid` and nothing
-  // else, so every agent who has not yet pressed Connect has a perfectly valid
-  // token that Google refuses for calendar reads. That is the normal state of a
-  // disconnected account, and it was surfacing as an unhandled 500 on every
-  // Settings load — noise in the log and a broken picker in the dashboard.
+  // A sign-in token carries no calendar scope, which is the normal state of a
+  // disconnected account rather than a failure.
   if (res.status === 401 || res.status === 403) {
     throw new CalendarScopeMissingError();
   }
@@ -61,14 +50,7 @@ export async function listCalendars(accessToken: string): Promise<CalendarOption
   }));
 }
 
-/**
- * What is already taken on the calendar, in a window.
- *
- * Deliberately only a fetch. All Google can tell us is what is unavailable;
- * deciding which times exist belongs in `agent/scheduling.ts`, which has the
- * opening hours and the service duration to do it properly. Generating slots
- * from freeBusy alone offers a caller 3 a.m. for a two-hour appointment.
- */
+/** Only a fetch. Google says what is taken; `domain/scheduling.ts` says what exists. */
 export async function fetchBusyRanges(
   accessToken: string,
   calendarId: string,
@@ -108,13 +90,7 @@ export async function createCalendarEvent(
   calendarId: string,
   event: {
     summary: string;
-    /**
-     * The whole block, padding included.
-     *
-     * The event has to cover setup and cleanup, not just the appointment —
-     * otherwise freeBusy reports that time free and the next booking lands on
-     * top of the cleanup for this one.
-     */
+    /** The padded block: freeBusy would report bare setup and cleanup as free. */
     startIso: string;
     endIso: string;
     timezone: string;

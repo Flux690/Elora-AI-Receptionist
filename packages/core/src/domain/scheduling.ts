@@ -7,15 +7,8 @@ import type {
 } from "@receptionist/shared";
 
 /**
- * Slot generation, as pure functions.
- *
- * Which times exist is decided here, from the opening hours, the service length
- * and the booking policy. A generator that walks fixed steps and keeps whatever
- * freeBusy leaves unmarked knows none of those, and offers a caller 3 a.m. for a
- * two-hour appointment.
- *
- * Nothing here touches the database, the network, or the clock except through an
- * explicit `now`, so every rule below is testable without booting a worker.
+ * Which times exist, from the opening hours, the service length and the booking
+ * policy. No database, no network, and the clock only through an explicit `now`.
  */
 
 /** Slot starts land on this grid. Fifteen minutes reads naturally out loud. */
@@ -42,13 +35,7 @@ export type BusyRange = { start: Date; end: Date };
 
 export type PartOfDay = "morning" | "afternoon" | "evening";
 
-/**
- * Wall-clock parts of an instant, in a specific zone.
- *
- * Everything goes through `Intl` with an explicit `timeZone`. Formatting in the
- * server's zone is the whole bug class this avoids: the worker runs in UTC and
- * the business is in New York, where "tomorrow" is a different day.
- */
+/** Always an explicit `timeZone`: the worker runs in UTC and the business does not. */
 function zonedParts(instant: Date, timeZone: string) {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat("en-US", {
@@ -84,19 +71,8 @@ function offsetMsAt(instant: Date, timeZone: string): number {
 }
 
 /**
- * "2026-08-19" + "09:00" in America/New_York -> the matching UTC instant.
- *
- * Two passes, because the offset depends on the instant we are still solving
- * for. The first pass guesses using the offset at the naive timestamp; if the
- * result lands on the other side of a daylight-saving change the offset differs,
- * and the second pass corrects it.
- *
- * On the spring-forward gap the named wall clock does not exist and on the
- * autumn fall-back it happens twice; this resolves both to a single sensible
- * instant. Neither matters here — opening times are never inside the gap.
- *
- * No dependency: Temporal is not stable in Node 22, and this is the whole of
- * what a date library would be doing for us.
+ * "2026-08-19" + "09:00" in a zone to the matching UTC instant. Two passes,
+ * because the offset depends on the instant still being solved for.
  */
 export function zonedWallClockToUtc(
   dateIso: string,
@@ -135,12 +111,8 @@ export function weekdayOf(dateIso: string): Weekday {
   return WEEKDAY_BY_INDEX[new Date(Date.UTC(year!, month! - 1, day!)).getUTCDay()]!;
 }
 
-/**
- * The opening periods for one date.
- *
- * An exception replaces the weekly pattern outright rather than merging with it
- * — that is what makes "closed on Christmas Day" expressible at all.
- */
+/** An exception replaces the weekly pattern outright, which is what makes a
+ *  closed day expressible. */
 export function intervalsForDate(
   hours: BusinessHours,
   dateIso: string
@@ -177,24 +149,8 @@ export type GenerateSlotsInput = {
 };
 
 /**
- * Every slot the business could offer, before the calendar is consulted.
- *
- * The grid walks **appointment** starts, not block starts, so the times a caller
- * hears land on the quarter hour rather than wherever the padding happened to
- * push them — a service with 10 minutes of setup offers 9:00 and 9:15, not 9:10
- * and 9:25.
- *
- * Extra time is held only where it fits inside the opening period, and is
- * **dropped rather than moved** at the edges. Before-time protects the
- * appointment that came before this one; at the moment the business opens there
- * is nothing behind it to protect, so a 45-minute service with 15 minutes of
- * setup is offered 9:00 in a shop that opens at 9:00, with the calendar holding
- * from 9:00. It is not offered 9:00 with a hold from 8:45: nobody is there at
- * 8:45. Closing is the mirror — the appointment may end exactly at close, and
- * the clearing up afterwards is not held on a calendar the business has shut.
- *
- * Requiring the whole padded block to fit inside the opening period instead
- * costs a 9-to-5 shop both its 9:00 and its 4:50, which is why it does not.
+ * The grid walks appointment starts, so quoted times land on the quarter hour.
+ * Extra time is dropped rather than moved at the edges of an opening period.
  */
 export function generateCandidateSlots({
   hours,
@@ -270,12 +226,7 @@ export function generateCandidateSlots({
   return slots;
 }
 
-/**
- * Drops slots whose padded block collides with something already on the calendar.
- *
- * The *block* is compared, not the appointment: cleanup after the previous job
- * is as real a conflict as the job itself.
- */
+/** Compares the padded block, not the appointment: cleanup is a real conflict. */
 export function filterByBusy(slots: Slot[], busy: BusyRange[]): Slot[] {
   if (busy.length === 0) return slots;
 
@@ -304,14 +255,8 @@ export function describeSlot(slot: Slot, timeZone: string): string {
 }
 
 /**
- * "9:00–9:30 AM" — the appointment's own window, in the business's timezone.
- *
- * The calendar event spans the padded BLOCK, so a 30-minute haircut with ten
- * minutes of cleanup shows as a 40-minute event. And Google renders every event
- * in the *viewer's* timezone, so an owner reading a New York calendar from India
- * sees 6:30pm. Both are correct and together they are unreadable: the title has
- * to state the real appointment window, in the business's own clock, or nobody
- * can tell what was actually booked.
+ * The appointment's own window in the business's timezone. The event spans the
+ * padded block and Google renders it in the viewer's zone, so the title says both.
  */
 export function describeAppointmentWindow(slot: Slot, timeZone: string): string {
   const fmt = new Intl.DateTimeFormat("en-US", {
@@ -338,13 +283,8 @@ export function describeDate(dateIso: string, timeZone: string): string {
   }).format(zonedWallClockToUtc(dateIso, "12:00", timeZone));
 }
 
-/**
- * Matches what the caller said to a configured service.
- *
- * Exact, then case-insensitive, then a containment check either way — callers
- * say "a cut" for "Haircut", and speech-to-text rarely returns the catalogue
- * name verbatim. Returns null rather than guessing between two candidates.
- */
+/** Exact, then case-insensitive, then containment. Null rather than a guess
+ *  between two candidates. */
 export function findService(services: Service[], spoken: string): Service | null {
   const needle = spoken.trim().toLowerCase();
   if (!needle) return null;

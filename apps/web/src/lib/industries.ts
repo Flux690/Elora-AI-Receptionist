@@ -1,13 +1,6 @@
 /**
- * What kind of business this is, in six buckets.
- *
- * Only ever read back to a caller who asks what you do, so it names a *shape* of
- * business rather than a trade: there is no useful list of every trade, and the
- * product is not built for one vertical.
- *
- * `OTHER` is a sentinel for the picker, never a stored value. `agents.industry`
- * is free text and goes into the system prompt verbatim, so storing the literal
- * word "Other" told the agent the business was in the Other industry.
+ * Six buckets naming a shape of business rather than a trade. `OTHER` is a
+ * picker sentinel: `agents.industry` reaches the system prompt verbatim.
  */
 export const INDUSTRIES = [
   'Hair and beauty',

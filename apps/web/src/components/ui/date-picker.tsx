@@ -4,13 +4,8 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { cn } from '@/lib/utils'
 
 /**
- * A date, picked from a calendar rather than typed into a native date input.
- * The native control brings its own unstyleable calendar button and the
- * browser's autofill tint, neither of which belongs to this palette.
- *
- * The value is an ISO `YYYY-MM-DD` string, which is what the API stores. Parsing
- * is done in local parts rather than `new Date(iso)`, because the string form is
- * treated as UTC and shifts the day west of Greenwich.
+ * A calendar rather than a native date input, which brings an unstyleable button
+ * and an autofill tint. Parsed in local parts: `new Date(iso)` is read as UTC.
  */
 function parse(value: string): Date | undefined {
   const [y, m, d] = value.split('-').map(Number)

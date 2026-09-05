@@ -14,12 +14,8 @@ interface FilterPillsProps<T extends string> {
   label?: string
 }
 
-/**
- * The one control for choosing which subset of a list to see, used for page
- * filters and for the settings panels alike. A `ToggleGroup` rather than a row
- * of buttons, so a screen reader announces one control with a chosen value and
- * the arrow keys walk it.
- */
+/** A `ToggleGroup` rather than a row of buttons, so it announces as one control
+ *  with a chosen value and the arrow keys walk it. */
 export function FilterPills<T extends string>({
   options,
   value,

@@ -214,9 +214,8 @@ function Sidebar({
       data-variant={variant}
       data-side={side}
       data-slot="sidebar"
-      /* The rail sits BELOW the stage, so everything in it re-derives against a
-         darker ground: its rows sink further, its ink is a shade deeper, and a
-         hairline in here is not the hairline out there. */
+      /* The rail sits below the stage, so everything in it re-derives against a
+         darker ground. */
       data-ground="sub"
     >
       {/* This is what handles the sidebar gap on desktop */}

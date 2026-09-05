@@ -6,24 +6,11 @@ import { callers } from "../src/db/schema.js";
 import { eq } from "drizzle-orm";
 import { makeAgent, makeAppointment } from "./factories.js";
 
-/**
- * PLAN.md 1.8.1 — the caller-ID leak.
- *
- * The proof that the *identity* is wrong lives in `agent/caller.test.ts`, which
- * is where the "unknown" fallback was. These tests cover the other half: the
- * mechanism that made that fallback dangerous, and the service contracts that
- * have to hold once the identity can be null.
- */
+/** The contracts that have to hold once a caller's identity can be null. */
 describe("getUpcomingByPhone", () => {
   /**
-   * A characterisation test: it documents *why* the identity must be null rather
-   * than a placeholder. Any non-null placeholder is a real, shared lookup key,
-   * and this shows exactly what that means — a booking made by one anonymous
-   * caller is returned to the next one.
-   *
-   * This stays green after the fix, because the fix is upstream: nothing ever
-   * writes a placeholder identity again. It exists so that anyone tempted to
-   * reintroduce one can see the consequence in a single assertion.
+   * A placeholder identity is a shared lookup key, so one anonymous caller's
+   * booking is read back to the next. Kept as the consequence in one assertion.
    */
   it("returns any booking stored under a shared placeholder identity", async () => {
     const agent = await makeAgent();

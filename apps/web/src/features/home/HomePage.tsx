@@ -34,19 +34,8 @@ function HomeSkeleton() {
 }
 
 /**
- * What happened while you were out, and what still needs you.
- *
- * Three shapes, depending on where the agent is:
- *
- *   no calls yet   the checklist *is* the page, with the log's own line beneath
- *                  saying what will appear there. No period pills — there is
- *                  nothing to filter.
- *   calls, unfinished setup   the handover note, then the checklist demoted to
- *                  one dismissible line above the log.
- *   settled        the handover note and the log.
- *
- * Settings and metrics are fetched here rather than inside the pieces, so the
- * page paints once instead of in three stages.
+ * What happened while you were out, and what still needs you. Settings and
+ * metrics are fetched here, so the page paints once rather than in three stages.
  */
 export default function HomePage() {
   const [params] = useSearchParams()

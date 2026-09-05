@@ -3,14 +3,8 @@ import { beforeAll, beforeEach } from "vitest";
 import { db } from "@receptionist/core/db/client.js";
 
 /**
- * Integration-test lifecycle against the throwaway Postgres in docker-compose.yml.
- *
- * Migrations are NOT run here. `src/db/migrations.int.test.ts` owns that, because
- * it needs to assert the chain runs cleanly against a genuinely empty database —
- * which is the whole point of that test (PLAN.md 1.6.1). Running migrations here
- * would poison it. That test migrates into its own scratch database and leaves
- * this one alone; everything else relies on `pnpm test:int` having applied the
- * schema first via the `pretest:int` script.
+ * Migrations run in the `test:int` script, not here: `migrations.int.test.ts`
+ * asserts the chain against a genuinely empty database and this would poison it.
  */
 
 const TABLES = [

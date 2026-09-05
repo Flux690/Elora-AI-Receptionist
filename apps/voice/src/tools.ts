@@ -34,15 +34,8 @@ export function createAgentTools(deps: AgentDeps) {
   const timeZone = deps.agent.timezone;
 
   /**
-   * Settles on the name to record, and remembers it for next time.
-   *
-   * A name given now beats one we already had — people correct themselves, and
-   * this is the name they just said. Persisting needs a caller row, which needs
-   * a phone number; an anonymous caller's name still reaches whatever is being
-   * written, it just cannot be remembered for a future call.
-   *
-   * Shared by booking and escalation rather than written twice. Two copies would
-   * drift the first time one of them learned something the other did not.
+   * A name given now beats one already stored, because people correct themselves.
+   * Remembering it needs a caller row, which an anonymous caller does not have.
    */
   async function resolveCallerName(spoken: string | null): Promise<string | null> {
     const given = spoken?.trim() || null;
@@ -55,24 +48,8 @@ export function createAgentTools(deps: AgentDeps) {
     return given ?? deps.caller?.name ?? null;
   }
 
-  /**
-   * NO HOLD PHRASE.
-   *
-   * Speech is a QUEUE. A phrase spoken to cover a slow tool is a second speech
-   * handle, and it does not sit beside that tool's answer — it stands in front
-   * of it, so the answer is discarded when the phrase finally stops and the
-   * caller hears nothing at all. `RunContext.filler` speaks through
-   * `AgentSession.say` and creates the same competing handle.
-   *
-   * The gap it would cover is 400ms to 3.2s. Two seconds of quiet is a
-   * receptionist thinking; a lost confirmation is a customer who does not know
-   * whether they have an appointment.
-   *
-   * For genuinely slow work the mechanism is `RunContext.update()`, which marks
-   * the tool NON-BLOCKING so the conversation continues rather than queueing
-   * behind it. That needs no editable phrase, which is why `agentProfile` has
-   * none — a setting that changes nothing is worse than no setting.
-   */
+  /** No hold phrase: speech is a queue, so one stands in front of the tool's
+   *  answer and the answer is discarded. */
 
   return {
     createEscalation: llm.tool({
@@ -98,10 +75,8 @@ export function createAgentTools(deps: AgentDeps) {
       }),
       execute: async ({ question, callerName, transcriptExcerpt }, { ctx }) => {
         ctx.speechHandle.allowInterruptions = false;
-        // DB writes are deferred until after the greeting, so the calls row may
-        // not exist yet — and escalations.call_id is a foreign key to it. Wait
-        // for it rather than moving the write onto the path to first audio.
-        // Normally resolved seconds ago, so this costs nothing (PLAN.md 1.7.3).
+        // `escalations.call_id` is a foreign key to a row written after the
+        // greeting, so this waits rather than moving the insert onto the call path.
         const callRowExists = await deps.callRowReady;
         await createEscalation({
           agentId,
@@ -326,9 +301,8 @@ export function createAgentTools(deps: AgentDeps) {
         }
 
         try {
-          // Re-check immediately before writing. The slot was computed when the
-          // caller was still deciding, and somebody may have taken it since —
-          // a walk-in, or the owner booking it by hand.
+          // The slot was computed while the caller was deciding, so it is
+          // re-checked immediately before the write.
           const busy = await fetchBusyRanges(
             token,
             deps.calendarExternalId,
@@ -352,11 +326,8 @@ export function createAgentTools(deps: AgentDeps) {
             token,
             deps.calendarExternalId,
             {
-              // The appointment window leads, because the event itself spans
-              // the padded block and Google renders it in whatever timezone
-              // the viewer's calendar is set to. Without this the owner reads
-              // a 40-minute event at 6:30pm and cannot tell that they booked a
-              // 30-minute haircut at 9am.
+              // The title leads with the appointment window: the event spans the
+              // padded block and Google renders it in the viewer's timezone.
               summary: `${service.name} ${describeAppointmentWindow(slot, timeZone)} — ${
                 bookedName ?? deps.callerPhone ?? "name not given"
               }`,
@@ -399,9 +370,8 @@ export function createAgentTools(deps: AgentDeps) {
         "Look up a caller's upcoming appointments by their phone number. Use when a caller asks about existing bookings or wants to cancel/reschedule.",
       parameters: z.object({}),
       execute: async () => {
-        // Anonymous caller: there is no identity to look up. Ask for a number
-        // rather than querying with a placeholder — a shared placeholder key is
-        // how one caller's appointments got read to another (PLAN.md 1.8.1).
+        // No identity to look up. A shared placeholder key would read one
+        // caller's appointments to another.
         if (!deps.callerPhone) {
           return {
             appointments: [],

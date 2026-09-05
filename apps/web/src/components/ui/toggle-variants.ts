@@ -14,16 +14,13 @@ export const toggleVariants = cva(
           "bg-transparent hover:bg-hover hover:text-foreground aria-pressed:bg-active data-[state=on]:bg-active",
         outline:
           "border border-border bg-control shadow-low hover:bg-control-hover aria-pressed:bg-control-active data-[state=on]:bg-control-active",
-        /* A pill is a control: a fill and a lit ring at rest, sinking when
-           chosen, so the unselected one is the raised one. A pressed thing loses
-           its lift, so the selected state drops the shadow. */
+        /* A control: lit at rest, sinking when chosen, so the unselected one is
+           the raised one. */
         /* The ring stays in both states; only the lift goes. A chosen pill is
            sunk, not edgeless. Same weight throughout, so nothing resizes. */
         pill: "rounded-full border-[0.5px] border-transparent bg-control bg-clip-padding px-2.5 font-medium text-muted-foreground shadow-control hover:bg-control-hover hover:text-foreground aria-pressed:border-transparent aria-pressed:bg-active aria-pressed:text-foreground aria-pressed:shadow-ring data-[state=on]:bg-active data-[state=on]:text-foreground data-[state=on]:shadow-ring",
-        /* A row has no rest fill, so its states are the row rungs and its
-           hover travels further. It stacks and wraps, because it carries a title
-           and a line of metadata rather than an icon and a word. A caller that
-           wants them side by side passes `flex-row items-center`. */
+        /* No rest fill, so its states are the row rungs. Stacks, because it
+           carries a title and a line of metadata rather than an icon. */
         row: "w-full flex-col items-start justify-start whitespace-normal bg-transparent text-left font-normal hover:bg-hover aria-pressed:bg-active data-[state=on]:bg-active",
       },
       size: {

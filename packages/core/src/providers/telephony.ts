@@ -36,23 +36,8 @@ export interface AvailableNumber {
 const AREA_CODE = /^\d{3}$/;
 
 /**
- * Available numbers, optionally narrowed to one area code.
- *
- * **The area code must be three digits or absent**, and it must be sent as a
- * *string*. Measured against the live API on 2026-09-03:
- *
- *   omitted / ""   200, ten numbers
- *   "484"          200, ten numbers
- *    484           400 malformed — the field is a string, not an int
- *   "4" / "50"     400 invalid_argument, "Failed to search phone numbers"
- *   "999"          200, zero items — a well-formed code with nothing free
- *
- * A partial code is therefore a caller mistake that the carrier reports as an
- * opaque failure, so it is caught here instead. A well-formed code with nothing
- * free is an empty list, which callers handle as its own case.
- *
- * Nothing about this survives the move to Twilio, which accepts `InLocality`,
- * `InPostalCode`, `NearLatLong` and a `Contains` pattern — see PLAN.md 2.2.
+ * The area code is three digits or absent, and always a string. A partial code
+ * is a caller mistake the carrier reports as an opaque failure, so it is caught here.
  */
 export async function searchPhoneNumbers(areaCode?: string): Promise<AvailableNumber[]> {
   if (areaCode && !AREA_CODE.test(areaCode)) {

@@ -12,11 +12,8 @@ const R2_KEYS = [
 
 export const storageConfigured = R2_KEYS.every((key) => Boolean(env[key]));
 
-/**
- * The single value deciding both whether egress runs and which disclosure the
- * caller hears. Read this, never `recordCalls`, or the two can disagree and the
- * agent claims a recording that is not happening.
- */
+/** The one value behind both egress and the disclosure. Never read `recordCalls`
+ *  directly, or the two can disagree. */
 export function recordingEnabled(agent: { recordCalls: boolean }): boolean {
   return agent.recordCalls && storageConfigured;
 }

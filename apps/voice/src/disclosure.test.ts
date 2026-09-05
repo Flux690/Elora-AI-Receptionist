@@ -9,13 +9,8 @@ import {
 } from "./disclosure.js";
 
 /**
- * PLAN.md 2.6 — the disclosure is platform-owned and cannot be removed.
- *
- * Cheap tests guarding an expensive failure: $500 per call in California, and
- * the platform, not the agent, is who built the omission.
- *
- * An agent can now turn recording off, which is the only part of the sentence
- * that is negotiable. The AI half never is.
+ * Cheap tests guarding $500 per call in California. Recording is the only
+ * negotiable half of the sentence; the AI half never is.
  */
 describe("buildGreeting", () => {
   it("puts the disclosure before the agent's own words", () => {
@@ -33,9 +28,8 @@ describe("buildGreeting", () => {
   });
 
   it("says the call is recorded only when it actually is", () => {
-    // All-party-consent states require saying so when recording. Saying it when
-    // we are NOT recording is its own kind of wrong — it describes something
-    // that is not happening.
+    // All-party-consent states require saying so when recording, and the claim
+    // has to be true either way.
     expect(buildGreeting("Hi!", true).text.toLowerCase()).toContain("recorded");
     expect(buildGreeting("Hi!", false).text.toLowerCase()).not.toContain("record");
   });

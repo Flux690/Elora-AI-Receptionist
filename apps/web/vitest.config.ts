@@ -1,11 +1,7 @@
 import { defineConfig } from "vitest/config";
 
-/**
- * The frontend had no test runner. This one exists for the design-token
- * contract, which reads `src/index.css` off disk and resolves it — so the
- * environment is node, not jsdom: there is no DOM to consult and a browser
- * would report `oklch()` back verbatim anyway.
- */
+/** Node rather than jsdom: the design-token contract reads `index.css` off disk
+ *  and resolves it, and a browser reports `lch()` back verbatim. */
 export default defineConfig({
   test: {
     globals: true,

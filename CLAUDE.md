@@ -11,7 +11,7 @@ argument.** The LLM is never given an agent id and never chooses one; backend
 code injects it.
 
 Deeper background — architecture, the agent worker, the colour system, the
-database, and the approaches that were tried and abandoned — is in `CONTEXT.md`.
+database, and the measurements behind each rule — is in `CONTEXT.md`.
 Read the relevant section before working in one of those areas.
 
 ## Commands

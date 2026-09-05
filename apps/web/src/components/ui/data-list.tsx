@@ -36,13 +36,8 @@ function track<T>(columns: Column<T>[]): string {
 }
 
 /**
- * The one list in the product. Calls, questions and knowledge are the same
- * object at different densities, so they share a column model, a header, a
- * hover and a focus ring.
- *
- * The header states the columns once for the whole list; a group row supplies
- * whatever the columns then leave out, which is why a grouped list needs no
- * date column.
+ * One list for calls, questions and knowledge, which are the same object at
+ * different densities. A group row supplies what the columns leave out.
  */
 export function DataList<T>({ columns, groups, rowKey, href, rowLabel }: DataListProps<T>) {
   const cols = track(columns)

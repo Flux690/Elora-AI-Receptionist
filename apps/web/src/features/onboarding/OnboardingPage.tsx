@@ -19,28 +19,8 @@ import { NumberSearch } from './NumberSearch'
 /** Every zone the platform knows. The backend validates against the same list. */
 const TIMEZONES: string[] = Intl.supportedValuesOf('timeZone')
 
-/**
- * The shortest path to a phone number that answers.
- *
- * One page, because what is genuinely required to *answer* a call is a business
- * name, a number and a timezone — and three fields plus a picker is not long
- * enough to want a stepper, which makes the job look bigger than it is.
- *
- * Deliberately absent:
- *
- * - **Services, hours and the calendar.** None is needed to answer a phone; all
- *   three are needed to book, and asking for some but not all of them produces
- *   an agent that answers "no calendar is connected" on its first call however
- *   carefully the form was filled in. They live on Home's setup checklist.
- * - **A description box.** With no services or hours anywhere near it, an open
- *   box collects exactly the things that must be structured — prices, opening
- *   times — and prose saying "open till six" beside `business_hours` saying five
- *   is a correctness hazard, not untidiness. Its label in Settings only works
- *   because services and hours are visible around it.
- * - **The agent's words.** Derived from the name below, editable in Settings.
- *   A greeting naming the business beats a generic one, and it is one fewer
- *   field to fill in before the phone is answered.
- */
+/** A name, a number and a timezone answer a call. Services, hours and the
+ *  calendar book on it, and live on Home's setup checklist. */
 export default function OnboardingPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()

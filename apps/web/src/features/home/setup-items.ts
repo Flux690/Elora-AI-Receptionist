@@ -11,12 +11,8 @@ export interface SetupItem {
 }
 
 /**
- * The three things that stand between answering a phone and booking on it.
- *
- * Onboarding deliberately asks for none of them — a name, a number and a
- * timezone are all it takes to answer — so this is where they land. Two of the
- * three can be read from the data; hours cannot, because they are valid from the
- * moment an agent exists (Mon–Fri 9–5), which is what `setup.hoursSeen` is for.
+ * The three things between answering a phone and booking on it. Hours are valid
+ * from creation, so only `hoursSeen` says whether they have been looked at.
  */
 export function setupItems(settings: AppSettings): SetupItem[] {
   return [

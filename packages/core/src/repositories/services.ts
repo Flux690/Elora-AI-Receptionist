@@ -16,13 +16,7 @@ const serviceFields = {
   requiredResources: services.requiredResources,
 } as const;
 
-/**
- * An agent's services, in display order.
- *
- * Read on every call (they go into the system prompt and into the STT keyterm
- * list) and on every Settings load, so the projection deliberately omits
- * `position`, `createdAt` and `updatedAt` — none of which the agent needs.
- */
+/** In display order, projected to what the prompt and the keyterm list need. */
 export async function listServices(agentId: string): Promise<Service[]> {
   const rows = await db
     .select(serviceFields)
@@ -81,14 +75,8 @@ export async function updateService(
   return row ? { ...row, description: row.description || undefined } : null;
 }
 
-/**
- * Deletes a service.
- *
- * Appointments booked against it survive: `appointments.service_id` is
- * `ON DELETE SET NULL` and `appointments.service` still holds the name as it
- * stood at booking time. A deleted service must not erase the record of what
- * someone booked — they are still turning up for it.
- */
+/** Appointments survive: `service_id` is SET NULL and `service_name` holds the
+ *  name as it stood at booking. */
 export async function deleteService(agentId: string, id: string): Promise<boolean> {
   const rows = await db
     .delete(services)
@@ -98,12 +86,7 @@ export async function deleteService(agentId: string, id: string): Promise<boolea
   return rows.length > 0;
 }
 
-/**
- * Replaces an agent's whole service list in one transaction.
- *
- * Onboarding submits several services at once, and doing that as N separate
- * inserts leaves a half-built list behind if one fails.
- */
+/** One transaction, so a failed insert cannot leave a half-built list. */
 export async function replaceServices(
   agentId: string,
   drafts: ServiceDraft[]

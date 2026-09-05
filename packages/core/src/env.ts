@@ -35,11 +35,8 @@ const coreEnvSchema = z
     }
   });
 
-/**
- * Blank counts as unset, so `FOO=` in a .env file or a Compose `environment:`
- * entry falls through to `.optional()` and `.default()` rather than failing.
- * Throws rather than exiting, so importing this never kills the test runner.
- */
+/** Blank counts as unset, so `FOO=` falls through to `.optional()`. Throws
+ *  rather than exiting, so importing this never kills the test runner. */
 export function parseEnv<T extends z.ZodTypeAny>(schema: T, source: unknown): z.infer<T> {
   const present = Object.fromEntries(
     Object.entries(source as Record<string, unknown>).filter(([, v]) => v !== "")

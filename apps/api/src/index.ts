@@ -11,16 +11,8 @@ const server = serve({ fetch: app.fetch, port: env.PORT }, () => {
 });
 
 /**
- * Shut down on a signal instead of waiting to be killed.
- *
- * Nothing here ever handled SIGINT, and two things keep the event loop alive:
- * the HTTP listener, and the pg pool's sockets (kept warm on purpose). So Ctrl-C
- * did nothing, `tsx` waited five seconds, force-killed the process, and on a
- * watch restart complained that the previous one had not exited — which is the
- * "Force killing" spam, and why the port stayed occupied afterwards.
- *
- * Both signals matter: Ctrl-C sends SIGINT, and `concurrently --kill-others`
- * sends SIGTERM when a sibling process dies.
+ * The HTTP listener and the pool's sockets both hold the event loop open, so a
+ * signal has to close them. SIGINT is Ctrl-C, SIGTERM is `concurrently`.
  */
 let closing = false;
 

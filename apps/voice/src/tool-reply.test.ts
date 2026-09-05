@@ -6,16 +6,8 @@ import { ReceptionistAgent } from "./receptionist.js";
 import { makeAgentDeps } from "../tests/fixtures.js";
 
 /**
- * Does the agent actually SAY the answer a tool produced?
- *
- * Twice in production a caller asked for appointment times, the tool found them
- * in under half a second, the model wrote the sentence — and nothing was ever
- * spoken. The caller sat in silence until they prodded ("did you look it up?",
- * "is it done?"), at which point the agent answered immediately.
- *
- * Reading logs produced three plausible causes and two wrong fixes. This drives
- * a real `AgentSession` offline instead: scripted LLM, mocked tool, and an
- * assertion that the post-tool reply reaches the conversation.
+ * Whether the agent says the answer a tool produced. Drives a real `AgentSession`
+ * offline: scripted LLM, mocked tool, and the reply asserted into the conversation.
  */
 
 const SLOTS = {

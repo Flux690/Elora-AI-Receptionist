@@ -2,17 +2,8 @@ import { initializeLogger } from "@livekit/agents";
 import "dotenv/config";
 
 /**
- * Live-test lifecycle. Unlike `setup.unit.ts` and `setup.int.ts`, these tests run
- * against REAL credentials and REAL third-party accounts.
- *
- * They read the production database and talk to Google. They never write to the
- * database; the only external side effect is a calendar event created and
- * deleted inside a single test.
- *
- * The `live` project in `vitest.config.ts` deliberately does not inject the
- * dummy `testEnv` — see the comment there. The check below is the guard against
- * that regressing: if a placeholder is still in the environment, the suite is
- * pointed at a fake and every assertion it makes is worthless.
+ * Real credentials and real accounts. The check below is the guard: a surviving
+ * placeholder means the suite is pointed at a fake and asserts nothing.
  */
 initializeLogger({ pretty: false, level: "warn" });
 

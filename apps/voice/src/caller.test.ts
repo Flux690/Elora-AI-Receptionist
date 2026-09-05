@@ -2,20 +2,8 @@ import { describe, it, expect } from "vitest";
 import { resolveCallerPhone } from "./caller.js";
 
 /**
- * PLAN.md 1.8.1 — the highest-severity defect in the codebase.
- *
- * `worker.ts` fell back to the literal string "unknown" when `sip.phoneNumber`
- * was absent. That string then became:
- *
- *   - the upsert key for `callers`, which is UNIQUE on (agent_id, phone_number)
- *   - the lookup key in `getUpcomingByPhone`
- *
- * So every caller withholding their number, for a given business, collapsed into
- * a single client row — and `lookupAppointments` would read one caller's
- * appointments aloud to a different caller. Withheld caller ID is common enough
- * that this was going to happen.
- *
- * Absent caller ID means *no identity*, not an identity named "unknown".
+ * A placeholder identity becomes the upsert key for `callers` and the lookup key
+ * in `getUpcomingByPhone`, collapsing every anonymous caller into one row.
  */
 describe("resolveCallerPhone", () => {
   it("returns the caller's number when present", () => {

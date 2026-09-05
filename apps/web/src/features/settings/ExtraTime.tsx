@@ -10,17 +10,8 @@ interface ExtraTimeProps {
 }
 
 /**
- * Time the calendar holds around an appointment that the customer is not booked
- * for — travel, setup, turning a room over.
- *
- * Opt-in, because most businesses have no such concept and a plumber should get
- * through the whole editor without meeting a minutes field.
- *
- * One row, not a list. A service has one before and one after and never a third:
- * the schema is two integer columns, so a repeating editor with an "add another"
- * would be modelling something that cannot be stored. If Fresha-style Processing
- * time ever arrives it genuinely *is* a list, and it changes the schema and this
- * component together — see PLAN.md 2.11.
+ * Opt-in, so a business without the concept never meets a minutes field. One row
+ * and not a list, because the schema is two integer columns.
  */
 export function ExtraTime({ before, after, onChange }: ExtraTimeProps) {
   const shown = before > 0 || after > 0

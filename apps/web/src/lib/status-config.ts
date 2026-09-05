@@ -4,15 +4,8 @@ import type {
   AppointmentStatus,
 } from '@receptionist/shared'
 
-/**
- * Status has four roles and colour appears for two of them.
- *
- *   fact     something happened. Ink, carried in weight.
- *   waiting  something needs a person. The accent, and the only place it appears
- *            in a list, so it is findable by colour alone.
- *   quiet    an outcome you read rather than act on. Muted ink.
- *   failed   an error. Red, which is used for nothing else.
- */
+/** Four roles, two of them coloured: `waiting` takes the accent and `failed`
+ *  takes red, which is used for nothing else. */
 export type StatusTone = 'fact' | 'waiting' | 'quiet' | 'failed'
 
 const toneClasses: Record<StatusTone, string> = {

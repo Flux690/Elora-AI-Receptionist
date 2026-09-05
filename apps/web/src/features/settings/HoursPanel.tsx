@@ -40,11 +40,8 @@ const toMinutes = (hhmm: string) => {
   return (h ?? 0) * 60 + (m ?? 0)
 }
 
-/**
- * The same rules the server enforces, so a problem shows next to the field
- * rather than as a rejected save. The API is reachable without this form, so
- * this duplicates the server rather than replacing it.
- */
+/** The server's rules again, so a problem shows next to the field. The API is
+ *  reachable without this form, so it duplicates rather than replaces. */
 function intervalProblem(intervals: TimeInterval[]): string | null {
   for (const i of intervals) {
     if (!i.start || !i.end) return 'Fill in both times'

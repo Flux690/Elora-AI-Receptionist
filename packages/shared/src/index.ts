@@ -6,17 +6,7 @@ export type AppointmentStatus = "requested" | "confirmed" | "cancelled";
 
 // Domain value objects
 
-/**
- * A bookable service.
- *
- * `durationMinutes` is what makes booking correct. Without it every appointment
- * is assumed to take an hour, so a two-hour colour and a fifteen-minute fringe
- * trim block the same slot.
- *
- * The two buffers are time the calendar must hold but the caller never hears
- * about — cleaning a chair, writing notes, driving to the next job. They widen
- * the block, not the appointment.
- */
+/** The buffers widen the calendar block, not the appointment the caller hears. */
 export type Service = {
   id: string;
   name: string;
@@ -25,12 +15,7 @@ export type Service = {
   durationMinutes: number;
   bufferBeforeMinutes: number;
   bufferAfterMinutes: number;
-  /**
-   * Plural from day one, and always empty today.
-   *
-   * A deliberate hedge (PLAN.md 2.5): when multi-staff booking arrives it
-   * becomes additive rather than a schema change and a rewrite of every row.
-   */
+  /** Plural from day one, empty for everyone today. */
   requiredResources: string[];
 };
 
@@ -49,18 +34,10 @@ export const WEEKDAYS: readonly Weekday[] = [
   "sun",
 ];
 
-/**
- * An open period, as local wall-clock "HH:MM" in the business's own timezone.
- *
- * **Never UTC.** "We open at 9" has to stay 9 o'clock through a daylight-saving
- * change; storing an instant would silently shift it to 8 or 10 twice a year.
- */
+/** Local wall clock "HH:MM", never UTC, so "we open at 9" survives daylight saving. */
 export type TimeInterval = { start: string; end: string };
 
-/**
- * A specific date that replaces the weekly pattern — a holiday, or a one-off
- * late opening. An empty `intervals` array means closed all day.
- */
+/** Replaces the weekly pattern for one date. Empty `intervals` means shut all day. */
 export type HoursException = {
   /** "YYYY-MM-DD", read in the business's timezone. */
   date: string;
@@ -69,26 +46,13 @@ export type HoursException = {
   label?: string;
 };
 
-/**
- * When the business is open.
- *
- * Multiple intervals per day from the start, because a lunch closure is two
- * intervals and not one — a single open/close pair cannot express it, and
- * retrofitting that means rewriting every row already saved.
- */
+/** Several intervals per day, because a lunch closure is two and not one. */
 export type BusinessHours = {
   weekly: Record<Weekday, TimeInterval[]>;
   exceptions: HoursException[];
 };
 
-/**
- * Limits on when a caller may book.
- *
- * `minNoticeMinutes` is not about the calendar being busy — padding covers that.
- * It covers the person: a booking made for twenty minutes from now is one the
- * plumber cannot drive to, and one the stylist will not see until they next look
- * at their phone. Defaults to 30, and 0 is a legitimate setting.
- */
+/** `minNoticeMinutes` covers the person, not the calendar; padding covers the calendar. */
 export type BookingPolicy = {
   minNoticeMinutes: number;
   maxAdvanceDays: number;
@@ -113,11 +77,7 @@ export const DEFAULT_BUSINESS_HOURS: BusinessHours = {
   exceptions: [],
 };
 
-/**
- * The phrases an owner controls. There is no hold phrase: speech is a queue, so
- * a phrase spoken during a slow tool call stands in front of that tool's own
- * answer and the reply is discarded. See `agent/tools.ts`.
- */
+/** The phrases an owner controls. There is no hold phrase: speech is a queue. */
 export type AgentProfile = {
   name: string;
   greeting: string;
@@ -126,59 +86,30 @@ export type AgentProfile = {
 };
 
 /**
- * The sentence every caller hears before the agent's own greeting.
- *
- * Platform-owned and not editable from the dashboard, deliberately. California
- * AB 2905 and SB 243 require a caller to be told they are speaking to an AI
- * *before any substantive interaction*, at $500 per call, and `agentProfile.greeting`
- * is entirely agent-authored free text — so an agent could and would write a
- * greeting with no disclosure at all. The platform built the system that omits
- * it, so the platform carries the exposure.
- *
- * It lives here rather than in the agent because the dashboard has to show the
- * owner what plays. That was a hand-copied string in `AgentTab.tsx` with a
- * comment promising to keep it in step; a second wording would have doubled the
- * drift.
+ * Plays before the owner's greeting and is not editable. California AB 2905 and
+ * SB 243 require it before any substantive interaction, at $500 per call.
  */
 export const AI_DISCLOSURE_RECORDED =
   "Just so you know, you're speaking with an AI assistant, and this call is recorded.";
 
-/**
- * The same disclosure minus the recording clause, for an agent who has turned
- * recording off. The AI half is never optional; only the recording half is,
- * because only the recording half describes something we are actually doing.
- */
+/** The AI half is never optional. The recording clause is, because it is a claim. */
 export const AI_DISCLOSURE_NOT_RECORDED =
   "Just so you know, you're speaking with an AI assistant.";
 
-/**
- * Which wording played, recorded against every call.
- *
- * The recorded id keeps its original value: rows written before the toggle
- * existed heard exactly this sentence, so re-labelling them would make the audit
- * trail lie. The new wording gets a new id rather than a version bump — these
- * are two concurrent wordings, not an old one and its replacement.
- */
+/** Two concurrent wordings with stable ids, stamped on every call as the audit trail. */
 export const DISCLOSURE_VERSION_RECORDED = "2026-08-v1";
 export const DISCLOSURE_VERSION_NOT_RECORDED = "2026-08-norec-v1";
 
 export type Disclosure = { text: string; version: string };
 
-/** The wording and its id, together — so nothing can stamp a call with an id
- *  that does not match what the caller actually heard. */
+/** Text and id together, so a call cannot be stamped with a wording it never heard. */
 export function disclosureFor(recordCalls: boolean): Disclosure {
   return recordCalls
     ? { text: AI_DISCLOSURE_RECORDED, version: DISCLOSURE_VERSION_RECORDED }
     : { text: AI_DISCLOSURE_NOT_RECORDED, version: DISCLOSURE_VERSION_NOT_RECORDED };
 }
 
-/**
- * Which system holds the agent's calendar.
- *
- * A union of one today. It exists so the schema stops naming a vendor in a
- * column name — `google_calendar_id` was the one place the design foreclosed
- * ever supporting Outlook, Apple, or a real booking system (PLAN.md 2.5).
- */
+/** A union of one, so no column has to name a vendor. */
 export type CalendarProvider = "google";
 
 /** Who sold the number. `manual` is one the operator wired up themselves. */
@@ -200,15 +131,8 @@ export interface CalendarOption {
   primary: boolean;
 }
 
-/**
- * A line of the conversation, as plain text.
- *
- * `startTime` / `endTime` were dropped with click-to-seek (PLAN.md 2.8.1).
- * They held `item.createdAt` — when the chat message object was made, which is
- * after speech-to-text finalised for a caller turn and before the audio played
- * for an agent turn — so they never described the recording and nothing should
- * be tempted to use them for that again.
- */
+/** A line of the conversation, as plain text. Carries no timing: chat message
+ *  timestamps do not line up with the recording. */
 export type TranscriptEntry = {
   role: "user" | "assistant";
   text: string;
@@ -216,12 +140,7 @@ export type TranscriptEntry = {
 
 // API response shapes
 
-/**
- * `callerPhone` is nullable everywhere below, because a withheld caller ID means
- * no identity rather than a placeholder one (PLAN.md 1.8.1). The columns are
- * nullable and the components branch on null, so a plain `string` here would be
- * the one thing claiming otherwise.
- */
+/** `callerPhone` is nullable throughout: a withheld ID is no identity, never a placeholder. */
 export interface CallListItem {
   id: string;
   callerId: string | null;
@@ -245,10 +164,7 @@ export interface EscalationItem {
   /** The call it came from, so the dashboard can link to the recording. */
   callId: string | null;
   callerPhone: string | null;
-  /**
-   * Who to ring back. The name given when the question was escalated, falling
-   * back to the one already on the client row.
-   */
+  /** Who to ring back: the name given at escalation, else the one on the caller row. */
   callerName: string | null;
   question: string;
   status: EscalationStatus;
@@ -283,13 +199,8 @@ export interface AvailableNumber {
   region: string;
 }
 
-/**
- * What the owner has already been through, for the setup checklist on Home.
- *
- * Only what cannot be derived. Whether services exist and whether a calendar is
- * connected are both readable from the data; whether the hours have been *looked
- * at* is not, because they are valid from the moment an agent exists.
- */
+/** Only what cannot be derived: hours are valid from creation, so nothing else says
+ *  whether they have been looked at. */
 export interface AgentSetup {
   checklistDismissed: boolean;
   hoursSeen: boolean;
@@ -302,16 +213,10 @@ export const DEFAULT_AGENT_SETUP: AgentSetup = {
 
 export interface DashboardMetrics {
   totalCalls: number;
-  /**
-   * Calls that arrived while the business was shut.
-   *
-   * The figure the product exists to produce: every one of these is a customer
-   * who would otherwise have reached a voicemail or rung somebody else. Scoped
-   * by the same period as the rest, unlike `pendingEscalations`.
-   */
+  /** Calls that arrived while the business was shut. Scoped by the period. */
   afterHoursCalls: number;
   confirmedBookings: number;
-  /** Every unanswered question, ignoring the period. See controllers/metrics.ts. */
+  /** Every unanswered question, ignoring the period. */
   pendingEscalations: number;
   abandonedCalls: number;
 }

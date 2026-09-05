@@ -2,24 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import { buildSessionConfig } from "./session-config.js";
 
 /**
- * PLAN.md 1.4 — the voice pipeline.
- *
- * Three defects this pins down:
- *
- *  1. The turn detector was `livekit.turnDetector.MultilingualModel()`, the older
- *     *text*-based detector. It cannot decide the caller has stopped until STT
- *     produces a final transcript, and sits on a 500ms floor. Leaving
- *     `turnDetection` undefined makes SDK 1.6.4 auto-provision the audio
- *     `inference.TurnDetector` AND swap the endpointing defaults from 500/3000 to
- *     300/2500 (`streamingEndpointingOptions`). The fix is a deletion.
- *
- *  2. `@livekit/noise-cancellation-node` was a declared dependency imported
- *     nowhere, and `session.start()` passed no input options at all. Phone audio
- *     is 8kHz and lossy, and noise cancellation runs *before* VAD, STT and turn
- *     detection — so it is a turn-detection accuracy fix, not an audio nicety.
- *
- *  3. Browser test sessions must NOT get the telephony model. It is tuned for
- *     8kHz phone audio; test sessions come from a laptop microphone.
+ * Pins the pipeline: `turnDetection` left undefined, telephony noise cancellation
+ * on SIP only, and keyterms fed from the business and service names.
  */
 describe("buildSessionConfig", () => {
   const vad = { label: "fake-vad" } as never;
@@ -33,10 +17,8 @@ describe("buildSessionConfig", () => {
     });
 
     it("keeps preemptive generation but never speaks a guess", () => {
-      // TTS must not run before the turn is confirmed. LiveKit's docs: "if the
-      // chat context or tools change... the speculative response is discarded
-      // and regenerated" — and a discarded guess that has already become audio
-      // is audio the caller may already have heard.
+      // TTS must not run before the turn is confirmed: a discarded guess that has
+      // already become audio is audio the caller may have heard.
       const { sessionOptions } = buildSessionConfig({ isTestSession: false, vad });
       expect(sessionOptions.turnHandling?.preemptiveGeneration).toEqual({
         preemptiveTts: false,
@@ -57,12 +39,7 @@ describe("buildSessionConfig", () => {
   });
 
   describe("LLM provider switch", () => {
-    /**
-     * Both gateways stay reachable by config rather than by code edit. The
-     * default is LiveKit Inference; OpenRouter needs credits on the account,
-     * and without them every request is a 402 and the agent silently never
-     * speaks — which is what made this worth making switchable.
-     */
+    /** Both gateways reachable by config rather than a code edit. */
     it("defaults to LiveKit Inference", async () => {
       vi.resetModules();
       const { buildLLM } = await import("./session-config.js");
@@ -85,11 +62,8 @@ describe("buildSessionConfig", () => {
   });
 
   describe("keyterms", () => {
-    /**
-     * Service names, staff names and the business name are exactly the
-     * vocabulary streaming STT mangles, and a misheard service name derails a
-     * booking. LiveKit manages one keyterm set across providers (PLAN.md 1.5).
-     */
+    /** The vocabulary streaming STT mangles most, and a misheard service name
+     *  derails a booking. */
     it("biases STT toward the business and service names", () => {
       const { sessionOptions } = buildSessionConfig({
         isTestSession: false,

@@ -23,11 +23,7 @@ interface RecordDrawerProps {
   children: React.ReactNode
 }
 
-/**
- * The one place a record in a settings list is edited. Adding and editing share
- * it, so adding several in a row does not mean opening and closing a dialog each
- * time, and the list stays visible beside it.
- */
+/** Adding and editing share it, so the list stays visible while several go in. */
 export function RecordDrawer({
   open,
   onOpenChange,

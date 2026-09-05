@@ -2,15 +2,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 
-/* The colour contract.
-
-   The system is one anchor plus a table of departures from it, so this suite
-   asserts relationships rather than constants: a change of contrast is allowed,
-   a broken ladder is not.
-
-   Values are computed here rather than read from a browser, because
-   `getComputedStyle` returns `lch()` verbatim and a naive rgb regex reads L, C
-   and H as r, g and b. */
+/* The colour contract: relationships rather than constants, so a change of
+   contrast passes and a broken ladder does not. */
 
 const root = process.cwd();
 const css = readFileSync(join(root, "src/index.css"), "utf8");
@@ -33,9 +26,8 @@ function blocks(source: string): Array<{ selector: string; body: string }> {
      it, and this file is mostly paragraphs. */
   const bare = source.replace(/\/\*[\s\S]*?\*\//g, "");
   const out: Array<{ selector: string; body: string }> = [];
-  /* Walked rather than matched. A single regex has to guess where a selector
-     starts, and here it can be preceded by an at-rule, a closing brace or the
-     top of the file, three anchors and each breaks the others. */
+  /* Walked rather than matched: a selector here can follow an at-rule, a brace
+     or the top of the file. */
   let cursor = 0;
   while (true) {
     const open = bare.indexOf("{", cursor);
@@ -98,9 +90,7 @@ function role(
   contrast = CONTRAST,
 ): Step {
   const g = ground(on, contrast);
-  /* A menu overrides its row departures, because a menu is read by pointing at
-     it, so
-     its highlight travels further than a list's. */
+  /* A menu is read by pointing, so its highlight travels further than a list's. */
   const dl =
     on === "menu" && menuDecls.has(`d-${name}`)
       ? num(`d-${name}`, menuDecls)
@@ -163,23 +153,18 @@ function absolute(name: string): Step & { H: number } {
 
 describe("the anchor", () => {
   it("never moves, at any contrast", () => {
-    /* The property the whole architecture rests on. If the base drifts with
-       contrast then contrast is a brightness control, not a contrast one, and
-       every departure below is measured from a moving point. */
+    /* If the base drifts with contrast then every departure is measured from a
+       moving point. */
     for (const c of [15, 27, 30, 50, 75, 100]) {
       expect(ground("base", c).L, `contrast ${c}`).toBe(BASE_L);
     }
   });
 
   it("multiplies every lightness departure by the contrast dial", () => {
-    /* Asserted against the stylesheet rather than against arithmetic done here,
-       which would only be testing this file against itself. Every derived
-       lightness must be `ground + departure × contrast`; a departure that
-       forgets the multiplier is a rung that ignores the dial. */
+    /* Read from the stylesheet, since arithmetic here would test this file
+       against itself. Every rung is `ground + departure x contrast`. */
     const derived = declarations(derivedBlock);
-    /* `--n-2` is the anchor itself and has no departure to scale; ink is
-       proportional and takes its scaling through the ground. Everything else
-       must name a departure AND multiply it. */
+    /* `--n-2` is the anchor and has no departure; ink scales through the ground. */
     const additive = [...derived].filter(
       ([n, v]) => /^(n-1|n-3|control|control-hover|control-active|sunk|sunk-1|line-1|line-2)$/.test(n) && v.startsWith("lch("),
     );
@@ -208,17 +193,14 @@ describe("the anchor", () => {
 
 describe("law 1: surfaces, borders and controls are additive", () => {
   it("rises: the rail is below the stage and a card above it", () => {
-    /* The relationship that was wrong before any of these tests existed: a card
-       sits above the page, so the page is faintly warm and the card is white;
-       not the other way round. */
+    /* A card sits above the page, so the page is faintly warm and the card white. */
     expect(ground("sub").L).toBeLessThan(BASE_L);
     expect(BASE_L).toBeLessThan(ground("card").L);
   });
 
   it("raises a control above its ground and reverses its hover toward the ink", () => {
-    /* Controls move toward WHITE in a light theme while surfaces move toward
-       the ink. The two directions coincide in dark, which hides the
-       distinction until somebody ports the system and every control inverts. */
+    /* Controls travel toward white while surfaces travel toward the ink. The two
+       coincide in dark, which hides the distinction until the system is ported. */
     for (const g of GROUNDS) {
       const rest = role("control", g);
       const hover = role("control-hover", g);
@@ -273,9 +255,8 @@ describe("law 2: ink is proportional, not additive", () => {
   });
 
   it("barely moves when the surface moves", () => {
-    /* The signature of the proportional law, and the reason it is worth having:
-       between the rail and a card the ground travels ~7 L and body ink travels
-       under 1. An additive ladder cannot reproduce that at any other contrast. */
+    /* Between the rail and a card the ground travels ~7 L and body ink under 1,
+       which an additive ladder cannot reproduce at another contrast. */
     const groundTravel = Math.abs(ground("card").L - ground("sub").L);
     const inkTravel = Math.abs(ink(3, "card").L - ink(3, "sub").L);
     expect(inkTravel).toBeLessThan(groundTravel / 4);
@@ -284,10 +265,8 @@ describe("law 2: ink is proportional, not additive", () => {
 
 describe("law 3: chroma re-anchors as well as lightness", () => {
   it("builds every ground-dependent chroma out of the ground's own", () => {
-    /* Asserted against the stylesheet, because the arithmetic version is
-       circular: it would recompute chroma from the same constants it checks and
-       pass while the CSS pins a flat value. `--n-1` and `--n-2` name particular
-       surfaces and are anchored absolutely, so they are exempt. */
+    /* Read from the stylesheet: recomputing chroma from the same constants would
+       pass while the CSS pins a flat value. `--n-1` and `--n-2` are anchored. */
     const derived = declarations(derivedBlock);
     const mustReanchor = /^(n-3|control|control-hover|control-active|sunk|sunk-1|line-1|line-2|ink-1|ink-2|ink-3)$/;
     let checked = 0;
@@ -313,9 +292,8 @@ describe("law 3: chroma re-anchors as well as lightness", () => {
   });
 
   it("departs from the ground's chroma rather than holding a flat constant", () => {
-    /* Hold chroma flat and the ladder lifts correctly while the colour does
-       not follow, so a control on a card comes out grey against a faintly warm
-       page. It takes a test rather than an eye. */
+    /* Flat chroma lifts the ladder without the colour, so a control on a card
+       comes out grey against a warm page. */
     for (const name of [...SURFACE_ROLES, ...LINE_ROLES]) {
       for (const g of GROUNDS) {
         expect(role(name, g).C, `${name} on ${g}`).toBeCloseTo(
@@ -395,9 +373,8 @@ describe("contrast floors, within each ground", () => {
 
 describe("derivation", () => {
   it("derives every ground-dependent token rather than naming a value", () => {
-    /* Each of these must be an `lch(calc(...))` built from `--ground-*`. A raw
-       triple here is a rung that is right at one depth and wrong at every
-       other. */
+    /* Built from `--ground-*`: a raw triple is right at one depth and wrong at
+       every other. */
     const derived = declarations(derivedBlock);
     const mustDerive = /^(n-3|control|control-hover|control-active|sunk|sunk-1|line-1|line-2|ink-1|ink-2|ink-3)$/;
     for (const [name, value] of derived) {
@@ -408,10 +385,8 @@ describe("derivation", () => {
   });
 
   it("re-declares the derived layer on every ground, not only on :root", () => {
-    /* A custom property substitutes its `var()`s where it is DECLARED, so a
-       token declared once on `:root` bakes in `:root`'s ground and
-       re-anchoring silently does nothing. The failure looks exactly like
-       success until you measure two depths and get one answer. */
+    /* A custom property substitutes its `var()`s where it is declared, so one
+       declared on `:root` bakes in `:root`'s ground and re-anchoring does nothing. */
     expect(css).toMatch(/:root,\s*\[data-ground\]\s*\{/);
     expect(derivedBlock).toMatch(/--ink-1:/);
     expect(derivedBlock).toMatch(/--control:/);
@@ -465,15 +440,8 @@ describe("the elevation ladder", () => {
   });
 
   it("targets the orientation attribute Base UI actually emits", () => {
-    /* The registry's base-nova components style orientation with
-       `data-horizontal:` / `data-vertical:`, which compile to `[data-horizontal]`
-       which @base-ui/react 1.5 does not emit. It emits
-       `data-orientation="horizontal"`.
-
-       Nothing errors; the utility simply never matches. The slider's track came
-       out at `height: 0`, a scrubber with no bar, and `Separator` at
-       zero height inside the sidebar. Re-running `shadcn add` reintroduces it,
-       so it needs a test rather than a memory. */
+    /* Registry components compile `data-horizontal:` to a selector
+       @base-ui/react 1.5 never emits, and `shadcn add` reintroduces it. */
     const files = readdirSync(join(root, "src/components/ui"));
     for (const file of files) {
       const source = readFileSync(join(root, "src/components/ui", file), "utf8");
@@ -506,9 +474,8 @@ describe("the elevation ladder", () => {
 });
 
 describe("law 4: chroma is proportional to lightness", () => {
-  /* A departure that ignores its own lightness step makes a surface read as a
-     different material: a card two rungs up shedding half its warmth stops being
-     the same paper as the page it sits on. `dc = -0.145 x dL`, capped at 1.20. */
+  /* `dc = -0.145 x dL`, capped at 1.20: a departure ignoring its own lightness
+     step reads as a different material from the surface under it. */
   const K = -0.145;
   const CAP = 1.2;
   const STEPS = [
@@ -576,11 +543,8 @@ describe("type and geometry", () => {
   });
 
   it("keeps pixel widths out of call sites", () => {
-    /* The rule is that a call site NAMES rather than measures — not that pixels
-       are banned, since the tokens themselves are pixel values. A component may
-       own its own width in one place (the drawer does); what is forbidden is the
-       same number pasted at three call sites, which is exactly how the drawer
-       width goes wrong, which is why `sheet.tsx` owns its own. */
+    /* A call site names rather than measures. Pixels are not banned: a component
+       may own its width in one place, and `sheet.tsx` does. */
     const offenders: string[] = [];
     const walk = (dir: string) => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {

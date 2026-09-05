@@ -59,9 +59,8 @@ export default function AppLayout() {
   const { user } = useUser()
   const { signOut } = useClerk()
 
-  // The setup checklist is dismissible on Home, which is only safe if there is
-  // somewhere to get back to it. This entry exists exactly while something is
-  // outstanding, and goes when nothing is.
+  // What makes dismissing the checklist safe: this entry stands exactly while
+  // something is outstanding.
   const { data: settings } = useQuery({
     queryKey: keys.settings,
     queryFn: fetchers.settings,
@@ -146,9 +145,8 @@ export default function AppLayout() {
               </SidebarMenuButton>
             </SidebarMenuItem>
 
-            {/* Who you are is a label, not a control. Signing out is the only
-                action here, so it is the only thing that reacts to a pointer.
-                The avatar shares the nav centreline. */}
+            {/* Who you are is a label. Signing out is the only action, so
+                it is the only thing that reacts to a pointer. */}
             <SidebarMenuItem>
               <div
                 className="flex h-8 items-center gap-2 rounded-lg p-2 text-sm text-sidebar-foreground"

@@ -5,18 +5,8 @@ import { createEscalation } from "@receptionist/core/repositories/escalations.js
 import { setCallerName } from "@receptionist/core/repositories/callers.js";
 
 /**
- * Every tool's `execute` must actually RETURN something to the model.
- *
- * A body wrapped in `return await (async () => { ... })` is valid TypeScript
- * that never invokes the arrow: `await` on a function object yields the
- * function, so the tool resolves to a closure rather than a result. LiveKit
- * reports the call as finished with `isError: false` and no `output` field, the
- * model retries, gives up and escalates, and the caller is told someone will
- * follow up. Booking is dead and nothing says so.
- *
- * Typecheck cannot see it and neither can any test that does not call
- * `execute`. A tool that cannot be shown to return a value is a tool nobody has
- * tested, which is what these cases are for.
+ * Every tool's `execute` must return a value to the model. A tool that resolves
+ * to a closure reports success with no output, and typecheck cannot see it.
  */
 
 const okCalendar = () =>
@@ -27,9 +17,8 @@ const okCalendar = () =>
 
 beforeEach(() => {
   vi.restoreAllMocks();
-  // `restoreAllMocks` only undoes spies. The module mocks below are plain
-  // `vi.fn()`s, so their call history survives into the next test unless it is
-  // cleared — which quietly makes `mock.calls[0]` the *first* test's call.
+  // `restoreAllMocks` only undoes spies, so plain `vi.fn()` history survives and
+  // `mock.calls[0]` becomes the first test's call.
   vi.clearAllMocks();
 });
 
@@ -141,12 +130,8 @@ describe("every tool returns a result to the model", () => {
   });
 });
 
-/**
- * An escalation is a promise to ring somebody back, so it has to record who.
- *
- * Asking is enforced by the schema rather than requested in prose, the same way
- * booking does it — the model cannot escalate without confronting the field.
- */
+/** Asking is enforced by the schema, so the model cannot escalate without
+ *  confronting the field. */
 describe("the caller's name", () => {
   it("is recorded on the escalation when the caller gives one", async () => {
     const tools = createAgentTools(makeAgentDeps());
