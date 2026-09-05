@@ -1,1 +1,0 @@
-ALTER TABLE "tenants" ADD COLUMN "record_calls" boolean DEFAULT true NOT NULL;

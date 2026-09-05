@@ -1,6 +1,5 @@
 import {
   boolean,
-  customType,
   index,
   integer,
   uniqueIndex,
@@ -36,31 +35,6 @@ export type {
   TenantSetup,
 } from "@receptionist/shared";
 export type { CallOutcome } from "@receptionist/shared";
-
-/**
- * Fixed at 1536 (the output width of text-embedding-3-small). Deliberately NOT
- * read from env.EMBEDDING_DIMENSIONS: deriving DDL from the environment makes
- * the same schema file emit different columns in different environments, and a
- * generated migration then drops and recreates this column, destroying every
- * stored embedding without saying so.
- *
- * EMBEDDING_DIMENSIONS is the runtime assertion in services/knowledge.ts, which
- * checks what the model actually returned. Changing this width is an explicit,
- * written migration that re-embeds — never a config side effect.
- */
-const EMBEDDING_DIMENSIONS = 1536;
-
-const vector = customType<{ data: number[] | null }>({
-  dataType() {
-    return `vector(${EMBEDDING_DIMENSIONS})`;
-  },
-  toDriver(value) {
-    if (!value) return null;
-    return `[${value.join(",")}]`;
-  },
-});
-
-
 
 export const callOutcomeEnum = pgEnum("call_outcome", [
   "answered",
@@ -250,15 +224,11 @@ export const knowledgeItems = pgTable(
     }),
     question: text("question").notNull(),
     answer: text("answer").notNull(),
-    embedding: vector("embedding"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("knowledge_items_tenant_created_at_idx").on(table.tenantId, table.createdAt),
-    index("knowledge_items_embedding_hnsw_idx")
-      .using("hnsw", table.embedding.op("vector_cosine_ops"))
-      .with({ m: 16, ef_construction: 64 }),
   ]
 );
 

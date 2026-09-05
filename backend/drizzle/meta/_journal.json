@@ -5,64 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1787080441804,
-      "tag": "0000_swift_diamondback",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1787080816854,
-      "tag": "0001_thin_changeling",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1787385847897,
-      "tag": "0002_green_komodo",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1787388750462,
-      "tag": "0003_equal_umar",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1787389494375,
-      "tag": "0004_minor_xorn",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1787864461822,
-      "tag": "0005_reflective_cassandra_nova",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1787909606501,
-      "tag": "0006_uneven_monster_badoon",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1788396226264,
-      "tag": "0007_heavy_meteorite",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1788396815814,
-      "tag": "0008_chunky_martin_li",
+      "when": 1788563400643,
+      "tag": "0000_init",
       "breakpoints": true
     }
   ]

@@ -8,7 +8,7 @@ Built as a multi-tenant B2B SaaS.
 
 - **Real phone calls** - LiveKit Phone Numbers, no SIP trunk setup required
 - **Answers from context** - services, pricing, business details *and the whole knowledge base* baked into the system prompt at call start, so no tool call and no retrieval round trip
-- **Knowledge base** - question/answer pairs built from resolved escalations, inlined into the prompt (pgvector and the HNSW index remain for when a tenant outgrows the prompt)
+- **Knowledge base** - question/answer pairs built from resolved escalations, inlined into the prompt at call start
 - **Real opening hours** - a weekly pattern with lunch closures, days you're shut, and one-off dates for holidays. Your agent answers "are you open Saturday?" without asking you
 - **Services with real durations** - each one has its own length, plus optional setup and cleanup time that blocks your calendar without the caller ever hearing about it
 - **Appointment booking that respects both** - the agent only offers times you're actually open, long enough for the service booked, and free on your calendar. It re-checks the moment before it books, so a slot taken mid-conversation doesn't become a double booking
@@ -36,7 +36,7 @@ Built as a multi-tenant B2B SaaS.
 
 ## Versioning
 
-`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.6**.
+`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.13**.
 
 ## Screenshots
 
@@ -64,16 +64,15 @@ Built as a multi-tenant B2B SaaS.
 | Layer | Technology |
 |---|---|
 | API server | Hono (Node.js, ESM) |
-| Database | Neon Postgres + Drizzle ORM + pgvector |
+| Database | Postgres 17 + Drizzle ORM |
 | Auth | Clerk |
 | Voice pipeline | LiveKit Agents SDK |
 | STT | AssemblyAI universal-3-5-pro (LiveKit Inference) |
 | LLM | LiveKit Inference by default; OpenRouter via `LLM_PROVIDER` |
 | TTS | Cartesia Sonic 3.5 (LiveKit Inference) |
-| Embeddings | OpenAI text-embedding-3-small (via OpenRouter) |
 | Noise cancellation | Krisp telephony model, SIP calls only |
 | Turn detection | LiveKit audio turn detector (`inference.TurnDetector`) |
-| Tests | Vitest + Docker `pgvector/pgvector:pg17` |
+| Tests | Vitest + Docker `postgres:17-alpine` |
 | VAD | Silero |
 | Telephony | LiveKit Phone Numbers |
 | Calendar | Google Calendar API |
@@ -92,10 +91,9 @@ Built as a multi-tenant B2B SaaS.
 - Node.js 22+
 - [LiveKit Cloud](https://cloud.livekit.io) project with a US phone number purchased and a SIP dispatch rule configured
 - [Clerk](https://clerk.com) application with Google OAuth enabled
-- [Neon](https://neon.tech) Postgres database (pgvector extension enabled)
 - [Cloudflare R2](https://developers.cloudflare.com/r2/) bucket for call recordings
-- [OpenRouter](https://openrouter.ai) API key (embeddings; also an optional LLM gateway, which needs credits)
-- [Docker](https://www.docker.com) for the test database
+- [OpenRouter](https://openrouter.ai) API key, only when `LLM_PROVIDER=openrouter`
+- [Docker](https://www.docker.com) for the development and test databases
 
 ### Install
 
@@ -110,7 +108,7 @@ pnpm install
 **`backend/.env`**
 ```env
 PORT=8080
-DATABASE_URL=
+DATABASE_URL=                  # postgresql://deskroute:deskroute@localhost:5432/deskroute
 
 LIVEKIT_URL=                   # wss://your-project.livekit.cloud
 LIVEKIT_API_KEY=
@@ -125,11 +123,8 @@ LLM_PROVIDER=                  # "livekit" (default) or "openrouter"
 LLM_MODEL=                     # id in the selected provider's format, e.g. google/gemini-3.5-flash
 SUMMARY_LLM_MODEL=             # model for post-call summaries (can match LLM_MODEL)
 
-OPENROUTER_API_KEY=            # required for embeddings; also used when LLM_PROVIDER=openrouter
+OPENROUTER_API_KEY=            # required only when LLM_PROVIDER=openrouter
 OPENROUTER_BASE_URL=           # https://openrouter.ai/api/v1
-
-EMBEDDING_MODEL=openai/text-embedding-3-small
-EMBEDDING_DIMENSIONS=1536      # text-embedding-3-small outputs 1536 dimensions
 
 R2_ACCOUNT_ID=
 R2_ACCESS_KEY_ID=
@@ -147,16 +142,16 @@ VITE_API_URL=http://localhost:8080/api
 
 ```bash
 pnpm -F backend db:generate   # generate a migration from schema changes
-pnpm -F backend db:migrate    # apply to Neon
+pnpm -F backend db:migrate    # apply to the database in DATABASE_URL
 ```
 
-The migration chain creates the `vector` extension itself, so it runs against
-any empty Postgres - no manual console step.
+The chain runs against any empty Postgres, and `db/migrations.int.test.ts`
+proves it on a throwaway database.
 
 ### Tests
 
 ```bash
-docker compose up -d          # throwaway Postgres on host port 5433
+docker compose up -d          # dev Postgres on 5432, throwaway test Postgres on 5433
 pnpm -F backend test          # unit + agent tests (no DB, no network)
 pnpm -F backend test:int      # service tests against the Docker Postgres
 pnpm -F backend test:live     # real Google Calendar; needs backend/.env
@@ -165,7 +160,7 @@ pnpm typecheck                # tsc --noEmit across all workspaces
 ```
 
 `test:live` is the only suite that runs against real credentials. It reads the
-production database to find a tenant with a connected calendar, gets that
+development database to find a tenant with a connected calendar, gets that
 tenant's Google token the same way a live call does, and books and cancels one
 clearly-labelled event to prove the padded block is actually reserved — because
 if an event covers only the appointment and not its buffers, freeBusy reports
@@ -232,9 +227,11 @@ Admin - `Authorization: Bearer <clerk_jwt>` required:
 | POST | `/api/admin/phone/provision` | Purchase phone number |
 | DELETE | `/api/admin/phone` | Release phone number |
 | POST | `/api/admin/agent/test` | Create a browser test session (room + join token) |
-| DELETE | `/api/admin/account` | Delete tenant and all data |
 
 
 ## License
 
-[ISC](LICENSE) © 2026 Prabhat Mattoo
+[AGPL-3.0](LICENSE) © 2026 Prabhat Mattoo
+
+Self-host it freely. If you run a modified version as a network service, the
+source of your changes has to be available to its users.

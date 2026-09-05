@@ -1,2 +1,0 @@
-ALTER TABLE "tenants" ALTER COLUMN "agent_profile" SET DEFAULT '{"name":"","greeting":"","farewell":"","fallback":""}'::jsonb;--> statement-breakpoint
-ALTER TABLE "escalations" ADD COLUMN "caller_name" text;

@@ -1,22 +1,17 @@
 import { useMemo, useState } from 'react'
-import { useUser, useClerk } from '@clerk/react'
+import { useUser } from '@clerk/react'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { apiClient } from '@/lib/apiClient'
 import { Section, Row } from './SettingsList'
 import { SaveBar } from './SaveBar'
 
 export function AccountPanel() {
   const { user } = useUser()
-  const { signOut } = useClerk()
   const email = user?.primaryEmailAddress?.emailAddress ?? ''
 
   const [firstName, setFirstName] = useState(user?.firstName ?? '')
   const [lastName, setLastName] = useState(user?.lastName ?? '')
   const [saving, setSaving] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const changes = useMemo(() => {
     const out: string[] = []
@@ -91,17 +86,6 @@ export function AccountPanel() {
         </Row>
       </Section>
 
-      <Section title="Danger zone">
-        <Row
-          title="Delete this account"
-          description="Removes the business, every call, and your phone number."
-        >
-          <Button variant="destructive" onClick={() => setConfirmDelete(true)}>
-            Delete account
-          </Button>
-        </Row>
-      </Section>
-
       <SaveBar
         changes={changes}
         saving={saving}
@@ -109,23 +93,6 @@ export function AccountPanel() {
         onDiscard={() => {
           setFirstName(user?.firstName ?? '')
           setLastName(user?.lastName ?? '')
-        }}
-      />
-
-      <ConfirmDialog
-        open={confirmDelete}
-        onOpenChange={setConfirmDelete}
-        title="Delete this account?"
-        description="The business, every call, every recording and your phone number go with it. This cannot be undone."
-        confirmLabel="Delete account"
-        variant="destructive"
-        onConfirm={async () => {
-          try {
-            await apiClient.delete('/admin/account')
-            await signOut()
-          } catch {
-            toast.error('Could not delete the account. Try again.')
-          }
         }}
       />
     </div>

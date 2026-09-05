@@ -65,9 +65,6 @@ importers:
       livekit-server-sdk:
         specifier: 2.17.0
         version: 2.17.0
-      openai:
-        specifier: 6.8.1
-        version: 6.8.1(ws@8.21.0)(zod@3.25.76)
       pg:
         specifier: 8.21.0
         version: 8.21.0
@@ -3933,18 +3930,6 @@ packages:
 
   openai@6.42.0:
     resolution: {integrity: sha512-1WFEt/uXMXOLhYRNkgJWo08Y2YNvNwpVU72K7ibrWgWpNOXd4VojXLbe6SQ4bLiUQ3Y8jz4IiyVkylJCL1DtZg==}
-    peerDependencies:
-      ws: ^8.18.0
-      zod: ^3.25 || ^4.0
-    peerDependenciesMeta:
-      ws:
-        optional: true
-      zod:
-        optional: true
-
-  openai@6.8.1:
-    resolution: {integrity: sha512-ACifslrVgf+maMz9vqwMP4+v9qvx5Yzssydizks8n+YUJ6YwUoxj51sKRQ8HYMfR6wgKLSIlaI108ZwCk+8yig==}
-    hasBin: true
     peerDependencies:
       ws: ^8.18.0
       zod: ^3.25 || ^4.0
@@ -8671,11 +8656,6 @@ snapshots:
       wsl-utils: 0.3.1
 
   openai@6.42.0(ws@8.21.0)(zod@3.25.76):
-    optionalDependencies:
-      ws: 8.21.0
-      zod: 3.25.76
-
-  openai@6.8.1(ws@8.21.0)(zod@3.25.76):
     optionalDependencies:
       ws: 8.21.0
       zod: 3.25.76

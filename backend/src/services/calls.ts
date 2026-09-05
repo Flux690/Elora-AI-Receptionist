@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { calls, clients } from "../db/schema.js";
 import type { TranscriptEntry, CallOutcome } from "../db/schema.js";
@@ -101,17 +101,4 @@ export async function getCallById(callId: string, tenantId: string) {
     .limit(1);
 
   return rows[0] ?? null;
-}
-
-/**
- * Returns the IDs of all calls for a tenant that have a recording stored in R2.
- * Must be called BEFORE deleteTenant() so the cascade doesn't wipe the rows first.
- */
-export async function getCallIdsWithRecordings(tenantId: string): Promise<string[]> {
-  const rows = await db
-    .select({ id: calls.id })
-    .from(calls)
-    .where(and(eq(calls.tenantId, tenantId), isNotNull(calls.recordingUrl)));
-
-  return rows.map((r) => r.id);
 }

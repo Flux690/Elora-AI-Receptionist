@@ -72,21 +72,6 @@ export async function createEscalation(
   return existing[0];
 }
 
-export async function resolveEscalation(
-  id: string,
-  tenantId: string,
-  answer: string
-): Promise<EscalationRow> {
-  const rows = await db
-    .update(escalations)
-    .set({ status: "resolved", answer, resolvedAt: new Date() })
-    .where(and(eq(escalations.id, id), eq(escalations.tenantId, tenantId)))
-    .returning();
-
-  if (!rows[0]) throw new Error(`Escalation ${id} not found`);
-  return rows[0];
-}
-
 export async function listEscalations(tenantId: string, status: "pending" | "resolved") {
   return db
     .select({

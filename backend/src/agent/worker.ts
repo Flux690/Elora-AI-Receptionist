@@ -10,7 +10,7 @@ import * as silero from "@livekit/agents-plugin-silero";
 import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import type { CallOutcome } from "@receptionist/shared";
-import { db, startDbKeepWarm } from "../db/client.js";
+import { db } from "../db/client.js";
 import { calls as callsTable } from "../db/schema.js";
 import { upsertClient } from "../services/clients.js";
 import { createCall, finishCall } from "../services/calls.js";
@@ -127,10 +127,6 @@ async function stopEgressWithRetry(egressId: string, maxAttempts = 3): Promise<v
 
 export default defineAgent({
   prewarm: async (proc: JobProcess) => {
-    // Keeps the pg pool warm and the Neon compute out of autosuspend, so the
-    // first call after a quiet spell does not pay a cold start before the
-    // greeting. See startDbKeepWarm() for why this is an experiment.
-    startDbKeepWarm();
     proc.userData.vad = await silero.VAD.load();
   },
 
@@ -146,13 +142,8 @@ export default defineAgent({
     const rawTrunk = !isTestSession ? (participant.attributes["sip.trunkPhoneNumber"] ?? "") : "";
     const trunkPhone = rawTrunk && !rawTrunk.startsWith("+") ? `+${rawTrunk}` : rawTrunk;
 
-    // 2. Resolve tenant. This DOES block the critical path on a cache miss —
-    //    the first call after a restart or a 5-minute gap awaits a DB round trip
-    //    before session.start(), so the caller hears silence for its duration.
-    //    Mitigated by the LRU below and by startDbKeepWarm() keeping the pool and
-    //    the Neon compute alive; not eliminated. (The previous comment here
-    //    claimed "zero blocking DB work on the critical path", 14 lines above an
-    //    awaited lookup.)
+    // Blocks the critical path on a cache miss: the caller hears silence for one
+    // DB round trip. Mitigated by the LRU below, not eliminated.
     let resolved: ResolvedTenant | null = null;
 
     if (isTestSession) {

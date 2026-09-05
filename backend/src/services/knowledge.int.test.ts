@@ -1,34 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { db } from "../db/client.js";
 import { knowledgeItems } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { makeTenant, makeEscalation } from "../test/factories.js";
 
-/**
- * The embedding call is the only network dependency in this service. Mocked at
- * the shared client so the rest of the path — insert, index, delete, reopen —
- * runs against the real database.
- */
-const embedding = Array.from({ length: 1536 }, () => 0.01);
-vi.mock("../llm.js", () => ({
-  openrouter: {
-    embeddings: {
-      create: vi.fn(async () => ({ data: [{ embedding }] })),
-    },
-  },
-}));
-
-const {
+import {
   createKnowledgeFromEscalation,
   deleteKnowledge,
   listKnowledgeForPrompt,
   resolveEscalationWithKnowledge,
-} = await import("./knowledge.js");
-const { getEscalationById } = await import("./escalations.js");
-
-beforeEach(() => {
-  vi.clearAllMocks();
-});
+} from "./knowledge.js";
+import { getEscalationById } from "./escalations.js";
 
 describe("deleteKnowledge", () => {
   /**
@@ -120,22 +102,6 @@ describe("listKnowledgeForPrompt", () => {
     await createKnowledgeFromEscalation(esc, "A's answer.");
 
     expect(await listKnowledgeForPrompt(b.id)).toEqual([]);
-  });
-});
-
-describe("createKnowledgeFromEscalation", () => {
-  it("embeds the question alone, not a question+answer blob", async () => {
-    const tenant = await makeTenant();
-    const escalation = await makeEscalation(tenant.id, { question: "Do you take card?" });
-    const { openrouter } = await import("../llm.js");
-
-    await createKnowledgeFromEscalation(escalation, "Yes, all major cards.");
-
-    // Queries are questions. Embedding question+answer put stored and query
-    // vectors in different regions of the space (PLAN.md 1.5).
-    expect(openrouter.embeddings.create).toHaveBeenCalledWith(
-      expect.objectContaining({ input: "Do you take card?" })
-    );
   });
 });
 

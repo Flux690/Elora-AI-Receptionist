@@ -36,20 +36,6 @@ export async function listServices(tenantId: string): Promise<Service[]> {
   }));
 }
 
-export async function getServiceById(
-  tenantId: string,
-  id: string
-): Promise<Service | null> {
-  const rows = await db
-    .select(serviceFields)
-    .from(services)
-    .where(and(eq(services.id, id), eq(services.tenantId, tenantId)))
-    .limit(1);
-
-  const row = rows[0];
-  return row ? { ...row, description: row.description || undefined } : null;
-}
-
 export async function createService(
   tenantId: string,
   draft: ServiceDraft

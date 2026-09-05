@@ -18,8 +18,8 @@ const envSchema = z.object({
   LIVEKIT_API_KEY: z.string().min(1),
   LIVEKIT_API_SECRET: z.string().min(1),
   CLERK_SECRET_KEY: z.string().min(1),
-  OPENROUTER_API_KEY: z.string().min(1),
-  OPENROUTER_BASE_URL: z.string().url(),
+  OPENROUTER_API_KEY: z.string().min(1).optional(),
+  OPENROUTER_BASE_URL: z.string().url().optional(),
   /**
    * Which gateway serves the in-call and summariser models.
    *
@@ -42,12 +42,17 @@ const envSchema = z.object({
   LLM_MODEL: z.string().min(1),
   /** LiveKit Inference model id for post-call summaries. */
   SUMMARY_LLM_MODEL: z.string().min(1),
-  EMBEDDING_MODEL: z.string().min(1),
-  EMBEDDING_DIMENSIONS: z.coerce.number().int().positive(),
   R2_ACCOUNT_ID: z.string().min(1),
   R2_ACCESS_KEY_ID: z.string().min(1),
   R2_SECRET_ACCESS_KEY: z.string().min(1),
   R2_BUCKET_NAME: z.string().min(1),
+}).superRefine((cfg, ctx) => {
+  if (cfg.LLM_PROVIDER !== "openrouter") return;
+  for (const key of ["OPENROUTER_API_KEY", "OPENROUTER_BASE_URL"] as const) {
+    if (!cfg[key]) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: "Required when LLM_PROVIDER is openrouter" });
+    }
+  }
 });
 
 const _env = envSchema.safeParse(process.env);

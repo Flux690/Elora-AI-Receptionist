@@ -7,19 +7,8 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 /**
- * PLAN.md 1.6.1 — the migration chain must run against a genuinely empty database.
- *
- * No migration contains `CREATE EXTENSION vector`. The extension was enabled by
- * hand in the Neon console, so the repo alone cannot stand up a working database:
- * the first migration declaring a `vector` column dies with
- * `type "vector" does not exist`.
- *
- * This is the one test that cannot be written against Neon — the extension is
- * already there, so the chain passes for the wrong reason. It needs a throwaway
- * database, which is why docker-compose.yml exists.
- *
- * Each run migrates into its own freshly created database and drops it after, so
- * it never touches the shared test database the other integration tests use.
+ * Migrates into a freshly created database and drops it after, so the chain is
+ * proven against genuinely empty state and never touches the shared test database.
  */
 
 const ADMIN_URL = process.env.DATABASE_URL!;
@@ -59,30 +48,24 @@ describe("migration chain", () => {
     const pool = new Pool({ connectionString: url.toString(), max: 1 });
 
     try {
-      // The pgvector image ships the extension but does not create it, exactly
-      // like a fresh Neon project. Prove that before migrating, so a failure
-      // below is unambiguously the chain's fault.
-      const pre = await pool.query(
-        `SELECT 1 FROM pg_extension WHERE extname = 'vector'`
-      );
-      expect(pre.rowCount, "extension must not pre-exist").toBe(0);
-
       await migrate(drizzle(pool), { migrationsFolder: MIGRATIONS_FOLDER });
 
-      // The chain is responsible for enabling the extension it depends on.
-      const post = await pool.query(
-        `SELECT 1 FROM pg_extension WHERE extname = 'vector'`
-      );
-      expect(post.rowCount, "chain must enable the vector extension").toBe(1);
-
-      // And the vector column must actually exist afterwards.
-      const col = await drizzle(pool).execute(sql`
-        SELECT format_type(a.atttypid, a.atttypmod) AS type
-        FROM pg_attribute a
-        JOIN pg_class c ON c.oid = a.attrelid
-        WHERE c.relname = 'knowledge_items' AND a.attname = 'embedding'
+      const tables = await drizzle(pool).execute(sql`
+        SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename
       `);
-      expect((col.rows[0] as { type: string } | undefined)?.type).toBe("vector(1536)");
+      const names = tables.rows.map((r) => (r as { tablename: string }).tablename);
+
+      expect(names).toEqual(
+        expect.arrayContaining([
+          "appointments",
+          "calls",
+          "clients",
+          "escalations",
+          "knowledge_items",
+          "services",
+          "tenants",
+        ])
+      );
     } finally {
       await pool.end();
     }

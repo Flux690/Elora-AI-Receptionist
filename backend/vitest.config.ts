@@ -25,8 +25,6 @@ const testEnv = {
   OPENROUTER_BASE_URL: "https://openrouter.ai/api/v1",
   LLM_MODEL: "anthropic/claude-haiku-4.5",
   SUMMARY_LLM_MODEL: "openai/gpt-4o-mini",
-  EMBEDDING_MODEL: "openai/text-embedding-3-small",
-  EMBEDDING_DIMENSIONS: "1536",
   R2_ACCOUNT_ID: "test-account",
   R2_ACCESS_KEY_ID: "test-access-key",
   R2_SECRET_ACCESS_KEY: "test-secret-key",

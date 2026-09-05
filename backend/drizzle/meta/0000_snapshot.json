@@ -1,5 +1,5 @@
 {
-  "id": "9507821a-8c29-4d5c-ae61-db5f2438e333",
+  "id": "5dfc14f3-edf0-4162-b5ef-90a96c6ffa0a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -31,7 +31,19 @@
           "name": "caller_phone",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "caller_name": {
+          "name": "caller_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "service_id": {
+          "name": "service_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "service": {
           "name": "service",
@@ -58,8 +70,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "google_event_id": {
-          "name": "google_event_id",
+        "external_event_id": {
+          "name": "external_event_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -128,6 +140,19 @@
           ],
           "onDelete": "set null",
           "onUpdate": "no action"
+        },
+        "appointments_service_id_services_id_fk": {
+          "name": "appointments_service_id_services_id_fk",
+          "tableFrom": "appointments",
+          "tableTo": "services",
+          "columnsFrom": [
+            "service_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -163,7 +188,7 @@
           "name": "caller_phone",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "livekit_room_name": {
           "name": "livekit_room_name",
@@ -205,6 +230,12 @@
         },
         "recording_url": {
           "name": "recording_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "disclosure_version": {
+          "name": "disclosure_version",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -410,7 +441,13 @@
           "name": "caller_phone",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "caller_name": {
+          "name": "caller_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "question": {
           "name": "question",
@@ -585,12 +622,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "embedding": {
-          "name": "embedding",
-          "type": "vector(1536)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -627,25 +658,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "knowledge_items_embedding_hnsw_idx": {
-          "name": "knowledge_items_embedding_hnsw_idx",
-          "columns": [
-            {
-              "expression": "embedding",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last",
-              "opclass": "vector_cosine_ops"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "hnsw",
-          "with": {
-            "m": 16,
-            "ef_construction": 64
-          }
         }
       },
       "foreignKeys": {
@@ -673,6 +685,137 @@
             "id"
           ],
           "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.services": {
+      "name": "services",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price": {
+          "name": "price",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "duration_minutes": {
+          "name": "duration_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 60
+        },
+        "buffer_before_minutes": {
+          "name": "buffer_before_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "buffer_after_minutes": {
+          "name": "buffer_after_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "required_resources": {
+          "name": "required_resources",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "services_tenant_position_idx": {
+          "name": "services_tenant_position_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "position",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "services_tenant_id_tenants_id_fk": {
+          "name": "services_tenant_id_tenants_id_fk",
+          "tableFrom": "services",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -719,19 +862,40 @@
           "notNull": true,
           "default": "''"
         },
-        "services": {
-          "name": "services",
+        "business_hours": {
+          "name": "business_hours",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "'{\"weekly\":{\"mon\":[{\"start\":\"09:00\",\"end\":\"17:00\"}],\"tue\":[{\"start\":\"09:00\",\"end\":\"17:00\"}],\"wed\":[{\"start\":\"09:00\",\"end\":\"17:00\"}],\"thu\":[{\"start\":\"09:00\",\"end\":\"17:00\"}],\"fri\":[{\"start\":\"09:00\",\"end\":\"17:00\"}],\"sat\":[],\"sun\":[]},\"exceptions\":[]}'::jsonb"
+        },
+        "booking_policy": {
+          "name": "booking_policy",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{\"minNoticeMinutes\":30,\"maxAdvanceDays\":60}'::jsonb"
         },
         "agent_profile": {
           "name": "agent_profile",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'{\"name\":\"\",\"greeting\":\"\",\"farewell\":\"\",\"fallback\":\"\",\"holdPhrase\":\"\"}'::jsonb"
+          "default": "'{\"name\":\"\",\"greeting\":\"\",\"farewell\":\"\",\"fallback\":\"\"}'::jsonb"
+        },
+        "record_calls": {
+          "name": "record_calls",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "setup": {
+          "name": "setup",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{\"checklistDismissed\":false,\"hoursSeen\":false}'::jsonb"
         },
         "phone_number": {
           "name": "phone_number",
@@ -745,9 +909,21 @@
           "primaryKey": false,
           "notNull": false
         },
-        "google_calendar_id": {
-          "name": "google_calendar_id",
+        "calendar_provider": {
+          "name": "calendar_provider",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "calendar_external_id": {
+          "name": "calendar_external_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "calendar_payload": {
+          "name": "calendar_payload",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },

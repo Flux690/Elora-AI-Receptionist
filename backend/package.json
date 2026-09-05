@@ -21,12 +21,11 @@
   "keywords": [
     "livekit",
     "voice-agent",
-    "neon",
     "drizzle",
     "typescript"
   ],
   "author": "Prabhat Mattoo",
-  "license": "ISC",
+  "license": "AGPL-3.0-only",
   "dependencies": {
     "@aws-sdk/client-s3": "3.1063.0",
     "@aws-sdk/s3-request-presigner": "3.1063.0",
@@ -44,7 +43,6 @@
     "drizzle-orm": "0.45.2",
     "hono": "4.12.23",
     "livekit-server-sdk": "2.17.0",
-    "openai": "6.8.1",
     "pg": "8.21.0",
     "zod": "3.25.76"
   },

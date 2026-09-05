@@ -7,7 +7,6 @@ import * as CallsController from "../controllers/calls.js";
 import * as AppointmentsController from "../controllers/appointments.js";
 import * as SettingsController from "../controllers/settings.js";
 import * as TelephonyController from "../controllers/telephony.js";
-import * as AccountController from "../controllers/account.js";
 import * as AgentTestController from "../controllers/agentTest.js";
 import * as CalendarController from "../controllers/calendar.js";
 import * as ServicesController from "../controllers/services.js";
@@ -39,6 +38,5 @@ router.get("/calendar/list", CalendarController.list);
 router.patch("/calendar", CalendarController.select);
 router.delete("/calendar", CalendarController.disconnect);
 router.post("/agent/test", AgentTestController.createTestSession);
-router.delete("/account", AccountController.deleteAccount);
 
 export default router;

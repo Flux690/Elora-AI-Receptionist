@@ -85,10 +85,6 @@ export async function createTenant(input: {
   return rows[0];
 }
 
-export async function deleteTenant(id: string): Promise<void> {
-  await db.delete(tenants).where(eq(tenants.id, id));
-}
-
 export async function updateTenant(
   id: string,
   patch: Partial<Pick<TenantRow,

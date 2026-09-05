@@ -1,1 +1,0 @@
-ALTER TABLE "calls" ADD COLUMN "disclosure_version" text;
