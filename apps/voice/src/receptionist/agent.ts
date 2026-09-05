@@ -1,5 +1,5 @@
 import { llm, voice } from "@livekit/agents";
-import type { AgentDeps } from "./types.js";
+import type { AgentDeps } from "./deps.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { createAgentTools } from "./tools.js";
 import { suppressSpeechOnToolTurns } from "./speech-guard.js";

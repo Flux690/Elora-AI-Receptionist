@@ -36,7 +36,7 @@ Self-hosted and open source. One deployment runs one or more agents.
 
 ## Versioning
 
-`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.16**.
+`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.17**.
 
 ## Screenshots
 
@@ -103,15 +103,11 @@ cd DeskRoute
 pnpm install
 ```
 
-A pnpm workspace. `apps/api`, `apps/voice` and `apps/web` are the three
-processes; `packages/core` holds the database, repositories, providers and
-domain logic they share; `packages/shared` holds the types the browser needs
-too.
+A pnpm workspace. `apps/api`, `apps/voice` and `apps/web` are the three processes; `packages/core` holds the database, repositories, providers and domain logic they share; `packages/shared` holds the types the browser needs too. `ARCHITECTURE.md` describes the whole system.
 
 ### Environment
 
-Each package owns the variables it reads, and every one ships an `.env.example`
-beside it. Copy each to `.env` and fill it in.
+Each package owns the variables it reads, and every one ships an `.env.example` beside it. Copy each to `.env` and fill it in.
 
 **`apps/api/.env`** and **`apps/voice/.env`** share the first block:
 
@@ -163,8 +159,7 @@ pnpm db:generate   # generate a migration from schema changes
 pnpm db:migrate    # apply to the database in DATABASE_URL
 ```
 
-The chain runs against any empty Postgres, and `db/migrations.int.test.ts`
-proves it on a throwaway database.
+The chain runs against any empty Postgres, and `db/migrations.int.test.ts` proves it on a throwaway database.
 
 ### Tests
 
@@ -177,23 +172,9 @@ pnpm test:web          # the design-token contract
 pnpm typecheck         # tsc --noEmit across every package
 ```
 
-`test:live` is the only suite that runs against real credentials. It reads the
-development database to find an agent with a connected calendar, gets that
-agent's Google token the same way a live call does, and books and cancels one
-clearly-labelled event to prove the padded block is actually reserved — because
-if an event covers only the appointment and not its buffers, freeBusy reports
-the setup and cleanup free and the next caller is offered them. It writes
-nothing to the database, and skips with a reason if no calendar is connected.
-Point it at a specific agent with `LIVE_AGENT_ID`.
+`test:live` is the only suite that runs against real credentials. It reads the development database to find an agent with a connected calendar, gets that agent's Google token the same way a live call does, and books and cancels one clearly-labelled event to prove the padded block is actually reserved — because if an event covers only the appointment and not its buffers, freeBusy reports the setup and cleanup free and the next caller is offered them. It writes nothing to the database, and skips with a reason if no calendar is connected. Point it at a specific agent with `LIVE_AGENT_ID`.
 
-The web suite is the colour contract rather than component tests. One
-surface is given, the stage, and every other colour is a departure from it, so
-the suite asserts *relationships* rather than values: the anchor holds still as
-contrast moves, surfaces and controls travel in opposite directions, ink mixes
-toward the pole instead of stepping a fixed distance, chroma moves in proportion
-to lightness, no line is ever lighter than what it edges, every overlay carries
-an edge, nothing anywhere is smaller than 14px, and every pair clears its floor
-**on the ground it actually lands on**.
+The web suite is the colour contract rather than component tests. One surface is given, the stage, and every other colour is a departure from it, so the suite asserts *relationships* rather than values: the anchor holds still as contrast moves, surfaces and controls travel in opposite directions, ink mixes toward the pole instead of stepping a fixed distance, chroma moves in proportion to lightness, no line is ever lighter than what it edges, every overlay carries an edge, nothing anywhere is smaller than 14px, and every pair clears its floor **on the ground it actually lands on**.
 
 Break a law in `index.css` and the suite goes red. That is the point of it.
 
@@ -251,5 +232,4 @@ Admin - `Authorization: Bearer <clerk_jwt>` required:
 
 [AGPL-3.0](LICENSE) © 2026 Prabhat Mattoo
 
-Self-host it freely. If you run a modified version as a network service, the
-source of your changes has to be available to its users.
+Self-host it freely. If you run a modified version as a network service, the source of your changes has to be available to its users.

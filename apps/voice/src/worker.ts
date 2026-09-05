@@ -16,15 +16,15 @@ import { upsertCaller } from "@receptionist/core/repositories/callers.js";
 import { createCall, finishCall } from "@receptionist/core/repositories/calls.js";
 import { recordingEnabled, startCallRecording, stopCallRecording } from "@receptionist/core/providers/storage.js";
 import { getGoogleOAuthToken } from "@receptionist/core/providers/googleAuth.js";
-import type { AgentDeps, CallState, SlotStore } from "./types.js";
-import { buildSessionConfig, buildKeyterms } from "./session-config.js";
-import { resolveCallerPhone } from "./caller.js";
-import { buildGreeting } from "./disclosure.js";
-import { ReceptionistAgent } from "./receptionist.js";
-import { CallMetrics } from "./metrics.js";
-import { extractTranscript } from "./transcript.js";
-import { generateCallSummary } from "./summary.js";
-import { resolveAgent, type ResolvedAgent } from "./agent-config.js";
+import type { AgentDeps, CallState, SlotStore } from "./receptionist/deps.js";
+import { buildSessionConfig, buildKeyterms } from "./session/pipeline.js";
+import { resolveCallerPhone } from "./session/caller.js";
+import { buildGreeting } from "./receptionist/greeting.js";
+import { ReceptionistAgent } from "./receptionist/agent.js";
+import { CallMetrics } from "./session/metrics.js";
+import { extractTranscript } from "./session/transcript.js";
+import { generateCallSummary } from "./session/summary.js";
+import { resolveAgent, type ResolvedAgent } from "./session/resolve-agent.js";
 
 // A failed stopEgress leaves the egress running and billing, so it retries.
 async function stopEgressWithRetry(egressId: string, maxAttempts = 3): Promise<void> {

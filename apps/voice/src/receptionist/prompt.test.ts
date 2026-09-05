@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { buildSystemPrompt } from "./prompt.js";
 import { DEFAULT_BUSINESS_HOURS } from "@receptionist/shared";
-import { makeAgentDeps, makeAgentConfig } from "../tests/fixtures.js";
+import { makeAgentDeps, makeAgentConfig } from "./fixtures.js";
 
 /**
  * Time frozen at an awkward instant: 2026-08-19 02:30 UTC is still Tuesday the

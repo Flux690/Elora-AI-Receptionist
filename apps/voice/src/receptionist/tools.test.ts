@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createAgentTools } from "./tools.js";
-import { makeAgentDeps } from "../tests/fixtures.js";
+import { makeAgentDeps } from "./fixtures.js";
 import { createEscalation } from "@receptionist/core/repositories/escalations.js";
 import { setCallerName } from "@receptionist/core/repositories/callers.js";
 

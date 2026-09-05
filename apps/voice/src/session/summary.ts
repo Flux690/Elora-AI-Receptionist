@@ -1,7 +1,7 @@
 import { llm } from "@livekit/agents";
 import type { TranscriptEntry } from "@receptionist/core/db/schema.js";
-import { env } from "./env.js";
-import { buildLLM } from "./session-config.js";
+import { env } from "../env.js";
+import { buildLLM } from "./pipeline.js";
 
 const SUMMARY_PROMPT = `Summarize this phone call in 3-4 sentences. Focus on:
 - What the caller wanted

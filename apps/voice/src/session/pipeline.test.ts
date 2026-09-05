@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { buildSessionConfig } from "./session-config.js";
+import { buildSessionConfig } from "./pipeline.js";
 
 /**
  * Pins the pipeline: `turnDetection` left undefined, telephony noise cancellation
@@ -42,7 +42,7 @@ describe("buildSessionConfig", () => {
     /** Both gateways reachable by config rather than a code edit. */
     it("defaults to LiveKit Inference", async () => {
       vi.resetModules();
-      const { buildLLM } = await import("./session-config.js");
+      const { buildLLM } = await import("./pipeline.js");
       const { inference } = await import("@livekit/agents");
 
       expect(buildLLM("openai/gpt-4o-mini")).toBeInstanceOf(inference.LLM);
@@ -51,7 +51,7 @@ describe("buildSessionConfig", () => {
     it("uses OpenRouter when LLM_PROVIDER says so", async () => {
       vi.resetModules();
       vi.stubEnv("LLM_PROVIDER", "openrouter");
-      const { buildLLM } = await import("./session-config.js");
+      const { buildLLM } = await import("./pipeline.js");
       const openai = await import("@livekit/agents-plugin-openai");
 
       expect(buildLLM("anthropic/claude-haiku-4.5")).toBeInstanceOf(openai.LLM);

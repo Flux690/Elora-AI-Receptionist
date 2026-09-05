@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { voice } from "@livekit/agents";
 
 const { FakeLLM, withMockTools } = voice.testing;
-import { ReceptionistAgent } from "./receptionist.js";
-import { makeAgentDeps } from "../tests/fixtures.js";
+import { ReceptionistAgent } from "./agent.js";
+import { makeAgentDeps } from "./fixtures.js";
 
 /**
  * Whether the agent says the answer a tool produced. Drives a real `AgentSession`

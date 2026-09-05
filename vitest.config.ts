@@ -36,7 +36,7 @@ export default defineConfig({
             `${r}/**/*.int.test.ts`,
             `${r}/**/*.live.test.ts`,
           ]),
-          setupFiles: ["test/setup.unit.ts"],
+          setupFiles: ["tests/setup.unit.ts"],
         },
       },
       {
@@ -44,7 +44,7 @@ export default defineConfig({
           ...base,
           name: "int",
           include: roots.flatMap((r) => [`${r}/**/*.int.test.ts`]),
-          setupFiles: ["test/setup.int.ts"],
+          setupFiles: ["tests/setup.int.ts"],
           // One shared database, so a parallel file's truncate wipes another's fixtures.
           fileParallelism: false,
         },
@@ -57,7 +57,7 @@ export default defineConfig({
           environment: "node" as const,
           name: "live",
           include: roots.flatMap((r) => [`${r}/**/*.live.test.ts`]),
-          setupFiles: ["test/setup.live.ts"],
+          setupFiles: ["tests/setup.live.ts"],
           testTimeout: 60_000,
           fileParallelism: false,
         },

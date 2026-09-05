@@ -7,7 +7,7 @@ import {
 } from "@receptionist/core/repositories/agents.js";
 import { listServices } from "@receptionist/core/repositories/services.js";
 import { listKnowledgeForPrompt } from "@receptionist/core/repositories/knowledge.js";
-import type { KnowledgeEntry } from "./prompt.js";
+import type { KnowledgeEntry } from "../receptionist/prompt.js";
 
 /** A config change, a new service and a new knowledge item all land within this. */
 const AGENT_CACHE_TTL_MS = 5 * 60 * 1000;

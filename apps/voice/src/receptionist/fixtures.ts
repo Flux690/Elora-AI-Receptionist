@@ -1,4 +1,4 @@
-import type { AgentDeps } from "../src/types.js";
+import type { AgentDeps } from "./deps.js";
 import type { AgentConfig } from "@receptionist/core/repositories/agents.js";
 import { AGENT_PROFILE, SERVICES } from "@receptionist/core/tests/factories.js";
 import {

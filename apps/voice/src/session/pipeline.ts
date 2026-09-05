@@ -2,7 +2,7 @@ import { inference, llm, voice } from "@livekit/agents";
 import * as openai from "@livekit/agents-plugin-openai";
 import type * as silero from "@livekit/agents-plugin-silero";
 import { TelephonyBackgroundVoiceCancellation } from "@livekit/noise-cancellation-node";
-import { env } from "./env.js";
+import { env } from "../env.js";
 
 /**
  * Pinned in one place and asserted in tests. universal-3-5-pro biases

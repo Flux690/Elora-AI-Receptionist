@@ -1,6 +1,6 @@
 import { llm } from "@livekit/agents";
 import { z } from "zod";
-import type { AgentDeps } from "./types.js";
+import type { AgentDeps } from "./deps.js";
 import { createEscalation } from "@receptionist/core/repositories/escalations.js";
 import { setCallerName } from "@receptionist/core/repositories/callers.js";
 import {

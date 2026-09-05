@@ -1,5 +1,5 @@
 import { WEEKDAYS, type BusinessHours, type TimeInterval, type Weekday } from "@receptionist/shared";
-import type { AgentDeps } from "./types.js";
+import type { AgentDeps } from "./deps.js";
 
 /** A question/answer pair from the agent's knowledge base. */
 export type KnowledgeEntry = { question: string; answer: string };

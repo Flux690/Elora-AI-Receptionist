@@ -6,7 +6,7 @@ import {
   DISCLOSURE_VERSION_NOT_RECORDED,
   buildGreeting,
   disclosureFor,
-} from "./disclosure.js";
+} from "./greeting.js";
 
 /**
  * Cheap tests guarding $500 per call in California. Recording is the only

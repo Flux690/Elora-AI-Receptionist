@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { ReceptionistAgent } from "./receptionist.js";
-import { makeAgentDeps } from "../tests/fixtures.js";
+import { ReceptionistAgent } from "./agent.js";
+import { makeAgentDeps } from "./fixtures.js";
 
 /**
  * The bare class, no worker and no network. Tests needing a real model to choose
