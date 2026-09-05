@@ -79,7 +79,7 @@ export function ConnectionsPanel({ settings }: { settings: AppSettings }) {
   const calendarId = settings.business.calendarExternalId
   const calendarName = settings.business.calendarPayload?.summary
 
-  /* Only reaches Google while the drawer is open. A connected tenant reads the
+  /* Only reaches Google while the drawer is open. A connected agent reads the
      calendar's name from what is stored. */
   const { data, isLoading } = useQuery({
     queryKey: keys.calendarList,

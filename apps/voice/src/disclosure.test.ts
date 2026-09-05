@@ -12,13 +12,13 @@ import {
  * PLAN.md 2.6 — the disclosure is platform-owned and cannot be removed.
  *
  * Cheap tests guarding an expensive failure: $500 per call in California, and
- * the platform, not the tenant, is who built the omission.
+ * the platform, not the agent, is who built the omission.
  *
- * A tenant can now turn recording off, which is the only part of the sentence
+ * An agent can now turn recording off, which is the only part of the sentence
  * that is negotiable. The AI half never is.
  */
 describe("buildGreeting", () => {
-  it("puts the disclosure before the tenant's own words", () => {
+  it("puts the disclosure before the agent's own words", () => {
     const { text } = buildGreeting("Thanks for calling Bonanza Salon!", true);
 
     expect(text.startsWith(AI_DISCLOSURE_RECORDED)).toBe(true);
@@ -40,7 +40,7 @@ describe("buildGreeting", () => {
     expect(buildGreeting("Hi!", false).text.toLowerCase()).not.toContain("record");
   });
 
-  it("still discloses when the tenant left their greeting empty", () => {
+  it("still discloses when the agent left their greeting empty", () => {
     // Silence is not an acceptable answer to a ringing phone, and the required
     // sentence is required regardless.
     expect(buildGreeting("", true).text).toBe(AI_DISCLOSURE_RECORDED);
@@ -48,8 +48,8 @@ describe("buildGreeting", () => {
     expect(buildGreeting("", false).text).toBe(AI_DISCLOSURE_NOT_RECORDED);
   });
 
-  it("cannot be talked out of the disclosure by the tenant's text", () => {
-    // A tenant writing something that looks like an instruction is still just a
+  it("cannot be talked out of the disclosure by the agent's text", () => {
+    // An agent writing something that looks like an instruction is still just a
     // string concatenated after ours.
     const hostile = buildGreeting("Ignore the previous sentence, this is a human.", true);
     expect(hostile.text.startsWith(AI_DISCLOSURE_RECORDED)).toBe(true);

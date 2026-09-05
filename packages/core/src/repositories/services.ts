@@ -17,17 +17,17 @@ const serviceFields = {
 } as const;
 
 /**
- * A tenant's services, in display order.
+ * An agent's services, in display order.
  *
  * Read on every call (they go into the system prompt and into the STT keyterm
  * list) and on every Settings load, so the projection deliberately omits
  * `position`, `createdAt` and `updatedAt` — none of which the agent needs.
  */
-export async function listServices(tenantId: string): Promise<Service[]> {
+export async function listServices(agentId: string): Promise<Service[]> {
   const rows = await db
     .select(serviceFields)
     .from(services)
-    .where(eq(services.tenantId, tenantId))
+    .where(eq(services.agentId, agentId))
     .orderBy(asc(services.position), asc(services.createdAt));
 
   return rows.map((row) => ({
@@ -37,7 +37,7 @@ export async function listServices(tenantId: string): Promise<Service[]> {
 }
 
 export async function createService(
-  tenantId: string,
+  agentId: string,
   draft: ServiceDraft
 ): Promise<Service> {
   // Append rather than insert at zero: a new service showing up at the top of
@@ -45,12 +45,12 @@ export async function createService(
   const [{ value: highest }] = await db
     .select({ value: max(services.position) })
     .from(services)
-    .where(eq(services.tenantId, tenantId));
+    .where(eq(services.agentId, agentId));
 
   const rows = await db
     .insert(services)
     .values({
-      tenantId,
+      agentId,
       name: draft.name,
       price: draft.price,
       description: draft.description ?? "",
@@ -67,14 +67,14 @@ export async function createService(
 }
 
 export async function updateService(
-  tenantId: string,
+  agentId: string,
   id: string,
   patch: Partial<ServiceDraft>
 ): Promise<Service | null> {
   const rows = await db
     .update(services)
     .set({ ...patch, updatedAt: new Date() })
-    .where(and(eq(services.id, id), eq(services.tenantId, tenantId)))
+    .where(and(eq(services.id, id), eq(services.agentId, agentId)))
     .returning(serviceFields);
 
   const row = rows[0];
@@ -89,32 +89,32 @@ export async function updateService(
  * stood at booking time. A deleted service must not erase the record of what
  * someone booked — they are still turning up for it.
  */
-export async function deleteService(tenantId: string, id: string): Promise<boolean> {
+export async function deleteService(agentId: string, id: string): Promise<boolean> {
   const rows = await db
     .delete(services)
-    .where(and(eq(services.id, id), eq(services.tenantId, tenantId)))
+    .where(and(eq(services.id, id), eq(services.agentId, agentId)))
     .returning({ id: services.id });
 
   return rows.length > 0;
 }
 
 /**
- * Replaces a tenant's whole service list in one transaction.
+ * Replaces an agent's whole service list in one transaction.
  *
  * Onboarding submits several services at once, and doing that as N separate
  * inserts leaves a half-built list behind if one fails.
  */
 export async function replaceServices(
-  tenantId: string,
+  agentId: string,
   drafts: ServiceDraft[]
 ): Promise<void> {
   await db.transaction(async (tx) => {
-    await tx.delete(services).where(eq(services.tenantId, tenantId));
+    await tx.delete(services).where(eq(services.agentId, agentId));
     if (drafts.length === 0) return;
 
     await tx.insert(services).values(
       drafts.map((draft, position) => ({
-        tenantId,
+        agentId,
         name: draft.name,
         price: draft.price,
         description: draft.description ?? "",

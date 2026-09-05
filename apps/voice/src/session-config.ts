@@ -61,8 +61,8 @@ export function buildLLM(model: string): llm.LLM {
 
 /**
  * Business name plus service names, de-duplicated and trimmed. Kept separate
- * from buildSessionConfig so the worker can derive it from the tenant without
- * this module needing to know about tenants.
+ * from buildSessionConfig so the worker can derive it from the agent without
+ * this module needing to know about agents.
  */
 export function buildKeyterms(businessName: string, serviceNames: string[]): string[] {
   return [...new Set([businessName, ...serviceNames].map((t) => t?.trim()).filter(Boolean))];

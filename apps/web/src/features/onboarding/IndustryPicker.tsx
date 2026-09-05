@@ -10,7 +10,7 @@ import { INDUSTRIES, OTHER, isCustomIndustry } from '@/lib/industries'
  * The input takes the pill's own place in the row rather than opening a nested
  * block beneath it — same slot, same height, a cross to go back to the list.
  *
- * What gets stored is what was typed, never the sentinel: `tenants.industry` is
+ * What gets stored is what was typed, never the sentinel: `agents.industry` is
  * free text and goes into the system prompt verbatim, so saving the word "Other"
  * told the agent the business was in the Other industry.
  *

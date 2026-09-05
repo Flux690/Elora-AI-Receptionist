@@ -11,20 +11,20 @@ import {
 } from "@receptionist/core/repositories/metrics.js";
 
 export const metrics = new Hono<AppEnv>().get("/", async (c) => {
-  const tenantId = c.get("tenantId");
+  const agentId = c.get("agentId");
   const since = periodStart(c.req.query("period") ?? "30d");
 
-  const [totalCalls, confirmedBookings, pendingEscalations, abandonedCalls, tenant] =
+  const [totalCalls, confirmedBookings, pendingEscalations, abandonedCalls, agent] =
     await Promise.all([
-      countCalls(tenantId, since),
-      countConfirmedBookings(tenantId, since),
-      countPendingEscalations(tenantId),
-      countAbandonedCalls(tenantId, since),
-      getHoursAndZone(tenantId),
+      countCalls(agentId, since),
+      countConfirmedBookings(agentId, since),
+      countPendingEscalations(agentId),
+      countAbandonedCalls(agentId, since),
+      getHoursAndZone(agentId),
     ]);
 
-  const afterHoursCalls = tenant
-    ? await countAfterHoursCalls(tenantId, since, tenant.businessHours, tenant.timezone)
+  const afterHoursCalls = agent
+    ? await countAfterHoursCalls(agentId, since, agent.businessHours, agent.timezone)
     : 0;
 
   return c.json({

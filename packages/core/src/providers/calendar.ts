@@ -15,7 +15,7 @@ export class CalendarScopeMissingError extends Error {
 /**
  * The calendars the connected Google account can write to.
  *
- * Exists because nothing ever wrote `tenants.google_calendar_id`: the dashboard
+ * Exists because nothing ever wrote `agents.google_calendar_id`: the dashboard
  * granted calendar scopes and then stopped, so the agent always saw "calendar
  * not connected" and the entire booking path was unreachable. Granting access
  * and choosing a calendar are two different acts, and only the first was built.
@@ -31,7 +31,7 @@ export async function listCalendars(accessToken: string): Promise<CalendarOption
   );
 
   // Signing in with Google mints a token with `email profile openid` and nothing
-  // else, so every tenant who has not yet pressed Connect has a perfectly valid
+  // else, so every agent who has not yet pressed Connect has a perfectly valid
   // token that Google refuses for calendar reads. That is the normal state of a
   // disconnected account, and it was surfacing as an unhandled 500 on every
   // Settings load — noise in the log and a broken picker in the dashboard.

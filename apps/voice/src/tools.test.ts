@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createAgentTools } from "./tools.js";
 import { makeAgentDeps } from "../tests/fixtures.js";
 import { createEscalation } from "@receptionist/core/repositories/escalations.js";
-import { setClientName } from "@receptionist/core/repositories/clients.js";
+import { setCallerName } from "@receptionist/core/repositories/callers.js";
 
 /**
  * Every tool's `execute` must actually RETURN something to the model.
@@ -49,8 +49,8 @@ vi.mock("@receptionist/core/repositories/escalations.js", () => ({
   createEscalation: vi.fn(async () => ({ id: "esc-1" })),
 }));
 
-vi.mock("@receptionist/core/repositories/clients.js", () => ({
-  setClientName: vi.fn(async () => null),
+vi.mock("@receptionist/core/repositories/callers.js", () => ({
+  setCallerName: vi.fn(async () => null),
 }));
 
 /** The RunContext the SDK passes; only `session` is touched by these tools. */
@@ -175,7 +175,7 @@ describe("the caller's name", () => {
   it("falls back to the name already on the client row", async () => {
     // A returning caller who does not say their name again is still known.
     const tools = createAgentTools(
-      makeAgentDeps({ client: { id: "cli-1", name: "Marcus" } as never })
+      makeAgentDeps({ caller: { id: "cli-1", name: "Marcus" } as never })
     );
     await tools.createEscalation.execute(
       { question: "Do you take cats?", callerName: null, transcriptExcerpt: null },
@@ -190,20 +190,20 @@ describe("the caller's name", () => {
   it("is remembered for the next call, through the same helper booking uses", async () => {
     // The point of extracting `resolveCallerName`: escalation persists the name
     // exactly as booking does, rather than carrying a second copy that drifts.
-    vi.mocked(setClientName).mockResolvedValueOnce({
+    vi.mocked(setCallerName).mockResolvedValueOnce({
       id: "cli-1",
       name: "Dana",
     } as never);
 
     const tools = createAgentTools(
-      makeAgentDeps({ client: { id: "cli-1", name: null } as never })
+      makeAgentDeps({ caller: { id: "cli-1", name: null } as never })
     );
     await tools.createEscalation.execute(
       { question: "Do you take cats?", callerName: "  Dana  ", transcriptExcerpt: null },
       escalationCtx()
     );
 
-    expect(vi.mocked(setClientName)).toHaveBeenCalledWith(
+    expect(vi.mocked(setCallerName)).toHaveBeenCalledWith(
       "11111111-1111-1111-1111-111111111111",
       "cli-1",
       "Dana",

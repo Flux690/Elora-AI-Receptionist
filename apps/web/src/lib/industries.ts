@@ -5,7 +5,7 @@
  * business rather than a trade: there is no useful list of every trade, and the
  * product is not built for one vertical.
  *
- * `OTHER` is a sentinel for the picker, never a stored value. `tenants.industry`
+ * `OTHER` is a sentinel for the picker, never a stored value. `agents.industry`
  * is free text and goes into the system prompt verbatim, so storing the literal
  * word "Other" told the agent the business was in the Other industry.
  */

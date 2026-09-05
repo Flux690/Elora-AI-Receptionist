@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { buildSystemPrompt } from "./prompt.js";
 import { DEFAULT_BUSINESS_HOURS } from "@receptionist/shared";
-import { makeAgentDeps, makeWorkerTenant } from "../tests/fixtures.js";
+import { makeAgentDeps, makeAgentConfig } from "../tests/fixtures.js";
 
 /**
  * PLAN.md 1.5 + 1.7.1 — the system prompt.
  *
- * Time is frozen and the tenant pinned to America/New_York so every date
+ * Time is frozen and the agent pinned to America/New_York so every date
  * assertion is stable. The chosen instant is deliberately awkward: 2026-08-19
  * 02:30 UTC is still *Tuesday the 18th* in New York, so any implementation that
  * formats in UTC instead of the business timezone fails these tests.
@@ -38,9 +38,9 @@ describe("buildSystemPrompt", () => {
       expect(buildSystemPrompt(makeAgentDeps())).toContain("America/New_York");
     });
 
-    it("respects a different tenant timezone", () => {
-      const tenant = makeWorkerTenant({ timezone: "Asia/Kolkata" });
-      const prompt = buildSystemPrompt(makeAgentDeps({ tenant }));
+    it("respects a different agent timezone", () => {
+      const agent = makeAgentConfig({ timezone: "Asia/Kolkata" });
+      const prompt = buildSystemPrompt(makeAgentDeps({ agent }));
 
       // 02:30 UTC on the 19th is 08:00 on Wednesday the 19th in Kolkata.
       expect(prompt).toContain("Asia/Kolkata");
@@ -147,7 +147,7 @@ describe("buildSystemPrompt", () => {
     });
 
     it("renders a lunch closure as two periods, not one long day", () => {
-      const tenant = makeWorkerTenant({
+      const agent = makeAgentConfig({
         businessHours: {
           weekly: {
             ...DEFAULT_BUSINESS_HOURS.weekly,
@@ -160,33 +160,33 @@ describe("buildSystemPrompt", () => {
         },
       });
 
-      expect(buildSystemPrompt(makeAgentDeps({ tenant }))).toContain(
+      expect(buildSystemPrompt(makeAgentDeps({ agent }))).toContain(
         "Monday: 9:00 AM to 1:00 PM, and 2:00 PM to 6:00 PM"
       );
     });
 
     it("surfaces an exception falling inside the next seven days", () => {
       // Frozen clock is Tuesday 18 Aug in New York; the 20th is inside the window.
-      const tenant = makeWorkerTenant({
+      const agent = makeAgentConfig({
         businessHours: {
           ...DEFAULT_BUSINESS_HOURS,
           exceptions: [{ date: "2026-08-20", intervals: [], label: "Staff training" }],
         },
       });
 
-      const prompt = buildSystemPrompt(makeAgentDeps({ tenant }));
+      const prompt = buildSystemPrompt(makeAgentDeps({ agent }));
       expect(prompt).toContain("2026-08-20 (Staff training): Closed");
     });
 
     it("omits an exception far outside the window — it is noise on every call", () => {
-      const tenant = makeWorkerTenant({
+      const agent = makeAgentConfig({
         businessHours: {
           ...DEFAULT_BUSINESS_HOURS,
           exceptions: [{ date: "2026-12-25", intervals: [], label: "Christmas Day" }],
         },
       });
 
-      expect(buildSystemPrompt(makeAgentDeps({ tenant }))).not.toContain("Christmas Day");
+      expect(buildSystemPrompt(makeAgentDeps({ agent }))).not.toContain("Christmas Day");
     });
 
     it("keeps hours in the cacheable prefix, above the per-call caller block", () => {
@@ -246,7 +246,7 @@ describe("the prompt states facts; the tools state procedure", () => {
   });
 
   it("still states whether booking is possible at all", () => {
-    // A fact about the tenant, which the model needs before it reaches for
+    // A fact about the agent, which the model needs before it reaches for
     // anything. Not an instruction about which tool to call.
     const connected = buildSystemPrompt(makeAgentDeps({ calendarExternalId: "cal-1" }));
     expect(connected.toLowerCase()).toContain("calendar is connected");

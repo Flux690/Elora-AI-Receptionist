@@ -1,5 +1,13 @@
 import { db } from "../src/db/client.js";
-import { tenants, clients, calls, escalations, appointments, services } from "../src/db/schema.js";
+import {
+  agents,
+  callers,
+  calls,
+  escalations,
+  appointments,
+  services,
+  phoneNumbers,
+} from "../src/db/schema.js";
 import type { AgentProfile, Service } from "@receptionist/shared";
 
 /**
@@ -44,16 +52,18 @@ export const SERVICES: Service[] = [
   },
 ];
 
-export async function makeTenant(overrides: Partial<typeof tenants.$inferInsert> = {}) {
+export async function makeAgent(overrides: Partial<typeof agents.$inferInsert> = {}) {
   const rows = await db
-    .insert(tenants)
+    .insert(agents)
     .values({
-      name: "Test Business",
+      businessName: "Test Business",
       industry: "Pet services",
       timezone: "America/New_York",
       description: "A test business.",
-      agentProfile: AGENT_PROFILE,
-      phoneNumber: `+1555${uniq().slice(-7)}`,
+      personaName: AGENT_PROFILE.name,
+      greeting: AGENT_PROFILE.greeting,
+      farewell: AGENT_PROFILE.farewell,
+      fallback: AGENT_PROFILE.fallback,
       clerkUserId: `user_${uniq()}`,
       ...overrides,
     })
@@ -61,14 +71,14 @@ export async function makeTenant(overrides: Partial<typeof tenants.$inferInsert>
   return rows[0]!;
 }
 
-export async function makeClient(
-  tenantId: string,
-  overrides: Partial<typeof clients.$inferInsert> = {}
+export async function makeCaller(
+  agentId: string,
+  overrides: Partial<typeof callers.$inferInsert> = {}
 ) {
   const rows = await db
-    .insert(clients)
+    .insert(callers)
     .values({
-      tenantId,
+      agentId,
       phoneNumber: `+1555${uniq().slice(-7)}`,
       lastSeenAt: new Date(),
       ...overrides,
@@ -78,15 +88,15 @@ export async function makeClient(
 }
 
 export async function makeCall(
-  tenantId: string,
+  agentId: string,
   overrides: Partial<typeof calls.$inferInsert> = {}
 ) {
   const rows = await db
     .insert(calls)
     .values({
-      tenantId,
+      agentId,
       callerPhone: `+1555${uniq().slice(-7)}`,
-      livekitRoomName: `call-${uniq()}`,
+      roomName: `call-${uniq()}`,
       ...overrides,
     })
     .returning();
@@ -94,13 +104,13 @@ export async function makeCall(
 }
 
 export async function makeEscalation(
-  tenantId: string,
+  agentId: string,
   overrides: Partial<typeof escalations.$inferInsert> = {}
 ) {
   const rows = await db
     .insert(escalations)
     .values({
-      tenantId,
+      agentId,
       callerPhone: `+1555${uniq().slice(-7)}`,
       question: "Do you have parking?",
       status: "pending",
@@ -111,16 +121,16 @@ export async function makeEscalation(
 }
 
 export async function makeAppointment(
-  tenantId: string,
+  agentId: string,
   overrides: Partial<typeof appointments.$inferInsert> = {}
 ) {
   const startTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const rows = await db
     .insert(appointments)
     .values({
-      tenantId,
+      agentId,
       callerPhone: `+1555${uniq().slice(-7)}`,
-      service: "Haircut",
+      serviceName: "Haircut",
       startTime,
       endTime: new Date(startTime.getTime() + 60 * 60 * 1000),
       status: "confirmed",
@@ -131,18 +141,29 @@ export async function makeAppointment(
 }
 
 export async function makeService(
-  tenantId: string,
+  agentId: string,
   overrides: Partial<typeof services.$inferInsert> = {}
 ) {
   const rows = await db
     .insert(services)
     .values({
-      tenantId,
+      agentId,
       name: `Haircut ${uniq()}`,
       price: "$45",
       durationMinutes: 30,
       ...overrides,
     })
+    .returning();
+  return rows[0]!;
+}
+
+export async function makePhoneNumber(
+  agentId: string,
+  overrides: Partial<typeof phoneNumbers.$inferInsert> = {}
+) {
+  const rows = await db
+    .insert(phoneNumbers)
+    .values({ agentId, e164: `+1555${uniq().slice(-7)}`, ...overrides })
     .returning();
   return rows[0]!;
 }

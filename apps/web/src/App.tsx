@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from '@clerk/react'
 import { ErrorBoundary } from 'react-error-boundary'
 import { AuthProvider } from '@/features/auth/AuthProvider'
-import { TenantGate } from '@/features/auth/TenantGate'
+import { AgentGate } from '@/features/auth/AgentGate'
 import AppLayout from '@/layout/AppLayout'
 import { RouteSkeleton } from '@/layout/RouteSkeleton'
 import { ErrorFallback } from '@/layout/ErrorFallback'
@@ -52,7 +52,7 @@ export default function App() {
           element={
             <ProtectedRoute>
               <AuthProvider>
-                <TenantGate />
+                <AgentGate />
               </AuthProvider>
             </ProtectedRoute>
           }

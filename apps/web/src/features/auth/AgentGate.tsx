@@ -6,16 +6,16 @@ import { keys, fetchers } from '@/lib/queries'
 /**
  * Sends a user to onboarding until they have a business, and away after.
  *
- * The answer comes from the API, which derives it from the tenant row.
+ * The answer comes from the API, which derives it from the agent row.
  *
  * Deliberately not Clerk's `publicMetadata.onboarded`: being onboarded is a fact
  * about the business, not the identity, and holding it in two places lets them
- * disagree. Any tenant created outside this flow — a restored backup, a seeded
+ * disagree. Any agent created outside this flow — a restored backup, a seeded
  * database — would leave the flag false and send its owner into onboarding on top
  * of a business that already exists, where the unique constraint on
  * `clerk_user_id` rejects the insert. PLAN.md 2.1 takes the same view.
  */
-export function TenantGate() {
+export function AgentGate() {
   const location = useLocation()
   const { data, isPending } = useQuery({
     queryKey: keys.session,

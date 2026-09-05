@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { AppEnv } from "./types.js";
-import { clerkAuth, requireTenant } from "./middleware/auth.js";
+import { clerkAuth, requireAgent } from "./middleware/auth.js";
 import { health } from "./modules/health/route.js";
 import { onboarding } from "./modules/onboarding/route.js";
 import { metrics } from "./modules/metrics/route.js";
@@ -15,7 +15,7 @@ import { telephony } from "./modules/telephony/route.js";
 import { agent } from "./modules/agent/route.js";
 
 const admin = new Hono<AppEnv>()
-  .use("*", clerkAuth, requireTenant)
+  .use("*", clerkAuth, requireAgent)
   .route("/metrics", metrics)
   .route("/calls", calls)
   .route("/escalations", escalations)

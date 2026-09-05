@@ -18,8 +18,9 @@ const TABLES = [
   "knowledge_items",
   "escalations",
   "calls",
-  "clients",
-  "tenants",
+  "callers",
+  "phone_numbers",
+  "agents",
 ] as const;
 
 beforeAll(async () => {

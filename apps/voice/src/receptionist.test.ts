@@ -42,10 +42,10 @@ describe("ReceptionistAgent", () => {
   });
 
   it("greets a known returning caller by name", () => {
-    // PLAN.md 1.8.4: clients.name existed but nothing ever wrote it, so this
+    // PLAN.md 1.8.4: callers.name existed but nothing ever wrote it, so this
     // branch was unreachable dead code. rememberCallerName now populates it.
     const deps = makeAgentDeps({
-      client: { id: "c1", name: "Sarah" } as never,
+      caller: { id: "c1", name: "Sarah" } as never,
     });
 
     expect(new ReceptionistAgent(deps).instructions).toContain("Sarah");

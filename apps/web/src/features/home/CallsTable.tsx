@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { DataList, type Column } from '@/components/ui/data-list'
 import { useCallsQuery } from '@/hooks/useCallsQuery'
-import { useTenantZone } from '@/hooks/useTenantZone'
+import { useAgentZone } from '@/hooks/useAgentZone'
 import { formatCaller, formatTime, formatDuration } from '@/lib/formatters'
 import { groupByDay } from '@/lib/group-by-day'
 import { callOutcomeConfig } from '@/lib/status-config'
@@ -66,7 +66,7 @@ function columns(zone: string | undefined): Column<CallListItem>[] {
 
 export function CallsTable() {
   const sentinelRef = useRef<HTMLDivElement>(null)
-  const zone = useTenantZone()
+  const zone = useAgentZone()
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useCallsQuery()
 
   useEffect(() => {

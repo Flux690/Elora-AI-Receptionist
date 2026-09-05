@@ -2,7 +2,7 @@ import { llm } from "@livekit/agents";
 import { z } from "zod";
 import type { AgentDeps } from "./types.js";
 import { createEscalation } from "@receptionist/core/repositories/escalations.js";
-import { setClientName } from "@receptionist/core/repositories/clients.js";
+import { setCallerName } from "@receptionist/core/repositories/callers.js";
 import {
   fetchBusyRanges,
   createCalendarEvent,
@@ -30,14 +30,14 @@ const MAX_SLOTS_OFFERED = 3;
 const DEFAULT_SEARCH_DAYS = 14;
 
 export function createAgentTools(deps: AgentDeps) {
-  const tenantId = deps.tenant.id;
-  const timeZone = deps.tenant.timezone;
+  const agentId = deps.agent.id;
+  const timeZone = deps.agent.timezone;
 
   /**
    * Settles on the name to record, and remembers it for next time.
    *
    * A name given now beats one we already had — people correct themselves, and
-   * this is the name they just said. Persisting needs a client row, which needs
+   * this is the name they just said. Persisting needs a caller row, which needs
    * a phone number; an anonymous caller's name still reaches whatever is being
    * written, it just cannot be remembered for a future call.
    *
@@ -47,12 +47,12 @@ export function createAgentTools(deps: AgentDeps) {
   async function resolveCallerName(spoken: string | null): Promise<string | null> {
     const given = spoken?.trim() || null;
 
-    if (given && deps.client) {
-      const updated = await setClientName(tenantId, deps.client.id, given);
-      if (updated) deps.client = updated;
+    if (given && deps.caller) {
+      const updated = await setCallerName(agentId, deps.caller.id, given);
+      if (updated) deps.caller = updated;
     }
 
-    return given ?? deps.client?.name ?? null;
+    return given ?? deps.caller?.name ?? null;
   }
 
   /**
@@ -104,11 +104,11 @@ export function createAgentTools(deps: AgentDeps) {
         // Normally resolved seconds ago, so this costs nothing (PLAN.md 1.7.3).
         const callRowExists = await deps.callRowReady;
         await createEscalation({
-          tenantId,
+          agentId,
           // Unlinked rather than lost: without the row, the FK would reject the
           // insert and the tool would throw mid-call.
           callId: callRowExists ? deps.callId : null,
-          clientId: deps.client?.id ?? null,
+          callerId: deps.caller?.id ?? null,
           callerPhone: deps.callerPhone,
           callerName: await resolveCallerName(callerName),
           question,
@@ -135,13 +135,13 @@ export function createAgentTools(deps: AgentDeps) {
       execute: async ({ name }) => {
         // No client row for an anonymous caller, so there is nothing to attach
         // a name to. Say nothing to the caller about it.
-        if (!deps.client) return { saved: false };
+        if (!deps.caller) return { saved: false };
 
-        const updated = await setClientName(tenantId, deps.client.id, name);
+        const updated = await setCallerName(agentId, deps.caller.id, name);
         if (!updated) return { saved: false };
 
         // Keep in-memory deps in step so the rest of this call uses the name.
-        deps.client = updated;
+        deps.caller = updated;
         return { saved: true };
       },
     }),
@@ -195,8 +195,11 @@ export function createAgentTools(deps: AgentDeps) {
         }
 
         const now = new Date();
-        const hours = deps.tenant.businessHours;
-        const policy = deps.tenant.bookingPolicy;
+        const hours = deps.agent.businessHours;
+        const policy = {
+          minNoticeMinutes: deps.agent.minNoticeMinutes,
+          maxAdvanceDays: deps.agent.maxAdvanceDays,
+        };
 
         // A closed day is not a dead end. Say so, then keep looking forward —
         // the caller still wants an appointment.
@@ -299,12 +302,12 @@ export function createAgentTools(deps: AgentDeps) {
         const bookedName = await resolveCallerName(callerName);
 
         const appointmentBase = {
-          tenantId,
-          clientId: deps.client?.id ?? null,
+          agentId,
+          callerId: deps.caller?.id ?? null,
           callerPhone: deps.callerPhone,
           callerName: bookedName,
           serviceId: service.id,
-          service: service.name,
+          serviceName: service.name,
           startTime: slot.start,
           endTime: slot.end,
         };
@@ -408,7 +411,7 @@ export function createAgentTools(deps: AgentDeps) {
           };
         }
         const upcoming = await getUpcomingByPhone(
-          tenantId,
+          agentId,
           deps.callerPhone!,
         );
         if (upcoming.length === 0) {
@@ -440,7 +443,7 @@ export function createAgentTools(deps: AgentDeps) {
       execute: async ({ appointmentId }) => {
         const cancelled = await cancelAppointmentById(
           appointmentId,
-          tenantId,
+          agentId,
         );
         if (!cancelled) return { error: "Appointment not found." };
 
@@ -468,7 +471,7 @@ export function createAgentTools(deps: AgentDeps) {
         "End the phone call. Use only after the caller has clearly indicated they are done — for example, said goodbye, thank you, or that's all.",
       parameters: z.object({}),
       execute: async (_params, { ctx }) => {
-        const farewell = deps.tenant.agentProfile.farewell;
+        const farewell = deps.agent.farewell;
         if (farewell) {
           ctx.session.say(farewell, { allowInterruptions: false });
         }

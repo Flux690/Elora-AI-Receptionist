@@ -47,7 +47,7 @@ const AREA_CODE = /^\d{3}$/;
  *   "4" / "50"     400 invalid_argument, "Failed to search phone numbers"
  *   "999"          200, zero items — a well-formed code with nothing free
  *
- * A partial code is therefore a client mistake that the carrier reports as an
+ * A partial code is therefore a caller mistake that the carrier reports as an
  * opaque failure, so it is caught here instead. A well-formed code with nothing
  * free is an empty list, which callers handle as its own case.
  *

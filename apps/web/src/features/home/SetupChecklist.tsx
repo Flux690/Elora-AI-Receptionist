@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import type { SetupItem } from './setup-items'
 
 /**
- * The checklist as the page, for a tenant with no calls yet.
+ * The checklist as the page, for an agent with no calls yet.
  *
  * The empty screen is the onboarding surface rather than a dead end: it says
  * what is missing and gives one obvious thing to do. Only the next unfinished

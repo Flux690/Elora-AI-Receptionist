@@ -11,7 +11,7 @@ export async function createKnowledgeFromEscalation(
   answer: string
 ): Promise<void> {
   await db.insert(knowledgeItems).values({
-    tenantId: escalation.tenantId,
+    agentId: escalation.agentId,
     sourceEscalationId: escalation.id,
     question: escalation.question,
     answer,
@@ -24,12 +24,12 @@ export async function createKnowledgeFromEscalation(
  */
 export async function resolveEscalationWithKnowledge(
   escalation: EscalationRow,
-  tenantId: string,
+  agentId: string,
   answer: string
 ): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.insert(knowledgeItems).values({
-      tenantId: escalation.tenantId,
+      agentId: escalation.agentId,
       sourceEscalationId: escalation.id,
       question: escalation.question,
       answer,
@@ -38,7 +38,7 @@ export async function resolveEscalationWithKnowledge(
     const updated = await tx
       .update(escalations)
       .set({ status: "resolved", answer, resolvedAt: new Date() })
-      .where(and(eq(escalations.id, escalation.id), eq(escalations.tenantId, tenantId)))
+      .where(and(eq(escalations.id, escalation.id), eq(escalations.agentId, agentId)))
       .returning({ id: escalations.id });
 
     if (!updated[0]) throw new Error(`Escalation ${escalation.id} not found`);
@@ -53,17 +53,17 @@ export const KNOWLEDGE_PROMPT_LIMIT = 300;
 
 /** Oldest first, so the prompt prefix stays stable and cacheable as items are added. */
 export async function listKnowledgeForPrompt(
-  tenantId: string
+  agentId: string
 ): Promise<Array<{ question: string; answer: string }>> {
   return db
     .select({ question: knowledgeItems.question, answer: knowledgeItems.answer })
     .from(knowledgeItems)
-    .where(eq(knowledgeItems.tenantId, tenantId))
+    .where(eq(knowledgeItems.agentId, agentId))
     .orderBy(knowledgeItems.createdAt)
     .limit(KNOWLEDGE_PROMPT_LIMIT);
 }
 
-export async function listKnowledge(tenantId: string) {
+export async function listKnowledge(agentId: string) {
   return db
     .select({
       id: knowledgeItems.id,
@@ -72,7 +72,7 @@ export async function listKnowledge(tenantId: string) {
       createdAt: knowledgeItems.createdAt,
     })
     .from(knowledgeItems)
-    .where(eq(knowledgeItems.tenantId, tenantId))
+    .where(eq(knowledgeItems.agentId, agentId))
     .orderBy(desc(knowledgeItems.createdAt))
     .limit(100);
 }
@@ -82,11 +82,11 @@ export async function listKnowledge(tenantId: string) {
  * is permanently unanswerable: resolved forever, and the dedup index can block a
  * re-escalation.
  */
-export async function deleteKnowledge(id: string, tenantId: string): Promise<void> {
+export async function deleteKnowledge(id: string, agentId: string): Promise<void> {
   await db.transaction(async (tx) => {
     const deleted = await tx
       .delete(knowledgeItems)
-      .where(and(eq(knowledgeItems.id, id), eq(knowledgeItems.tenantId, tenantId)))
+      .where(and(eq(knowledgeItems.id, id), eq(knowledgeItems.agentId, agentId)))
       .returning({ sourceEscalationId: knowledgeItems.sourceEscalationId });
 
     const sourceEscalationId = deleted[0]?.sourceEscalationId;
@@ -96,7 +96,7 @@ export async function deleteKnowledge(id: string, tenantId: string): Promise<voi
       .update(escalations)
       .set({ status: "pending", answer: null, resolvedAt: null })
       .where(
-        and(eq(escalations.id, sourceEscalationId), eq(escalations.tenantId, tenantId))
+        and(eq(escalations.id, sourceEscalationId), eq(escalations.agentId, agentId))
       );
   });
 }

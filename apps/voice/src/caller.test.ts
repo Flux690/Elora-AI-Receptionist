@@ -7,7 +7,7 @@ import { resolveCallerPhone } from "./caller.js";
  * `worker.ts` fell back to the literal string "unknown" when `sip.phoneNumber`
  * was absent. That string then became:
  *
- *   - the upsert key for `clients`, which is UNIQUE on (tenant_id, phone_number)
+ *   - the upsert key for `callers`, which is UNIQUE on (agent_id, phone_number)
  *   - the lookup key in `getUpcomingByPhone`
  *
  * So every caller withholding their number, for a given business, collapsed into

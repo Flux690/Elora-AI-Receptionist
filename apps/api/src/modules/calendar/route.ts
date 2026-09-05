@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { getAuth } from "@clerk/hono";
 import type { AppEnv } from "../../types.js";
-import { getTenantById, updateTenant } from "@receptionist/core/repositories/tenants.js";
+import { getAgentById, updateAgent } from "@receptionist/core/repositories/agents.js";
 import { listCalendars, CalendarScopeMissingError } from "@receptionist/core/providers/calendar.js";
 import {
   getGoogleOAuthToken,
@@ -31,7 +31,7 @@ export const calendar = new Hono<AppEnv>()
 
     // The display name is stored beside the id so Settings renders a name
     // without a round trip to Google on every load.
-    await updateTenant(c.get("tenantId"), {
+    await updateAgent(c.get("agentId"), {
       calendarProvider: "google",
       calendarExternalId: calendarId,
       calendarPayload: { summary, ...(timeZone ? { timeZone } : {}) },
@@ -42,11 +42,11 @@ export const calendar = new Hono<AppEnv>()
   // Existing appointments stay: they are commitments in a calendar the owner
   // still holds. The agent stops offering new ones.
   .delete("/", async (c) => {
-    const tenantId = c.get("tenantId");
-    const tenant = await getTenantById(tenantId);
-    if (!tenant) return c.json({ error: "Tenant not found" }, 404);
+    const agentId = c.get("agentId");
+    const agent = await getAgentById(agentId);
+    if (!agent) return c.json({ error: "Agent not found" }, 404);
 
-    await updateTenant(tenantId, {
+    await updateAgent(agentId, {
       calendarProvider: null,
       calendarExternalId: null,
       calendarPayload: null,

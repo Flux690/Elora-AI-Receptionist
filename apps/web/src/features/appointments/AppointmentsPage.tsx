@@ -8,7 +8,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { PageContainer } from '@/layout/PageContainer'
 import { PageHeader } from '@/layout/PageHeader'
 import { keys, fetchers } from '@/lib/queries'
-import { useTenantZone } from '@/hooks/useTenantZone'
+import { useAgentZone } from '@/hooks/useAgentZone'
 import { formatPhone, formatTime, dayKey, relativeDay } from '@/lib/formatters'
 import { appointmentStatusConfig } from '@/lib/status-config'
 import { cn } from '@/lib/utils'
@@ -30,7 +30,7 @@ function minutesBetween(a: string | null, b: string | null): number | null {
 }
 
 export default function AppointmentsPage() {
-  const zone = useTenantZone()
+  const zone = useAgentZone()
   const { data, isLoading } = useQuery({ queryKey: keys.appointments, queryFn: fetchers.appointments })
   const appointments = useMemo(() => data ?? [], [data])
 

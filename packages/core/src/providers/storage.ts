@@ -17,8 +17,8 @@ export const storageConfigured = R2_KEYS.every((key) => Boolean(env[key]));
  * caller hears. Read this, never `recordCalls`, or the two can disagree and the
  * agent claims a recording that is not happening.
  */
-export function recordingEnabled(tenant: { recordCalls: boolean }): boolean {
-  return tenant.recordCalls && storageConfigured;
+export function recordingEnabled(agent: { recordCalls: boolean }): boolean {
+  return agent.recordCalls && storageConfigured;
 }
 
 function r2Config() {

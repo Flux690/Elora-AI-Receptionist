@@ -1,6 +1,6 @@
 /**
  * Human-readable formatting, in the business's timezone rather than the
- * viewer's. The agent quotes every time in `tenants.timezone`, so the dashboard
+ * viewer's. The agent quotes every time in `agents.timezone`, so the dashboard
  * has to agree or an owner reading from another zone sees different times than
  * their callers were given.
  */

@@ -11,17 +11,12 @@ import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import type { CallOutcome } from "@receptionist/shared";
 import { db } from "@receptionist/core/db/client.js";
-import { LRUCache } from "@receptionist/core/lru.js";
 import { calls as callsTable } from "@receptionist/core/db/schema.js";
-import { upsertClient } from "@receptionist/core/repositories/clients.js";
+import { upsertCaller } from "@receptionist/core/repositories/callers.js";
 import { createCall, finishCall } from "@receptionist/core/repositories/calls.js";
-import { getTenantById, getTenantByPhoneNumber } from "@receptionist/core/repositories/tenants.js";
-import { listKnowledgeForPrompt } from "@receptionist/core/repositories/knowledge.js";
-import { listServices } from "@receptionist/core/repositories/services.js";
 import { recordingEnabled, startCallRecording, stopCallRecording } from "@receptionist/core/providers/storage.js";
 import { getGoogleOAuthToken } from "@receptionist/core/providers/googleAuth.js";
 import type { AgentDeps, CallState, SlotStore } from "./types.js";
-import type { KnowledgeEntry } from "./prompt.js";
 import { buildSessionConfig, buildKeyterms } from "./session-config.js";
 import { resolveCallerPhone } from "./caller.js";
 import { buildGreeting } from "./disclosure.js";
@@ -29,63 +24,7 @@ import { ReceptionistAgent } from "./receptionist.js";
 import { CallMetrics } from "./metrics.js";
 import { extractTranscript } from "./transcript.js";
 import { generateCallSummary } from "./summary.js";
-
-// ── Tenant cache ──────────────────────────────────────────────────────────────
-// 5-minute TTL so config changes propagate without a restart.
-// Capped at 500 entries to prevent unbounded memory growth in production.
-const TENANT_CACHE_TTL_MS = 5 * 60 * 1000;
-
-type ResolvedTenant = {
-  tenant: import("@receptionist/core/repositories/tenants.js").WorkerTenant;
-  services: import("@receptionist/shared").Service[];
-  knowledge: KnowledgeEntry[];
-};
-
-// Tenant, services and knowledge are cached together: all three are read on
-// every call, all three go into the system prompt, and all three should expire
-// at the same moment so a config change, a new service and a new knowledge item
-// propagate on the same 5-minute cycle.
-const tenantCache = new LRUCache<string, ResolvedTenant & { expiresAt: number }>(500);
-
-async function resolveTenant(idOrPhone: {
-  tenantId?: string;
-  phoneNumber?: string;
-}): Promise<ResolvedTenant | null> {
-  const cacheKey = idOrPhone.tenantId ?? idOrPhone.phoneNumber ?? "";
-  if (!cacheKey) return null;
-
-  const cached = tenantCache.get(cacheKey);
-  if (cached && Date.now() < cached.expiresAt) {
-    return {
-      tenant: cached.tenant,
-      services: cached.services,
-      knowledge: cached.knowledge,
-    };
-  }
-
-  const tenant = idOrPhone.tenantId
-    ? await getTenantById(idOrPhone.tenantId)
-    : await getTenantByPhoneNumber(idOrPhone.phoneNumber!);
-
-  if (!tenant) return null;
-
-  // Second round trip on a cache miss only. The tenant id is not known until
-  // the first query resolves, so these cannot be parallelised with it on the
-  // phone-number path — but they can be parallelised with each other, so the
-  // services read costs no extra wall-clock time on the path to first audio.
-  const [services, knowledge] = await Promise.all([
-    listServices(tenant.id),
-    listKnowledgeForPrompt(tenant.id),
-  ]);
-
-  tenantCache.set(cacheKey, {
-    tenant,
-    services,
-    knowledge,
-    expiresAt: Date.now() + TENANT_CACHE_TTL_MS,
-  });
-  return { tenant, services, knowledge };
-}
+import { resolveAgent, type ResolvedAgent } from "./agent-config.js";
 
 // ── Egress stop with retry ────────────────────────────────────────────────────
 // A single failed stopEgress leaves the LiveKit egress running and billing.
@@ -124,42 +63,42 @@ export default defineAgent({
 
     // Blocks the critical path on a cache miss: the caller hears silence for one
     // DB round trip. Mitigated by the LRU below, not eliminated.
-    let resolved: ResolvedTenant | null = null;
+    let resolved: ResolvedAgent | null = null;
 
     if (isTestSession) {
-      const tenantId = participant.attributes["tenantId"];
-      if (!tenantId) {
-        console.error("[worker] no tenantId in participant attributes for test session — dropping");
+      const agentId = participant.attributes["agentId"];
+      if (!agentId) {
+        console.error("[worker] no agentId in participant attributes for test session — dropping");
         return;
       }
-      resolved = await resolveTenant({ tenantId });
+      resolved = await resolveAgent({ agentId });
     } else {
       if (!trunkPhone) {
         console.error(`[worker] No trunkPhoneNumber found for SIP participant — dropping`);
         return;
       }
-      resolved = await resolveTenant({ phoneNumber: trunkPhone });
+      resolved = await resolveAgent({ phoneNumber: trunkPhone });
     }
 
     if (!resolved) {
-      console.error(`[worker] tenant not found — dropping`);
+      console.error(`[worker] agent not found — dropping`);
       return;
     }
-    const { tenant, services, knowledge } = resolved;
-    console.log(`[worker] resolved tenant: ${tenant.id}${isTestSession ? " (test session)" : ""}`);
+    const { agent, services, knowledge } = resolved;
+    console.log(`[worker] resolved agent: ${agent.id}${isTestSession ? " (test session)" : ""}`);
 
     // 3. Fire Google OAuth token fetch in background (no await — resolves while greeting plays).
     //    Token is cached at module level with a 50-minute TTL so repeat calls skip the network.
     const tokenPromise: Promise<string | null> =
-      tenant.calendarExternalId && tenant.clerkUserId
-        ? getGoogleOAuthToken(tenant.clerkUserId)
+      agent.calendarExternalId && agent.clerkUserId
+        ? getGoogleOAuthToken(agent.clerkUserId)
         : Promise.resolve(null);
 
     // 4. Generate callId locally — zero DB roundtrip needed
     const callId = crypto.randomUUID();
 
     // 5. Build deps immediately with what we have.
-    //    client starts null — set after upsertClient resolves (step 10).
+    //    client starts null — set after upsertCaller resolves (step 10).
     //    Tools fire only after caller speaks + LLM responds, so client will
     //    always be populated by the time any tool execute() runs.
     const callState: CallState = { wasBooked: false, wasEscalated: false };
@@ -179,13 +118,13 @@ export default defineAgent({
         });
 
     const deps: AgentDeps = {
-      tenant,
+      agent,
       services,
-      client: null,
+      caller: null,
       callerPhone,
       callId,
       getGoogleToken: () => tokenPromise,
-      calendarExternalId: tenant.calendarExternalId ?? null,
+      calendarExternalId: agent.calendarExternalId ?? null,
       knowledge,
       callRowReady,
       callState,
@@ -197,7 +136,7 @@ export default defineAgent({
     const { sessionOptions, inputOptions } = buildSessionConfig({
       isTestSession,
       vad: ctx.proc.userData.vad as silero.VAD,
-      keyterms: buildKeyterms(tenant.name, services.map((s) => s.name)),
+      keyterms: buildKeyterms(agent.businessName, services.map((s) => s.name)),
     });
 
     // 7. Create and start session
@@ -261,7 +200,7 @@ export default defineAgent({
       // STT/TTS/LLM variants.
       const cause = "error" in err ? err.error : err;
       console.error(
-        `[worker] PIPELINE ERROR call=${callId} tenant=${tenant.id} ` +
+        `[worker] PIPELINE ERROR call=${callId} agent=${agent.id} ` +
           `type=${err.type} source=${ev.source?.label ?? "unknown"} ` +
           `recoverable=${err.recoverable}:`,
         cause instanceof Error ? cause.message : cause
@@ -284,7 +223,7 @@ export default defineAgent({
           await stopEgressWithRetry(egressId);
         }
 
-        callMetrics.logSummary(callId, tenant.id);
+        callMetrics.logSummary(callId, agent.id);
 
         // Test sessions skip DB finalization — no call row was created
         if (isTestSession) {
@@ -309,7 +248,7 @@ export default defineAgent({
           outcome,
           transcript,
           summary,
-          recordingUrl: callRecordingKey,
+          recordingKey: callRecordingKey,
         });
 
         console.log(`[worker] call ${callId} finalized: ${outcome}`);
@@ -323,7 +262,7 @@ export default defineAgent({
             outcome: "error",
             transcript: [],
             summary: null,
-            recordingUrl: callRecordingKey,
+            recordingKey: callRecordingKey,
           }).catch((writeErr: unknown) =>
             console.error("[worker] could not mark call as errored:", callId, writeErr)
           );
@@ -335,8 +274,8 @@ export default defineAgent({
     // The disclosure leads on test sessions too, so the owner hears what their
     // callers hear. `recording` is false when storage is unconfigured, so the
     // wording never claims a recording that cannot happen.
-    const recording = recordingEnabled(tenant);
-    const greeting = buildGreeting(tenant.agentProfile.greeting, recording);
+    const recording = recordingEnabled(agent);
+    const greeting = buildGreeting(agent.greeting, recording);
     session.say(greeting.text, {
       allowInterruptions: false,
     });
@@ -357,20 +296,20 @@ export default defineAgent({
             console.error("[worker] failed to start recording:", err);
           });
       } else {
-        console.log(`[worker] recording off for tenant ${tenant.id}`);
+        console.log(`[worker] recording off for agent ${agent.id}`);
       }
 
-      // upsertClient + createCall run concurrently WHILE greeting plays
-      let client: Awaited<ReturnType<typeof upsertClient>> = null;
+      // upsertCaller + createCall run concurrently WHILE greeting plays
+      let caller: Awaited<ReturnType<typeof upsertCaller>> = null;
       try {
-        [client] = await Promise.all([
-          upsertClient(tenant.id, callerPhone),
+        [caller] = await Promise.all([
+          upsertCaller(agent.id, callerPhone),
           createCall({
             id: callId,
-            tenantId: tenant.id,
-            clientId: null,
+            agentId: agent.id,
+            callerId: null,
             callerPhone,
-            livekitRoomName: roomName,
+            roomName: roomName,
             disclosureVersion: greeting.version,
           }),
         ]);
@@ -383,13 +322,13 @@ export default defineAgent({
         throw err;
       }
 
-      deps.client = client;
+      deps.caller = caller;
       // No client row for an anonymous caller, so nothing to backfill.
-      if (client) {
+      if (caller) {
         db.update(callsTable)
-          .set({ clientId: client.id })
+          .set({ callerId: caller.id })
           .where(eq(callsTable.id, callId))
-          .catch((err: unknown) => console.error("[worker] clientId backfill failed:", err));
+          .catch((err: unknown) => console.error("[worker] callerId backfill failed:", err));
       }
     }
 

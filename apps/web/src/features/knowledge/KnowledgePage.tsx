@@ -11,12 +11,12 @@ import { PageContainer } from '@/layout/PageContainer'
 import { PageHeader } from '@/layout/PageHeader'
 import { keys, fetchers } from '@/lib/queries'
 import { apiClient } from '@/lib/apiClient'
-import { useTenantZone } from '@/hooks/useTenantZone'
+import { useAgentZone } from '@/hooks/useAgentZone'
 import { formatDate } from '@/lib/formatters'
 
 export default function KnowledgePage() {
   const qc = useQueryClient()
-  const zone = useTenantZone()
+  const zone = useAgentZone()
   const [search, setSearch] = useState('')
   const [pendingDelete, setPendingDelete] = useState<KnowledgeItem | null>(null)
 

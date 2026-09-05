@@ -1,14 +1,14 @@
 import { disclosureFor, type Disclosure } from "@receptionist/shared";
 
 /**
- * The disclosure, then the tenant's greeting.
+ * The disclosure, then the agent's greeting.
  *
  * The wordings and their version ids live in `@receptionist/shared` because the
  * dashboard has to show the owner what plays; the reasoning for why they are
  * platform-owned lives there with them. What stays here is the agent's use of
  * them.
  *
- * Two wordings, not one, since a tenant can now turn recording off: claiming a
+ * Two wordings, not one, since an agent can now turn recording off: claiming a
  * call is recorded when it is not is its own problem, and the AI half of the
  * sentence is never optional either way.
  */
@@ -23,7 +23,7 @@ export {
 export type { Disclosure } from "@receptionist/shared";
 
 /**
- * Falls back to the disclosure alone when a tenant has left their greeting
+ * Falls back to the disclosure alone when an agent has left their greeting
  * blank: silence is not an acceptable answer to a ringing phone, and the
  * required sentence is still required.
  *
@@ -32,11 +32,11 @@ export type { Disclosure } from "@receptionist/shared";
  * trail is that the two match.
  */
 export function buildGreeting(
-  tenantGreeting: string,
+  agentGreeting: string,
   recordCalls: boolean
 ): Disclosure {
   const disclosure = disclosureFor(recordCalls);
-  const greeting = tenantGreeting.trim();
+  const greeting = agentGreeting.trim();
 
   return {
     text: greeting ? `${disclosure.text} ${greeting}` : disclosure.text,

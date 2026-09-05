@@ -4,9 +4,11 @@ Telephony-first AI receptionist for appointment-based local businesses. A custom
 calls a real number → LiveKit SIP → AI agent answers, escalates or books → the
 owner sees it in the admin dashboard.
 
-Multi-tenant B2B SaaS. **Every table has `tenant_id`, and every service function
-takes `tenantId` as its first argument.** The LLM is never given a tenant id and
-never chooses one; backend code injects it.
+Self-hosted and open source. One deployment holds one or more **agents**: a
+business's phone presence, and everything shaping how it answers. **Every table
+has `agent_id`, and every repository function takes `agentId` as its first
+argument.** The LLM is never given an agent id and never chooses one; backend
+code injects it.
 
 Deeper background — architecture, the agent worker, the colour system, the
 database, and the approaches that were tried and abandoned — is in `CONTEXT.md`.
@@ -78,7 +80,7 @@ Run `pnpm typecheck` and `pnpm lint` before calling any change done.
   one exception is phone-number provisioning, which releases the purchased
   number then re-throws.
 - **Repositories** — all DB access, in `packages/core/src/repositories`.
-- Use `AppEnv` from `apps/api/src/types.ts` on admin modules so `c.get('tenantId')`
+- Use `AppEnv` from `apps/api/src/types.ts` on admin modules so `c.get('agentId')`
   is typed.
 
 ## Frontend conventions
@@ -97,9 +99,9 @@ Run `pnpm typecheck` and `pnpm lint` before calling any change done.
   Minutes is the unit you edit in; `formatMinutes` is the unit you read in.
 - **Colours come from the tokens in `index.css`**, never a hardcoded value. The
   same test enforces the four rules the system is built on.
-- **Dates render in the tenant's timezone** via `useTenantZone()` and the
+- **Dates render in the agent's timezone** via `useAgentZone()` and the
   `timeZone` argument in `lib/formatters.ts`. The agent quotes times in
-  `tenants.timezone`, so the dashboard has to agree.
+  `agents.timezone`, so the dashboard has to agree.
 - **A settings row's description is one line.** If it needs two, the setting needs
   a better name.
 - **No centred empty states on a list page.** A page with a heading, filters and
@@ -124,10 +126,10 @@ Each one has a mechanism behind it. `CONTEXT.md` has the reasoning.
   auto-provisions the streaming turn detector and lowers the endpointing floor.
 - **Never call `RoomServiceClient.deleteRoom()`** to end a call. Use
   `ctx.session.shutdown({ drain: true })`.
-- **Never create per-tenant SIP dispatch rules.** One platform-wide rule with an
-  empty routing filter; the tenant is resolved at runtime from
-  `sip.trunkPhoneNumber`. A rule without `trunk_ids` matches every inbound trunk,
-  so the second tenant collides with the first.
+- **Never create per-agent SIP dispatch rules.** One deployment-wide rule with an
+  empty routing filter; the agent is resolved at runtime by joining
+  `sip.trunkPhoneNumber` against `phone_numbers.e164`. A rule without `trunk_ids`
+  matches every inbound trunk, so a second rule collides with the first.
 - **Never instantiate `new OpenAI(...)`.** Chat goes through `buildLLM()` in
   `apps/voice/src/session-config.ts`, the only place a model client is built.
 - **Never read `recordCalls` to decide anything.** `recordingEnabled()` in
@@ -149,3 +151,17 @@ fires, and elements mid-transition stay in the DOM. Confirm
 `major.minor.patch`, in the root `package.json` only. **One patch bump per commit
 that changes the product**, in the same commit as the work. Commits that change
 nothing a customer runs — docs, tests, tooling, comments — do not bump.
+
+## The schema
+
+`agents` is the configuration row: `business_name` for the shop, `persona_name`
+for what the receptionist calls itself, and flat columns for the greeting, the
+booking window and the setup checklist. `business_hours` stays jsonb because it
+is read whole and its shape varies.
+
+`phone_numbers` is its own table, so a number changes without writing to the
+agent row. `e164` is globally unique: a number reaches exactly one agent.
+
+`callers` is who phoned. `calls.recording_key` is an object key, and the URL is
+presigned per request. `appointments.service_name` holds the name as it stood at
+booking, beside the live `service_id`.

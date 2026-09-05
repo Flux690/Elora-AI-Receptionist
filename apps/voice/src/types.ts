@@ -1,7 +1,7 @@
 import type { Service } from "@receptionist/shared";
 import type { Slot } from "@receptionist/core/domain/scheduling.js";
-import type { WorkerTenant } from "@receptionist/core/repositories/tenants.js";
-import type { ClientRow } from "@receptionist/core/repositories/clients.js";
+import type { AgentConfig } from "@receptionist/core/repositories/agents.js";
+import type { CallerRow } from "@receptionist/core/repositories/callers.js";
 import type { KnowledgeEntry } from "./prompt.js";
 
 export type CallState = {
@@ -30,14 +30,14 @@ export type SlotStore = {
 };
 
 export type AgentDeps = {
-  tenant: WorkerTenant;
+  agent: AgentConfig;
   /**
-   * The tenant's bookable services, read alongside the tenant and cached with
-   * it. Off the tenant row since they became their own table — the agent needs
+   * The agent's bookable services, read alongside the agent and cached with
+   * it. Off the agent row since they became their own table — the agent needs
    * their durations to compute slots, not just their names and prices.
    */
   services: Service[];
-  client: ClientRow | null; // null briefly during greeting; populated before any tool can fire
+  caller: CallerRow | null; // null briefly during greeting; populated before any tool can fire
   /** null when the caller withheld their number — see agent/caller.ts. */
   callerPhone: string | null;
   callId: string;           // generated locally via crypto.randomUUID() — never empty
@@ -58,11 +58,11 @@ export type AgentDeps = {
   getGoogleToken: () => Promise<string | null>;
   /**
    * The connected calendar's id in its provider's system, or null when no
-   * calendar has been chosen. The provider is on `tenant.calendarProvider`.
+   * calendar has been chosen. The provider is on `agent.calendarProvider`.
    */
   calendarExternalId: string | null;
   /**
-   * The tenant's whole knowledge base, inlined into the system prompt at call
+   * The agent's whole knowledge base, inlined into the system prompt at call
    * start. Replaces the searchKnowledge tool — see PLAN.md 1.5.
    */
   knowledge: KnowledgeEntry[];

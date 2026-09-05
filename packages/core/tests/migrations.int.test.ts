@@ -57,13 +57,14 @@ describe("migration chain", () => {
 
       expect(names).toEqual(
         expect.arrayContaining([
+          "agents",
           "appointments",
+          "callers",
           "calls",
-          "clients",
           "escalations",
           "knowledge_items",
+          "phone_numbers",
           "services",
-          "tenants",
         ])
       );
     } finally {

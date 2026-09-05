@@ -6,7 +6,7 @@ import { keys, fetchers } from '@/lib/queries'
  * Undefined while settings load, which makes `toLocaleString` fall back to the
  * viewer's zone for one frame.
  */
-export function useTenantZone(): string | undefined {
+export function useAgentZone(): string | undefined {
   const { data } = useQuery({ queryKey: keys.settings, queryFn: fetchers.settings })
   return data?.business.timezone
 }

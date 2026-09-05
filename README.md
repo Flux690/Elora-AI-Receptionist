@@ -2,7 +2,7 @@
 
 An AI receptionist for appointment-based local businesses. Customers call a real US phone number - DeskRoute answers, books appointments via Google Calendar, and escalates anything it can't handle to the business owner through an admin dashboard.
 
-Built as a multi-tenant B2B SaaS.
+Self-hosted and open source. One deployment runs one or more agents.
 
 ## Features
 
@@ -19,14 +19,14 @@ Built as a multi-tenant B2B SaaS.
 - **Call recordings** - recorded calls get audio alongside the full transcript and AI-generated summary; transcript and summary are kept either way
 - **In-browser agent test** - talk to your agent live from the dashboard, no phone call. Nothing is recorded and no call is logged, but booking is real: a test session writes a genuine appointment and calendar event
 - **Admin dashboard** - the call log, a queue for answering escalations, a day-by-day view of what is booked, the knowledge base, and settings
-- **Multi-tenant** - every table is tenant-scoped; each business is fully isolated
+- **More than one agent per install** - every table is agent-scoped, so a second business, a second location or a second line is another row rather than another deployment
 
 
 ## How It Works
 
 1. Customer calls the business's US phone number
 2. LiveKit routes the call to the AI agent worker via SIP
-3. Agent resolves the tenant from the number dialed, builds a system prompt with business context, and answers - the AI disclosure first (mentioning recording only if recording is on), then the business's own greeting
+3. The dialled number is matched against `phone_numbers` to pick which agent answers, builds a system prompt with business context, and answers - the AI disclosure first (mentioning recording only if recording is on), then the business's own greeting
 4. STT → LLM → TTS pipeline handles the conversation; the audio turn detector decides when the caller has finished
 5. Pricing, opening hours and knowledge-base answers come straight from the system prompt - no tool calls needed
 6. Genuinely unknown questions are flagged for admin review
@@ -36,7 +36,7 @@ Built as a multi-tenant B2B SaaS.
 
 ## Versioning
 
-`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.15**.
+`major.minor.patch`, tracked in the root `package.json`. Currently **1.0.16**.
 
 ## Screenshots
 
@@ -178,13 +178,13 @@ pnpm typecheck         # tsc --noEmit across every package
 ```
 
 `test:live` is the only suite that runs against real credentials. It reads the
-development database to find a tenant with a connected calendar, gets that
-tenant's Google token the same way a live call does, and books and cancels one
+development database to find an agent with a connected calendar, gets that
+agent's Google token the same way a live call does, and books and cancels one
 clearly-labelled event to prove the padded block is actually reserved — because
 if an event covers only the appointment and not its buffers, freeBusy reports
 the setup and cleanup free and the next caller is offered them. It writes
 nothing to the database, and skips with a reason if no calendar is connected.
-Point it at a specific tenant with `LIVE_TENANT_ID`.
+Point it at a specific agent with `LIVE_AGENT_ID`.
 
 The web suite is the colour contract rather than component tests. One
 surface is given, the stage, and every other colour is a departure from it, so
@@ -216,7 +216,7 @@ Public:
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/health` | Liveness check |
-| POST | `/api/onboarding` | Create tenant + purchase phone number |
+| POST | `/api/onboarding` | Create agent + purchase phone number |
 | GET | `/api/onboarding/phone/search?areaCode=415` | Search available numbers (`areaCode` optional) |
 
 Admin - `Authorization: Bearer <clerk_jwt>` required:
@@ -239,7 +239,7 @@ Admin - `Authorization: Bearer <clerk_jwt>` required:
 | GET | `/api/admin/calendar/list` | Calendars the connected Google account can write to |
 | PATCH | `/api/admin/calendar` | Choose which calendar holds appointments |
 | DELETE | `/api/admin/calendar` | Disconnect the calendar |
-| GET | `/api/admin/settings` | Tenant settings, opening hours, booking window and recording |
+| GET | `/api/admin/settings` | Agent settings, opening hours, booking window and recording |
 | PATCH | `/api/admin/settings` | Update settings, hours or booking window |
 | GET | `/api/admin/phone/search?areaCode=415` | Search available numbers (`areaCode` optional) |
 | POST | `/api/admin/phone/provision` | Purchase phone number |

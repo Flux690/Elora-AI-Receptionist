@@ -109,19 +109,19 @@ describe("CallMetrics", () => {
     m.record(llm(400));
     m.record(tts(200));
 
-    m.logSummary("call-1", "tenant-1");
+    m.logSummary("call-1", "agent-1");
 
     expect(spy).toHaveBeenCalledOnce();
     const line = spy.mock.calls[0]![0] as string;
     expect(line).toContain("call=call-1");
-    expect(line).toContain("tenant=tenant-1");
+    expect(line).toContain("agent=agent-1");
     expect(line).toContain("response_p50=900");
     spy.mockRestore();
   });
 
   it("stays silent for a call that produced no turns", () => {
     const spy = vi.spyOn(console, "log").mockImplementation(() => {});
-    new CallMetrics().logSummary("call-2", "tenant-1");
+    new CallMetrics().logSummary("call-2", "agent-1");
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });

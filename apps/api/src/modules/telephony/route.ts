@@ -1,6 +1,11 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../../types.js";
-import { getTenantById, updateTenant } from "@receptionist/core/repositories/tenants.js";
+import {
+  getAgentById,
+  addPhoneNumber,
+  listPhoneNumbers,
+  removePhoneNumber,
+} from "@receptionist/core/repositories/agents.js";
 import {
   searchPhoneNumbers,
   purchasePhoneNumber,
@@ -19,16 +24,16 @@ export const telephony = new Hono<AppEnv>()
     }
   })
   .post("/provision", async (c) => {
-    const tenantId = c.get("tenantId");
-    const tenant = await getTenantById(tenantId);
-    if (!tenant) return c.json({ error: "Tenant not found" }, 404);
+    const agentId = c.get("agentId");
+    const agent = await getAgentById(agentId);
+    if (!agent) return c.json({ error: "Agent not found" }, 404);
 
     const parsed = phoneProvisionSchema.safeParse(await c.req.json());
     if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400);
 
     const purchased = await purchasePhoneNumber(parsed.data.phoneNumber);
     try {
-      await updateTenant(tenantId, { phoneNumber: purchased.e164_format });
+      await addPhoneNumber({ agentId, e164: purchased.e164_format, provider: "livekit" });
     } catch (dbErr) {
       await releasePhoneNumber(purchased.e164_format).catch((e: unknown) =>
         console.error("[telephony] rollback release failed:", e)
@@ -39,16 +44,16 @@ export const telephony = new Hono<AppEnv>()
     return c.json({ phoneNumber: purchased.e164_format });
   })
   .delete("/", async (c) => {
-    const tenantId = c.get("tenantId");
-    const tenant = await getTenantById(tenantId);
-    if (!tenant) return c.json({ error: "Tenant not found" }, 404);
+    const agentId = c.get("agentId");
+    const agent = await getAgentById(agentId);
+    if (!agent) return c.json({ error: "Agent not found" }, 404);
 
-    if (tenant.phoneNumber) {
-      await releasePhoneNumber(tenant.phoneNumber).catch((e: unknown) =>
+    for (const number of await listPhoneNumbers(agentId)) {
+      await releasePhoneNumber(number.e164).catch((e: unknown) =>
         console.error("[telephony] release failed:", e)
       );
+      await removePhoneNumber(agentId, number.e164);
     }
 
-    await updateTenant(tenantId, { phoneNumber: null });
     return c.json({ ok: true });
   });

@@ -126,12 +126,12 @@ export type AgentProfile = {
 };
 
 /**
- * The sentence every caller hears before the tenant's own greeting.
+ * The sentence every caller hears before the agent's own greeting.
  *
  * Platform-owned and not editable from the dashboard, deliberately. California
  * AB 2905 and SB 243 require a caller to be told they are speaking to an AI
  * *before any substantive interaction*, at $500 per call, and `agentProfile.greeting`
- * is entirely tenant-authored free text — so a tenant could and would write a
+ * is entirely agent-authored free text — so an agent could and would write a
  * greeting with no disclosure at all. The platform built the system that omits
  * it, so the platform carries the exposure.
  *
@@ -144,7 +144,7 @@ export const AI_DISCLOSURE_RECORDED =
   "Just so you know, you're speaking with an AI assistant, and this call is recorded.";
 
 /**
- * The same disclosure minus the recording clause, for a tenant who has turned
+ * The same disclosure minus the recording clause, for an agent who has turned
  * recording off. The AI half is never optional; only the recording half is,
  * because only the recording half describes something we are actually doing.
  */
@@ -173,13 +173,16 @@ export function disclosureFor(recordCalls: boolean): Disclosure {
 }
 
 /**
- * Which system holds the tenant's calendar.
+ * Which system holds the agent's calendar.
  *
  * A union of one today. It exists so the schema stops naming a vendor in a
  * column name — `google_calendar_id` was the one place the design foreclosed
  * ever supporting Outlook, Apple, or a real booking system (PLAN.md 2.5).
  */
 export type CalendarProvider = "google";
+
+/** Who sold the number. `manual` is one the operator wired up themselves. */
+export type PhoneNumberProvider = "livekit" | "twilio" | "telnyx" | "manual";
 
 /** Display data for the connected calendar. Never read on the call path. */
 export type CalendarPayload = {
@@ -221,9 +224,9 @@ export type TranscriptEntry = {
  */
 export interface CallListItem {
   id: string;
-  clientId: string | null;
+  callerId: string | null;
   callerPhone: string | null;
-  /** From `clients.name`. Null for a caller we have never been given a name for. */
+  /** From `callers.name`. Null for a caller we have never been given a name for. */
   callerName: string | null;
   startedAt: string;
   endedAt: string | null;
@@ -232,9 +235,9 @@ export interface CallListItem {
 }
 
 export interface CallDetail extends CallListItem {
-  livekitRoomName: string;
+  roomName: string;
   transcript: TranscriptEntry[] | null;
-  recordingUrl: string | null;
+  recordingKey: string | null;
 }
 
 export interface EscalationItem {
@@ -285,14 +288,14 @@ export interface AvailableNumber {
  *
  * Only what cannot be derived. Whether services exist and whether a calendar is
  * connected are both readable from the data; whether the hours have been *looked
- * at* is not, because they are valid from the moment a tenant exists.
+ * at* is not, because they are valid from the moment an agent exists.
  */
-export interface TenantSetup {
+export interface AgentSetup {
   checklistDismissed: boolean;
   hoursSeen: boolean;
 }
 
-export const DEFAULT_TENANT_SETUP: TenantSetup = {
+export const DEFAULT_AGENT_SETUP: AgentSetup = {
   checklistDismissed: false,
   hoursSeen: false,
 };

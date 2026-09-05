@@ -36,7 +36,7 @@ function HomeSkeleton() {
 /**
  * What happened while you were out, and what still needs you.
  *
- * Three shapes, depending on where the tenant is:
+ * Three shapes, depending on where the agent is:
  *
  *   no calls yet   the checklist *is* the page, with the log's own line beneath
  *                  saying what will appear there. No period pills — there is
@@ -76,7 +76,7 @@ export default function HomePage() {
   const m = metrics.data!
   const items = setupItems(s)
   const outstanding = items.some((i) => !i.done)
-  // A tenant with no calls at all, ever — not a filtered view that happens to be
+  // An agent with no calls at all, ever — not a filtered view that happens to be
   // empty, which the period pills can produce on any day.
   const neverCalled = m.totalCalls === 0 && period === '30d'
 

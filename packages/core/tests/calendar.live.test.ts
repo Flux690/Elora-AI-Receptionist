@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { and, eq, isNotNull } from "drizzle-orm";
 import type { BookingPolicy, BusinessHours } from "@receptionist/shared";
 import { closeDb, db } from "../src/db/client.js";
-import { tenants } from "../src/db/schema.js";
+import { agents } from "../src/db/schema.js";
 import { getGoogleOAuthToken } from "../src/providers/googleAuth.js";
 import {
   createCalendarEvent,
@@ -35,13 +35,13 @@ import {
  * as two customers arriving at once.
  *
  * This runs against the real database and the real Google account, through the
- * exact chain a live call uses: tenant row → `clerkUserId` → Clerk-issued Google
+ * exact chain a live call uses: agent row → `clerkUserId` → Clerk-issued Google
  * token → Google. Nothing is written to the database. The one external side
  * effect is a calendar event created and deleted inside test 2, with a second
  * cleanup pass in `afterAll` so a mid-test failure cannot strand it.
  */
 
-/** Buffers on BOTH sides, so padding is exercised whatever the tenant configured. */
+/** Buffers on BOTH sides, so padding is exercised whatever the agent configured. */
 const PROBE_SERVICE = {
   durationMinutes: 30,
   bufferBeforeMinutes: 10,
@@ -59,8 +59,8 @@ const WINDOW_PAD_MS = 60 * 60 * 1000;
 const EVENT_SUMMARY = "DeskRoute automated test — safe to delete";
 
 type LiveContext = {
-  tenantId: string;
-  tenantName: string;
+  agentId: string;
+  businessName: string;
   calendarId: string;
   token: string;
   timeZone: string;
@@ -73,56 +73,57 @@ type LiveContext = {
  * is evaluated at collection time and cannot see a hook's result.
  */
 async function resolveContext(): Promise<{ ctx: LiveContext | null; reason?: string }> {
-  const override = process.env.LIVE_TENANT_ID;
+  const override = process.env.LIVE_AGENT_ID;
 
   const rows = await db
     .select({
-      id: tenants.id,
-      name: tenants.name,
-      timezone: tenants.timezone,
-      businessHours: tenants.businessHours,
-      bookingPolicy: tenants.bookingPolicy,
-      clerkUserId: tenants.clerkUserId,
-      calendarExternalId: tenants.calendarExternalId,
+      id: agents.id,
+      businessName: agents.businessName,
+      timezone: agents.timezone,
+      businessHours: agents.businessHours,
+      minNoticeMinutes: agents.minNoticeMinutes,
+      maxAdvanceDays: agents.maxAdvanceDays,
+      clerkUserId: agents.clerkUserId,
+      calendarExternalId: agents.calendarExternalId,
     })
-    .from(tenants)
+    .from(agents)
     .where(
       override
-        ? eq(tenants.id, override)
-        : and(isNotNull(tenants.calendarExternalId), isNotNull(tenants.clerkUserId))
+        ? eq(agents.id, override)
+        : and(isNotNull(agents.calendarExternalId), isNotNull(agents.clerkUserId))
     )
     .limit(1);
 
-  const tenant = rows[0];
-  if (!tenant) {
+  const agent = rows[0];
+  if (!agent) {
     return {
       ctx: null,
       reason: override
-        ? `no tenant with id ${override}`
-        : "no tenant has a connected calendar — connect one in Settings → Business first",
+        ? `no agent with id ${override}`
+        : "no agent has a connected calendar — connect one in Settings → Business first",
     };
   }
-  if (!tenant.calendarExternalId || !tenant.clerkUserId) {
-    return { ctx: null, reason: `tenant ${tenant.id} has no connected calendar` };
+  if (!agent.calendarExternalId || !agent.clerkUserId) {
+    return { ctx: null, reason: `agent ${agent.id} has no connected calendar` };
   }
 
-  const token = await getGoogleOAuthToken(tenant.clerkUserId);
+  const token = await getGoogleOAuthToken(agent.clerkUserId);
   if (!token) {
     return {
       ctx: null,
-      reason: `no Google token for tenant ${tenant.id} — reconnect the calendar`,
+      reason: `no Google token for agent ${agent.id} — reconnect the calendar`,
     };
   }
 
   return {
     ctx: {
-      tenantId: tenant.id,
-      tenantName: tenant.name,
-      calendarId: tenant.calendarExternalId,
+      agentId: agent.id,
+      businessName: agent.businessName,
+      calendarId: agent.calendarExternalId,
       token,
-      timeZone: tenant.timezone,
-      hours: tenant.businessHours,
-      policy: tenant.bookingPolicy,
+      timeZone: agent.timezone,
+      hours: agent.businessHours,
+      policy: { minNoticeMinutes: agent.minNoticeMinutes, maxAdvanceDays: agent.maxAdvanceDays },
     },
   };
 }
@@ -154,7 +155,7 @@ afterAll(async () => {
 describe.skipIf(ctx === null)("Google Calendar, for real", () => {
   const live = ctx as LiveContext;
 
-  it("still lists the calendar the tenant chose, as writable", async () => {
+  it("still lists the calendar the agent chose, as writable", async () => {
     // `listCalendars` filters to minAccessRole=writer, so this also catches a
     // calendar that was deleted or un-shared after being chosen — which would
     // otherwise surface at the first booking, the worst possible moment.
@@ -180,7 +181,7 @@ describe.skipIf(ctx === null)("Google Calendar, for real", () => {
     expect(
       candidates.length,
       `no candidate slots in ${SEARCH_DAYS} days from ${fromDate} — check the ` +
-        `tenant's opening hours, every weekday may be closed`
+        `agent's opening hours, every weekday may be closed`
     ).toBeGreaterThan(0);
 
     const searchBusy = await fetchBusyRanges(
@@ -251,7 +252,7 @@ describe.skipIf(ctx === null)("Google Calendar, for real", () => {
     expect(filterByBusy([slot], busyFinal)).toHaveLength(1);
 
     console.log(
-      `[live] verified padded block for "${live.tenantName}" at ` +
+      `[live] verified padded block for "${live.businessName}" at ` +
         `${describeSlot(slot, live.timeZone)} (${live.timeZone})`
     );
   });

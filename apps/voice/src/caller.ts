@@ -3,7 +3,7 @@
  *
  * Returns `null` when the caller withheld their number. Deliberately NOT a
  * placeholder string: the previous "unknown" fallback became the upsert key for
- * `clients` (UNIQUE on tenant_id + phone_number) and the lookup key in
+ * `callers` (UNIQUE on agent_id + phone_number) and the lookup key in
  * `getUpcomingByPhone`, so every anonymous caller to a business collapsed into
  * one identity and the agent would read one caller's appointments to the next
  * (PLAN.md 1.8.1).

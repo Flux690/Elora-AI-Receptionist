@@ -56,7 +56,7 @@ function summarise(values: number[]): Percentiles {
  * Accumulates metrics events for one call and reports percentiles at the end.
  *
  * Per call rather than per process: a worker handles many concurrent calls for
- * many tenants, and mixing them produces a number that describes nobody.
+ * many agents, and mixing them produces a number that describes nobody.
  */
 export class CallMetrics {
   private readonly eou: number[] = [];
@@ -111,11 +111,11 @@ export class CallMetrics {
   }
 
   /** One structured line per call, greppable and cheap to ship to a log sink. */
-  logSummary(callId: string, tenantId: string): void {
+  logSummary(callId: string, agentId: string): void {
     if (this.turnCount === 0) return;
     const r = this.report();
     console.log(
-      `[metrics] call=${callId} tenant=${tenantId} turns=${this.turnCount} ` +
+      `[metrics] call=${callId} agent=${agentId} turns=${this.turnCount} ` +
         `eou_p50=${r.eouDelayMs.p50} eou_p95=${r.eouDelayMs.p95} ` +
         `llm_ttft_p50=${r.llmTtftMs.p50} llm_ttft_p95=${r.llmTtftMs.p95} ` +
         `tts_ttfb_p50=${r.ttsTtfbMs.p50} tts_ttfb_p95=${r.ttsTtfbMs.p95} ` +

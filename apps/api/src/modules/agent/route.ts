@@ -5,17 +5,17 @@ import type { AppEnv } from "../../types.js";
 import { env } from "@receptionist/core/env.js";
 
 /**
- * The token carries `tenantId` and `testSession`, so the worker resolves the
- * tenant as it would for a SIP call while skipping recording and the call row.
+ * The token carries `agentId` and `testSession`, so the worker resolves the
+ * agent as it would for a SIP call while skipping recording and the call row.
  */
 export const agent = new Hono<AppEnv>().post("/test", async (c) => {
-  const tenantId = c.get("tenantId");
-  const roomName = `test-${tenantId}-${Date.now()}`;
+  const agentId = c.get("agentId");
+  const roomName = `test-${agentId}-${Date.now()}`;
 
   const at = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, {
-    identity: `admin-${tenantId}`,
+    identity: `admin-${agentId}`,
     name: "Admin (Test)",
-    attributes: { tenantId, testSession: "true" },
+    attributes: { agentId, testSession: "true" },
     ttl: "10m",
   });
 

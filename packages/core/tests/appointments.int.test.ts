@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { getUpcomingByPhone } from "../src/repositories/appointments.js";
-import { upsertClient, setClientName } from "../src/repositories/clients.js";
+import { upsertCaller, setCallerName } from "../src/repositories/callers.js";
 import { db } from "../src/db/client.js";
-import { clients } from "../src/db/schema.js";
+import { callers } from "../src/db/schema.js";
 import { eq } from "drizzle-orm";
-import { makeTenant, makeAppointment } from "./factories.js";
+import { makeAgent, makeAppointment } from "./factories.js";
 
 /**
  * PLAN.md 1.8.1 — the caller-ID leak.
@@ -26,11 +26,11 @@ describe("getUpcomingByPhone", () => {
    * reintroduce one can see the consequence in a single assertion.
    */
   it("returns any booking stored under a shared placeholder identity", async () => {
-    const tenant = await makeTenant();
-    await makeAppointment(tenant.id, { callerPhone: "unknown", service: "Colour" });
+    const agent = await makeAgent();
+    await makeAppointment(agent.id, { callerPhone: "unknown", serviceName: "Colour" });
 
     const whatTheNextAnonymousCallerWouldHear = await getUpcomingByPhone(
-      tenant.id,
+      agent.id,
       "unknown"
     );
 
@@ -39,18 +39,18 @@ describe("getUpcomingByPhone", () => {
   });
 
   it("returns appointments for a caller who did share their number", async () => {
-    const tenant = await makeTenant();
+    const agent = await makeAgent();
     const phone = "+14155550123";
-    await makeAppointment(tenant.id, { callerPhone: phone, service: "Haircut" });
+    await makeAppointment(agent.id, { callerPhone: phone, serviceName: "Haircut" });
 
-    const found = await getUpcomingByPhone(tenant.id, phone);
+    const found = await getUpcomingByPhone(agent.id, phone);
 
     expect(found).toHaveLength(1);
     expect(found[0]!.service).toBe("Haircut");
   });
 
-  it("scopes lookups to the tenant", async () => {
-    const [a, b] = await Promise.all([makeTenant(), makeTenant()]);
+  it("scopes lookups to the agent", async () => {
+    const [a, b] = await Promise.all([makeAgent(), makeAgent()]);
     const phone = "+14155550123";
     await makeAppointment(a.id, { callerPhone: phone });
 
@@ -58,57 +58,57 @@ describe("getUpcomingByPhone", () => {
   });
 });
 
-describe("upsertClient", () => {
+describe("upsertCaller", () => {
   it("creates no client row when caller ID is withheld", async () => {
-    const tenant = await makeTenant();
+    const agent = await makeAgent();
 
-    const result = await upsertClient(tenant.id, null);
+    const result = await upsertCaller(agent.id, null);
 
     expect(result).toBeNull();
-    const rows = await db.select().from(clients).where(eq(clients.tenantId, tenant.id));
+    const rows = await db.select().from(callers).where(eq(callers.agentId, agent.id));
     expect(rows).toEqual([]);
   });
 
   it("upserts on repeat calls from the same number rather than duplicating", async () => {
-    const tenant = await makeTenant();
+    const agent = await makeAgent();
     const phone = "+14155550123";
 
-    const first = await upsertClient(tenant.id, phone);
-    const second = await upsertClient(tenant.id, phone);
+    const first = await upsertCaller(agent.id, phone);
+    const second = await upsertCaller(agent.id, phone);
 
     expect(first).not.toBeNull();
     expect(second!.id).toBe(first!.id);
 
-    const rows = await db.select().from(clients).where(eq(clients.tenantId, tenant.id));
+    const rows = await db.select().from(callers).where(eq(callers.agentId, agent.id));
     expect(rows).toHaveLength(1);
   });
 });
 
-describe("setClientName", () => {
+describe("setCallerName", () => {
   it("records a name so the caller is recognised next time", async () => {
-    const tenant = await makeTenant();
-    const client = await upsertClient(tenant.id, "+14155550123");
+    const agent = await makeAgent();
+    const client = await upsertCaller(agent.id, "+14155550123");
 
-    const updated = await setClientName(tenant.id, client!.id, "  Sarah  ");
+    const updated = await setCallerName(agent.id, client!.id, "  Sarah  ");
 
     expect(updated?.name).toBe("Sarah");
   });
 
   it("ignores a blank name rather than wiping an existing one", async () => {
-    const tenant = await makeTenant();
-    const client = await upsertClient(tenant.id, "+14155550123");
-    await setClientName(tenant.id, client!.id, "Sarah");
+    const agent = await makeAgent();
+    const client = await upsertCaller(agent.id, "+14155550123");
+    await setCallerName(agent.id, client!.id, "Sarah");
 
-    expect(await setClientName(tenant.id, client!.id, "   ")).toBeNull();
+    expect(await setCallerName(agent.id, client!.id, "   ")).toBeNull();
 
-    const [row] = await db.select().from(clients).where(eq(clients.id, client!.id));
+    const [row] = await db.select().from(callers).where(eq(callers.id, client!.id));
     expect(row!.name).toBe("Sarah");
   });
 
-  it("will not rename another tenant's client", async () => {
-    const [owner, attacker] = await Promise.all([makeTenant(), makeTenant()]);
-    const client = await upsertClient(owner.id, "+14155550123");
+  it("will not rename another agent's client", async () => {
+    const [owner, attacker] = await Promise.all([makeAgent(), makeAgent()]);
+    const client = await upsertCaller(owner.id, "+14155550123");
 
-    expect(await setClientName(attacker.id, client!.id, "Mallory")).toBeNull();
+    expect(await setCallerName(attacker.id, client!.id, "Mallory")).toBeNull();
   });
 });

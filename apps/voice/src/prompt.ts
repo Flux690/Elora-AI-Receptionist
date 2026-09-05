@@ -1,7 +1,7 @@
 import { WEEKDAYS, type BusinessHours, type TimeInterval, type Weekday } from "@receptionist/shared";
 import type { AgentDeps } from "./types.js";
 
-/** A question/answer pair from the tenant's knowledge base. */
+/** A question/answer pair from the agent's knowledge base. */
 export type KnowledgeEntry = { question: string; answer: string };
 
 const DAYS_AHEAD = 7;
@@ -115,9 +115,8 @@ function buildHoursBlock(hours: BusinessHours, now: Date, timeZone: string): str
 }
 
 export function buildSystemPrompt(deps: AgentDeps): string {
-  const { tenant, client, knowledge, services } = deps;
-  const agent = tenant.agentProfile;
-  const timeZone = tenant.timezone;
+  const { agent, caller, knowledge, services } = deps;
+  const timeZone = agent.timezone;
 
   // Duration is stated so the agent can answer "how long does that take?"
   // without a tool call. It does NOT do the slot arithmetic — that is the
@@ -144,14 +143,14 @@ export function buildSystemPrompt(deps: AgentDeps): string {
         .join("\n\n")}\n`
     : "";
 
-  // A fact about this tenant, not a procedure. Which tool to reach for, and in
+  // A fact about this agent, not a procedure. Which tool to reach for, and in
   // what order, belongs to the tools — see `createAgentTools`.
   const calendarBlock = deps.calendarExternalId
     ? "This business takes appointments and its calendar is connected."
     : "This business has no calendar connected, so no appointment can be booked or checked today.";
 
-  const callerBlock = client?.name
-    ? `${client.name} (returning client, phone: ${deps.callerPhone})`
+  const callerBlock = caller?.name
+    ? `${caller.name} (returning client, phone: ${deps.callerPhone})`
     : deps.callerPhone
       ? `Unrecognised caller, phone: ${deps.callerPhone}`
       : // Never render a missing number as "null" — and the model needs to know
@@ -160,20 +159,20 @@ export function buildSystemPrompt(deps: AgentDeps): string {
 
   // ── Ordering matters ───────────────────────────────────────────────────────
   // Everything above the "Caller" heading is identical for every call to this
-  // tenant, so it forms a cacheable prefix. Everything below changes per call.
+  // agent, so it forms a cacheable prefix. Everything below changes per call.
   // The previous version put the caller block in the middle, which invalidated
   // the cache for everything after it (PLAN.md 1.3).
-  return `You are ${agent.name}, the receptionist for ${tenant.name}.
+  return `You are ${agent.personaName}, the receptionist for ${agent.businessName}.
 
 ## Business
-Industry: ${tenant.industry}
-Description: ${tenant.description}
+Industry: ${agent.industry}
+Description: ${agent.description}
 
 ## Services
 ${serviceLines || "No services listed."}
 
 ## Hours
-${buildHoursBlock(tenant.businessHours, now, timeZone)}
+${buildHoursBlock(agent.businessHours, now, timeZone)}
 
 ## Booking
 ${calendarBlock}

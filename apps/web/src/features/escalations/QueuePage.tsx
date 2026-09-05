@@ -11,7 +11,7 @@ import { PageContainer } from '@/layout/PageContainer'
 import { EmptyState } from '@/layout/EmptyState'
 import { apiClient } from '@/lib/apiClient'
 import { keys, fetchers } from '@/lib/queries'
-import { useTenantZone } from '@/hooks/useTenantZone'
+import { useAgentZone } from '@/hooks/useAgentZone'
 import { formatCaller, formatDateTime } from '@/lib/formatters'
 
 /**
@@ -20,7 +20,7 @@ import { formatCaller, formatDateTime } from '@/lib/formatters'
  */
 export default function QueuePage() {
   const qc = useQueryClient()
-  const zone = useTenantZone()
+  const zone = useAgentZone()
   const [params, setParams] = useSearchParams()
   const [answer, setAnswer] = useState('')
 

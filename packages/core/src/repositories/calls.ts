@@ -1,16 +1,16 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "../db/client.js";
-import { calls, clients } from "../db/schema.js";
+import { calls, callers } from "../db/schema.js";
 import type { TranscriptEntry, CallOutcome } from "../db/schema.js";
 
 export type CallRow = typeof calls.$inferSelect;
 
 type CreateCallInput = {
   id?: string;          // caller-generated UUID — omit to let Postgres generate one
-  tenantId: string;
-  clientId?: string | null;
+  agentId: string;
+  callerId?: string | null;
   callerPhone: string | null;
-  livekitRoomName: string;
+  roomName: string;
   /** Which disclosure wording the caller heard. The compliance audit trail. */
   disclosureVersion?: string;
 };
@@ -20,10 +20,10 @@ export async function createCall(input: CreateCallInput): Promise<CallRow> {
     .insert(calls)
     .values({
       ...(input.id ? { id: input.id } : {}),
-      tenantId: input.tenantId,
-      clientId: input.clientId ?? null,
+      agentId: input.agentId,
+      callerId: input.callerId ?? null,
       callerPhone: input.callerPhone,
-      livekitRoomName: input.livekitRoomName,
+      roomName: input.roomName,
       disclosureVersion: input.disclosureVersion ?? null,
     })
     .returning();
@@ -35,7 +35,7 @@ type FinishCallData = {
   outcome: CallOutcome;
   transcript: TranscriptEntry[];
   summary: string | null;
-  recordingUrl: string | null;
+  recordingKey: string | null;
 };
 
 export async function finishCall(
@@ -49,55 +49,55 @@ export async function finishCall(
       outcome: data.outcome,
       transcript: data.transcript,
       summary: data.summary,
-      recordingUrl: data.recordingUrl,
+      recordingKey: data.recordingKey,
     })
     .where(eq(calls.id, callId));
 }
 
 export async function listCalls(
-  tenantId: string,
+  agentId: string,
   limit = 50,
   offset = 0
 ) {
   return db
     .select({
       id: calls.id,
-      clientId: calls.clientId,
+      callerId: calls.callerId,
       callerPhone: calls.callerPhone,
-      // `clientId` was selected and never read. A caller with a name on file
+      // `callerId` was selected and never read. A caller with a name on file
       // should be shown by it, not by a number the owner has to recognise.
-      callerName: clients.name,
+      callerName: callers.name,
       startedAt: calls.startedAt,
       endedAt: calls.endedAt,
       outcome: calls.outcome,
       summary: calls.summary,
     })
     .from(calls)
-    .leftJoin(clients, eq(calls.clientId, clients.id))
-    .where(eq(calls.tenantId, tenantId))
+    .leftJoin(callers, eq(calls.callerId, callers.id))
+    .where(eq(calls.agentId, agentId))
     .orderBy(desc(calls.startedAt))
     .limit(limit)
     .offset(offset);
 }
 
-export async function getCallById(callId: string, tenantId: string) {
+export async function getCallById(callId: string, agentId: string) {
   const rows = await db
     .select({
       id: calls.id,
-      clientId: calls.clientId,
+      callerId: calls.callerId,
       callerPhone: calls.callerPhone,
-      callerName: clients.name,
-      livekitRoomName: calls.livekitRoomName,
+      callerName: callers.name,
+      roomName: calls.roomName,
       startedAt: calls.startedAt,
       endedAt: calls.endedAt,
       outcome: calls.outcome,
       transcript: calls.transcript,
       summary: calls.summary,
-      recordingUrl: calls.recordingUrl,
+      recordingKey: calls.recordingKey,
     })
     .from(calls)
-    .leftJoin(clients, eq(calls.clientId, clients.id))
-    .where(and(eq(calls.id, callId), eq(calls.tenantId, tenantId)))
+    .leftJoin(callers, eq(calls.callerId, callers.id))
+    .where(and(eq(calls.id, callId), eq(calls.agentId, agentId)))
     .limit(1);
 
   return rows[0] ?? null;

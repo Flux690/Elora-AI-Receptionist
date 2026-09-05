@@ -11,7 +11,7 @@ import { DataList, type Column } from '@/components/ui/data-list'
 import { PageContainer } from '@/layout/PageContainer'
 import { PageHeader } from '@/layout/PageHeader'
 import { keys, fetchers } from '@/lib/queries'
-import { useTenantZone } from '@/hooks/useTenantZone'
+import { useAgentZone } from '@/hooks/useAgentZone'
 import { formatCaller, formatTime } from '@/lib/formatters'
 import { groupByDay } from '@/lib/group-by-day'
 
@@ -69,7 +69,7 @@ function columns(zone: string | undefined): Column<EscalationItem>[] {
 
 /** Every question a caller has asked that the agent could not answer. */
 export default function EscalationsPage() {
-  const zone = useTenantZone()
+  const zone = useAgentZone()
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
 

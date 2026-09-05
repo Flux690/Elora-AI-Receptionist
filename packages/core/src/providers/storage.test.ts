@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 /**
- * A tenant with recordCalls true and no storage must still be told the truth:
+ * An agent with recordCalls true and no storage must still be told the truth:
  * the disclosure and the egress guard both read recordingEnabled, never the flag.
  */
 vi.mock("../env.js", () => ({
@@ -21,7 +21,7 @@ const { storageConfigured, recordingEnabled, startCallRecording } = await import
 );
 
 describe("recordingEnabled", () => {
-  it("is false with no storage, whatever the tenant asked for", () => {
+  it("is false with no storage, whatever the agent asked for", () => {
     expect(storageConfigured).toBe(false);
     expect(recordingEnabled({ recordCalls: true })).toBe(false);
     expect(recordingEnabled({ recordCalls: false })).toBe(false);

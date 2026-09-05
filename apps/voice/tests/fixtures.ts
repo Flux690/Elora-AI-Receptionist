@@ -1,10 +1,10 @@
 import type { AgentDeps } from "../src/types.js";
-import type { WorkerTenant } from "@receptionist/core/repositories/tenants.js";
+import type { AgentConfig } from "@receptionist/core/repositories/agents.js";
 import { AGENT_PROFILE, SERVICES } from "@receptionist/core/tests/factories.js";
 import {
   DEFAULT_BUSINESS_HOURS,
   DEFAULT_BOOKING_POLICY,
-  DEFAULT_TENANT_SETUP,
+  DEFAULT_AGENT_SETUP,
 } from "@receptionist/shared";
 
 /**
@@ -13,20 +13,24 @@ import {
  * friends, which are pure functions.
  */
 
-export function makeWorkerTenant(overrides: Partial<WorkerTenant> = {}): WorkerTenant {
+export function makeAgentConfig(overrides: Partial<AgentConfig> = {}): AgentConfig {
   return {
     id: "11111111-1111-1111-1111-111111111111",
-    name: "Test Business",
+    businessName: "Test Business",
     industry: "Pet services",
     timezone: "America/New_York",
     description: "A test business.",
+    personaName: AGENT_PROFILE.name,
+    greeting: AGENT_PROFILE.greeting,
+    farewell: AGENT_PROFILE.farewell,
+    fallback: AGENT_PROFILE.fallback,
     businessHours: DEFAULT_BUSINESS_HOURS,
-    bookingPolicy: DEFAULT_BOOKING_POLICY,
-    agentProfile: AGENT_PROFILE,
-    // Matches the column default: recording on unless a tenant turns it off.
+    minNoticeMinutes: DEFAULT_BOOKING_POLICY.minNoticeMinutes,
+    maxAdvanceDays: DEFAULT_BOOKING_POLICY.maxAdvanceDays,
+    // Matches the column default: recording on unless an agent turns it off.
     recordCalls: true,
-    setup: DEFAULT_TENANT_SETUP,
-    phoneNumber: "+15550000000",
+    checklistDismissed: DEFAULT_AGENT_SETUP.checklistDismissed,
+    hoursSeen: DEFAULT_AGENT_SETUP.hoursSeen,
     clerkUserId: "user_test",
     calendarProvider: null,
     calendarExternalId: null,
@@ -37,9 +41,9 @@ export function makeWorkerTenant(overrides: Partial<WorkerTenant> = {}): WorkerT
 
 export function makeAgentDeps(overrides: Partial<AgentDeps> = {}): AgentDeps {
   return {
-    tenant: makeWorkerTenant(),
+    agent: makeAgentConfig(),
     services: SERVICES,
-    client: null,
+    caller: null,
     callerPhone: "+14155550123",
     callId: "22222222-2222-2222-2222-222222222222",
     getGoogleToken: async () => null,

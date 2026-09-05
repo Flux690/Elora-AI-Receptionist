@@ -16,7 +16,7 @@ export interface SetupItem {
  * Onboarding deliberately asks for none of them — a name, a number and a
  * timezone are all it takes to answer — so this is where they land. Two of the
  * three can be read from the data; hours cannot, because they are valid from the
- * moment a tenant exists (Mon–Fri 9–5), which is what `setup.hoursSeen` is for.
+ * moment an agent exists (Mon–Fri 9–5), which is what `setup.hoursSeen` is for.
  */
 export function setupItems(settings: AppSettings): SetupItem[] {
   return [

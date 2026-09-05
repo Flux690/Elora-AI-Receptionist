@@ -23,7 +23,7 @@ beforeAll(async () => {
     Array.from({ length: RACE_WIDTH }, () => db.execute(sql`SELECT pg_sleep(0.15)`))
   );
 });
-import { makeTenant, makeCall } from "./factories.js";
+import { makeAgent, makeCall } from "./factories.js";
 
 /**
  * PLAN.md 1.7.4 — escalation deduplication throws instead of returning.
@@ -37,11 +37,11 @@ import { makeTenant, makeCall } from "./factories.js";
  */
 describe("createEscalation", () => {
   it("returns the existing row instead of throwing when two land at once", async () => {
-    const tenant = await makeTenant();
-    const call = await makeCall(tenant.id);
+    const agent = await makeAgent();
+    const call = await makeCall(agent.id);
 
     const input = {
-      tenantId: tenant.id,
+      agentId: agent.id,
       callId: call.id,
       callerPhone: "+14155550123",
       question: "Do you offer gift cards?",
@@ -64,9 +64,9 @@ describe("createEscalation", () => {
   });
 
   it("dedupes case-insensitively, matching the index definition", async () => {
-    const tenant = await makeTenant();
-    const call = await makeCall(tenant.id);
-    const base = { tenantId: tenant.id, callId: call.id, callerPhone: "+14155550123" };
+    const agent = await makeAgent();
+    const call = await makeCall(agent.id);
+    const base = { agentId: agent.id, callId: call.id, callerPhone: "+14155550123" };
 
     const a = await createEscalation({ ...base, question: "Do you take card?" });
     const b = await createEscalation({ ...base, question: "DO YOU TAKE CARD?" });
@@ -75,21 +75,21 @@ describe("createEscalation", () => {
   });
 
   it("keeps the same question separate across different calls", async () => {
-    const tenant = await makeTenant();
+    const agent = await makeAgent();
     const [callOne, callTwo] = await Promise.all([
-      makeCall(tenant.id),
-      makeCall(tenant.id),
+      makeCall(agent.id),
+      makeCall(agent.id),
     ]);
     const q = "Do you validate parking?";
 
     const a = await createEscalation({
-      tenantId: tenant.id,
+      agentId: agent.id,
       callId: callOne.id,
       callerPhone: "+14155550001",
       question: q,
     });
     const b = await createEscalation({
-      tenantId: tenant.id,
+      agentId: agent.id,
       callId: callTwo.id,
       callerPhone: "+14155550002",
       question: q,
@@ -99,17 +99,17 @@ describe("createEscalation", () => {
   });
 
   it("records an escalation from a caller with no number", async () => {
-    const tenant = await makeTenant();
-    const call = await makeCall(tenant.id, { callerPhone: null });
+    const agent = await makeAgent();
+    const call = await makeCall(agent.id, { callerPhone: null });
 
     const row = await createEscalation({
-      tenantId: tenant.id,
+      agentId: agent.id,
       callId: call.id,
       callerPhone: null,
       question: "Are you open on Sunday?",
     });
 
-    const stored = await getEscalationById(row.id, tenant.id);
+    const stored = await getEscalationById(row.id, agent.id);
     expect(stored).not.toBeNull();
   });
 });
@@ -127,13 +127,13 @@ describe("escalation before the call row exists (PLAN.md 1.7.3)", () => {
    * not speech-to-text.
    */
   it("rejects an escalation naming a call row that does not exist", async () => {
-    const tenant = await makeTenant();
+    const agent = await makeAgent();
     const ghostCallId = "00000000-0000-4000-8000-000000000000";
 
     // This is the mid-call throw the guard prevents.
     await expect(
       createEscalation({
-        tenantId: tenant.id,
+        agentId: agent.id,
         callId: ghostCallId,
         callerPhone: "+14155550123",
         question: "Are you open Sunday?",
@@ -142,12 +142,12 @@ describe("escalation before the call row exists (PLAN.md 1.7.3)", () => {
   });
 
   it("records the escalation unlinked when the call row is unavailable", async () => {
-    const tenant = await makeTenant();
+    const agent = await makeAgent();
 
     // What the tool does when callRowReady resolves false: keep the question,
     // drop the link, rather than losing the escalation entirely.
     const row = await createEscalation({
-      tenantId: tenant.id,
+      agentId: agent.id,
       callId: null,
       callerPhone: "+14155550123",
       question: "Are you open Sunday?",

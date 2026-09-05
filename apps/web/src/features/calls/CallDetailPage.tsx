@@ -7,7 +7,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { PageContainer } from '@/layout/PageContainer'
 import { PageHeader } from '@/layout/PageHeader'
 import { keys, fetchers } from '@/lib/queries'
-import { useTenantZone } from '@/hooks/useTenantZone'
+import { useAgentZone } from '@/hooks/useAgentZone'
 import { callOutcomeConfig } from '@/lib/status-config'
 import { formatPhone, formatDateTime, formatDuration } from '@/lib/formatters'
 import AudioPlayer from './AudioPlayer'
@@ -25,7 +25,7 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
 /** A call is a record with a URL, so it gets a page rather than a drawer. */
 export default function CallDetailPage() {
   const { id = '' } = useParams()
-  const zone = useTenantZone()
+  const zone = useAgentZone()
 
   const { data: call, isLoading } = useQuery<CallDetail>({
     queryKey: keys.call(id),
@@ -71,7 +71,7 @@ export default function CallDetailPage() {
         <Fact label="Length">{length ?? 'Still running'}</Fact>
       </dl>
 
-      <AudioPlayer callId={id} hasRecording={!!call.recordingUrl} />
+      <AudioPlayer callId={id} hasRecording={!!call.recordingKey} />
 
       <h2 className="mt-8 mb-2 font-medium text-foreground">Transcript</h2>
       <div className="border-t border-border">

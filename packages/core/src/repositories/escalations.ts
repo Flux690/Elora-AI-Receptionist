@@ -1,13 +1,13 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
-import { clients, escalations } from "../db/schema.js";
+import { callers, escalations } from "../db/schema.js";
 
 export type EscalationRow = typeof escalations.$inferSelect;
 
 type CreateEscalationInput = {
-  tenantId: string;
+  agentId: string;
   callId?: string | null;
-  clientId?: string | null;
+  callerId?: string | null;
   callerPhone: string | null;
   callerName?: string | null;
   question: string;
@@ -36,9 +36,9 @@ export async function createEscalation(
   const rows = await db
     .insert(escalations)
     .values({
-      tenantId: input.tenantId,
+      agentId: input.agentId,
       callId: input.callId ?? null,
-      clientId: input.clientId ?? null,
+      callerId: input.callerId ?? null,
       callerPhone: input.callerPhone,
       callerName: input.callerName ?? null,
       question: input.question,
@@ -72,7 +72,7 @@ export async function createEscalation(
   return existing[0];
 }
 
-export async function listEscalations(tenantId: string, status: "pending" | "resolved") {
+export async function listEscalations(agentId: string, status: "pending" | "resolved") {
   return db
     .select({
       id: escalations.id,
@@ -80,22 +80,22 @@ export async function listEscalations(tenantId: string, status: "pending" | "res
       callerPhone: escalations.callerPhone,
       // The name given at escalation wins; the stored client name is the
       // fallback for a caller we already knew.
-      callerName: sql<string | null>`coalesce(${escalations.callerName}, ${clients.name})`,
+      callerName: sql<string | null>`coalesce(${escalations.callerName}, ${callers.name})`,
       question: escalations.question,
       status: escalations.status,
       answer: escalations.answer,
       createdAt: escalations.createdAt,
     })
     .from(escalations)
-    .leftJoin(clients, eq(escalations.clientId, clients.id))
-    .where(and(eq(escalations.tenantId, tenantId), eq(escalations.status, status)))
+    .leftJoin(callers, eq(escalations.callerId, callers.id))
+    .where(and(eq(escalations.agentId, agentId), eq(escalations.status, status)))
     .orderBy(desc(escalations.createdAt))
     .limit(100);
 }
 
 export async function getEscalationById(
   id: string,
-  tenantId: string
+  agentId: string
 ): Promise<EscalationRow | null> {
   // Full row, not a projection. A narrower select cast to `EscalationRow` leaves
   // the missing fields undefined at runtime while the type claims otherwise, and
@@ -103,7 +103,7 @@ export async function getEscalationById(
   const rows = await db
     .select()
     .from(escalations)
-    .where(and(eq(escalations.id, id), eq(escalations.tenantId, tenantId)))
+    .where(and(eq(escalations.id, id), eq(escalations.agentId, agentId)))
     .limit(1);
 
   return rows[0] ?? null;
